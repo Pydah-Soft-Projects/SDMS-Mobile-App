@@ -337,6 +337,37 @@ export const staffService = {
     return res.data;
   },
 
+  async getServicesConfig() {
+    const res = await api.get('/services');
+    return res.data?.data || (Array.isArray(res.data) ? res.data : []);
+  },
+
+  async createServiceConfig(data: { name: string; description?: string; price?: number; is_active?: boolean }) {
+    const res = await api.post('/services', {
+      name: data.name,
+      description: data.description || '',
+      price: Number(data.price) || 0,
+      is_active: data.is_active !== false,
+      template_type: 'standard',
+    });
+    return res.data;
+  },
+
+  async updateServiceConfig(id: number | string, data: any) {
+    const res = await api.put(`/services/${id}`, data);
+    return res.data;
+  },
+
+  async toggleServiceConfigStatus(id: number | string, isActive: boolean) {
+    const res = await api.put(`/services/${id}`, { is_active: isActive });
+    return res.data;
+  },
+
+  async deleteServiceConfig(id: number | string) {
+    const res = await api.delete(`/services/${id}`);
+    return res.data;
+  },
+
   async getCertificateBorrowRequests() {
     const res = await api.get('/certificate-borrow/admin/all-requests');
     return res.data?.data || res.data?.requests || res.data || [];

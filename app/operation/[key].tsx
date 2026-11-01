@@ -186,6 +186,8 @@ export default function OperationScreen() {
     | 'create_club'
     | 'create_seminar_hall'
     | 'create_hall_item'
+    | 'create_service'
+    | 'edit_service'
     | 'reject_prompt'
     | 'update_pin'
     | null
@@ -209,6 +211,7 @@ export default function OperationScreen() {
   const [formTitle, setFormTitle] = useState('');
   const [formContent, setFormContent] = useState('');
   const [formPriority, setFormPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
+  const [formPrice, setFormPrice] = useState('0');
 
   const [formHallName, setFormHallName] = useState('');
   const [formBookingDate, setFormBookingDate] = useState('');
@@ -348,6 +351,24 @@ export default function OperationScreen() {
           } else if (activeSubTab === 'profile_requests') {
             const allReqs = await staffService.getProfileChangeRequests();
             rawList = fStatus ? allReqs.filter((r: any) => r.status === fStatus) : allReqs;
+          } else if (activeSubTab === 'print_id_cards') {
+            const idRes = await staffService.getPaginatedStudents({
+              search: query,
+              page: targetPage,
+              limit: pageSize,
+              college: fCollege,
+              course: fCourse,
+              branch: fBranch,
+              batch: fBatch,
+              year: fYear,
+              semester: fSemester,
+              section: fSection,
+            });
+            setDataList(idRes.students);
+            setTotalCount(idRes.total);
+            setTotalPages(idRes.totalPages);
+            setPage(idRes.page);
+            return;
           } else if (activeSubTab === 'section_partition' || activeSubTab === 'promotions') {
             const res = await api.get('/courses');
             rawList = res.data?.data || res.data || [];
@@ -424,12 +445,32 @@ export default function OperationScreen() {
             }
           }
         } else if (opKey === 'services') {
-          if (activeSubTab === 'borrow') {
+          if (activeSubTab === 'config') {
+            const allConfigs = await staffService.getServicesConfig();
+            rawList = allConfigs;
+            if (fStatus === 'active') rawList = rawList.filter((s: any) => s.is_active !== false);
+            if (fStatus === 'inactive') rawList = rawList.filter((s: any) => s.is_active === false);
+            if (query) {
+              rawList = rawList.filter((s: any) =>
+                String(s.name || s.description || '').toLowerCase().includes(query.toLowerCase())
+              );
+            }
+          } else if (activeSubTab === 'borrow') {
             const allBorrow = await staffService.getCertificateBorrowRequests();
             rawList = fStatus ? allBorrow.filter((b: any) => b.status === fStatus) : allBorrow;
+            if (query) {
+              rawList = rawList.filter((b: any) =>
+                String(b.student_name || b.certificate_type || b.admission_number || '').toLowerCase().includes(query.toLowerCase())
+              );
+            }
           } else {
             const allServ = await staffService.getServiceRequests();
             rawList = fStatus ? allServ.filter((s: any) => s.status === fStatus) : allServ;
+            if (query) {
+              rawList = rawList.filter((s: any) =>
+                String(s.student_name || s.service_title || s.admission_number || '').toLowerCase().includes(query.toLowerCase())
+              );
+            }
           }
         } else if (opKey === 'user-management') {
           const allUsers = await staffService.getRbacUsers();
@@ -444,6 +485,13 @@ export default function OperationScreen() {
             rawList = await staffService.getPolls();
           } else if (activeSubTab === 'events') {
             rawList = await staffService.getEvents();
+          } else if (activeSubTab === 'exam_notifications') {
+            try {
+              const notifRes = await api.get('/notifications');
+              rawList = notifRes.data?.data || (Array.isArray(notifRes.data) ? notifRes.data : []);
+            } catch (err) {
+              rawList = [];
+            }
           } else {
             const allAnn = await staffService.getAdminAnnouncements();
             rawList = fPriority ? allAnn.filter((n: any) => n.priority === fPriority) : allAnn;
@@ -578,7 +626,22 @@ export default function OperationScreen() {
         setFormPurpose('');
         setFormRequester(staff?.name || 'Staff');
       }
+    } else if (opKey === 'services' && activeSubTab === 'config') {
+      setActionType('create_service');
+      setFormTitle('');
+      setFormContent('');
+      setFormPrice('0');
     }
+    setActionModalVisible(true);
+  };
+
+  // OPEN EDIT SERVICE MODAL
+  const handleOpenEditService = (service: any) => {
+    setActionTargetItem(service);
+    setActionType('edit_service');
+    setFormTitle(service.name || '');
+    setFormContent(service.description || '');
+    setFormPrice(String(service.price ?? 0));
     setActionModalVisible(true);
   };
 
@@ -700,6 +763,29 @@ export default function OperationScreen() {
           closeTime: formHallCloseTime.trim() || '20:00',
         });
         Alert.alert('Success', `Seminar Hall "${formHallName}" created`);
+      } else if (actionType === 'create_service') {
+        if (!formTitle.trim()) {
+          Alert.alert('Required', 'Service Name is required');
+          return;
+        }
+        await staffService.createServiceConfig({
+          name: formTitle.trim(),
+          description: formContent.trim(),
+          price: Number(formPrice) || 0,
+          is_active: true,
+        });
+        Alert.alert('Success', `Service "${formTitle}" created`);
+      } else if (actionType === 'edit_service') {
+        if (!formTitle.trim()) {
+          Alert.alert('Required', 'Service Name is required');
+          return;
+        }
+        await staffService.updateServiceConfig(actionTargetItem.id, {
+          name: formTitle.trim(),
+          description: formContent.trim(),
+          price: Number(formPrice) || 0,
+        });
+        Alert.alert('Updated', 'Service configuration updated');
       } else if (actionType === 'update_pin') {
         if (!formPin.trim()) {
           Alert.alert('Required', 'Please enter new PIN number');
@@ -929,6 +1015,46 @@ export default function OperationScreen() {
     }
   };
 
+  const handleToggleServiceStatus = async (service: any) => {
+    try {
+      const nextStatus = !service.is_active;
+      await staffService.toggleServiceConfigStatus(service.id, nextStatus);
+      Alert.alert('Status Updated', `Service "${service.name}" is now ${nextStatus ? 'Active' : 'Inactive'}`);
+      loadData();
+    } catch (e: any) {
+      Alert.alert('Failed', e.message);
+    }
+  };
+
+  const handleDeleteService = (serviceId: number | string, serviceName: string) => {
+    Alert.alert('Delete Service', `Permanently delete service "${serviceName}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await staffService.deleteServiceConfig(serviceId);
+            Alert.alert('Deleted', 'Service removed from configuration');
+            loadData();
+          } catch (e: any) {
+            Alert.alert('Delete Failed', e.message);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleCertificateBorrowAction = async (id: number | string, status: string) => {
+    try {
+      await staffService.updateCertificateBorrowStatus(id, status, `Marked as ${status} via SDMS Mobile`);
+      Alert.alert('Updated', `Borrow request marked as ${status}`);
+      loadData();
+    } catch (e: any) {
+      Alert.alert('Action Failed', e.message);
+    }
+  };
+
   const handleToggleAttendance = (studentId: number) => {
     setAttendanceRecords((prev) => ({
       ...prev,
@@ -1073,7 +1199,8 @@ export default function OperationScreen() {
       opKey === 'user-management' ||
       (opKey === 'announcements' && activeSubTab === 'notices') ||
       (opKey === 'clubs' && activeSubTab === 'management') ||
-      opKey === 'seminar-halls');
+      opKey === 'seminar-halls' ||
+      (opKey === 'services' && activeSubTab === 'config'));
 
   return (
     <SafeAreaView style={styles.container}>
@@ -1108,6 +1235,8 @@ export default function OperationScreen() {
                 ? activeSubTab === 'halls'
                   ? 'Add Hall'
                   : 'Book Hall'
+                : opKey === 'services' && activeSubTab === 'config'
+                ? 'Add Service'
                 : 'New Item'}
             </Text>
           </TouchableOpacity>
@@ -1881,7 +2010,158 @@ export default function OperationScreen() {
                 );
               }
 
-              // 4. SERVICES / CERTIFICATES
+              // 4. SERVICES - CONFIGURATION (Settings & Actions)
+              if (opKey === 'services' && activeSubTab === 'config') {
+                const isActive = item.is_active !== false;
+                const adminFields = Array.isArray(item.admin_fields) ? item.admin_fields : [];
+                return (
+                  <View key={item.id || idx} style={styles.actionCard}>
+                    <View style={styles.actionCardHeader}>
+                      <View style={styles.actionCardInfo}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <Text style={styles.actionTitle}>{item.name}</Text>
+                          <View style={styles.servicePriceBadge}>
+                            <Text style={styles.servicePriceText}>
+                              {Number(item.price || 0) > 0 ? `₹${item.price}` : 'FREE'}
+                            </Text>
+                          </View>
+                        </View>
+                        {item.description ? (
+                          <Text style={styles.serviceDesc} numberOfLines={2}>
+                            {item.description}
+                          </Text>
+                        ) : null}
+                        {adminFields.length > 0 && (
+                          <View style={styles.adminFieldsRow}>
+                            <Text style={styles.adminFieldTagText}>Fields: </Text>
+                            {adminFields.map((field: any, fIdx: number) => (
+                              <View key={fIdx} style={styles.adminFieldTag}>
+                                <Text style={styles.adminFieldTagText}>{field.label || field.name || field}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                      <TouchableOpacity
+                        style={[styles.statusPill, isActive ? styles.pillSuccess : styles.pillInactive]}
+                        onPress={() => canWrite && handleToggleServiceStatus(item)}
+                      >
+                        <Text style={styles.statusPillText}>{isActive ? 'Active' : 'Inactive'}</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {canWrite && (
+                      <View style={styles.btnRow}>
+                        <TouchableOpacity
+                          style={[styles.actionBtn, { backgroundColor: isActive ? '#F59E0B' : '#059669' }]}
+                          onPress={() => handleToggleServiceStatus(item)}
+                        >
+                          <Text style={styles.actionBtnText}>{isActive ? 'Deactivate' : 'Activate'}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.actionBtn, { backgroundColor: '#1E3A8A' }]}
+                          onPress={() => handleOpenEditService(item)}
+                        >
+                          <Edit2 size={14} color="#FFFFFF" />
+                          <Text style={styles.actionBtnText}>Edit</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.actionBtn, styles.deleteActionBtn]}
+                          onPress={() => handleDeleteService(item.id, item.name)}
+                        >
+                          <Trash2 size={14} color="#DC2626" />
+                          <Text style={[styles.actionBtnText, { color: '#DC2626' }]}>Delete</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                );
+              }
+
+              // SERVICES - CERTIFICATE BORROW
+              if (opKey === 'services' && activeSubTab === 'borrow') {
+                const borrowStatus = String(item.status || 'pending').toLowerCase();
+                return (
+                  <View key={item.id || idx} style={styles.actionCard}>
+                    <View style={styles.actionCardHeader}>
+                      <View style={styles.actionCardInfo}>
+                        <Text style={styles.actionTitle}>{item.certificate_type || item.service_name || 'Certificate Borrow'}</Text>
+                        <Text style={styles.actionSub}>Student: {item.student_name || item.name} ({item.admission_number || item.pin_no || 'N/A'})</Text>
+                        <Text style={styles.actionDetail}>Purpose: {item.purpose || item.reason || 'Not specified'}</Text>
+                        {item.expected_return_date && (
+                          <Text style={[styles.actionDetail, { color: '#4338CA', marginTop: 2 }]}>
+                            Return Date: {item.expected_return_date.split('T')[0]}
+                          </Text>
+                        )}
+                      </View>
+                      <View
+                        style={[
+                          styles.statusPill,
+                          borrowStatus === 'approved' || borrowStatus === 'issued'
+                            ? styles.pillSuccess
+                            : borrowStatus === 'returned'
+                            ? { backgroundColor: '#E0E7FF' }
+                            : borrowStatus === 'rejected'
+                            ? styles.pillInactive
+                            : styles.pillPending,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.statusPillText,
+                            borrowStatus === 'returned' ? { color: '#3730A3' } : undefined,
+                          ]}
+                        >
+                          {item.status || 'Pending'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {canWrite && (
+                      <View style={styles.btnRow}>
+                        {borrowStatus === 'pending' && (
+                          <>
+                            <TouchableOpacity
+                              style={[styles.actionBtn, styles.approveBtn]}
+                              onPress={() => handleCertificateBorrowAction(item.id, 'approved')}
+                            >
+                              <Check size={14} color="#FFFFFF" />
+                              <Text style={styles.actionBtnText}>Approve</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.actionBtn, styles.deleteActionBtn]}
+                              onPress={() => handleCertificateBorrowAction(item.id, 'rejected')}
+                            >
+                              <X size={14} color="#DC2626" />
+                              <Text style={[styles.actionBtnText, { color: '#DC2626' }]}>Reject</Text>
+                            </TouchableOpacity>
+                          </>
+                        )}
+                        {borrowStatus === 'approved' && (
+                          <TouchableOpacity
+                            style={[styles.actionBtn, { backgroundColor: '#3B82F6' }]}
+                            onPress={() => handleCertificateBorrowAction(item.id, 'issued')}
+                          >
+                            <Check size={14} color="#FFFFFF" />
+                            <Text style={styles.actionBtnText}>Issue Certificate</Text>
+                          </TouchableOpacity>
+                        )}
+                        {borrowStatus === 'issued' && (
+                          <TouchableOpacity
+                            style={[styles.actionBtn, { backgroundColor: '#059669' }]}
+                            onPress={() => handleCertificateBorrowAction(item.id, 'returned')}
+                          >
+                            <Check size={14} color="#FFFFFF" />
+                            <Text style={styles.actionBtnText}>Mark Returned</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                );
+              }
+
+              // 4. SERVICES - REQUESTS (Student Certificate / Document Applications)
               if (opKey === 'services') {
                 return (
                   <View key={item.id || idx} style={styles.actionCard}>
@@ -2621,6 +2901,49 @@ export default function OperationScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
+            ) : actionType === 'create_service' || actionType === 'edit_service' ? (
+              /* 9. CREATE / EDIT SERVICE CONFIGURATION */
+              <View>
+                <Text style={styles.dialogTitle}>
+                  {actionType === 'create_service' ? 'New Service' : 'Edit Service'}
+                </Text>
+                <Text style={styles.dialogSub}>
+                  Configure student certificate or document service
+                </Text>
+                <TextInput
+                  style={styles.dialogSingleInput}
+                  placeholder="Service Name * (e.g. Study Certificate)"
+                  value={formTitle}
+                  onChangeText={setFormTitle}
+                />
+                <TextInput
+                  style={styles.dialogSingleInput}
+                  placeholder="Price (₹) (e.g. 50, 0 for free)"
+                  value={formPrice}
+                  onChangeText={setFormPrice}
+                  keyboardType="numeric"
+                />
+                <TextInput
+                  style={[styles.dialogInput, { height: 75 }]}
+                  placeholder="Description / Requirements..."
+                  value={formContent}
+                  onChangeText={setFormContent}
+                  multiline
+                />
+                <View style={styles.dialogBtnRow}>
+                  <TouchableOpacity
+                    style={styles.dialogCancelBtn}
+                    onPress={() => setActionModalVisible(false)}
+                  >
+                    <Text style={styles.dialogCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.dialogConfirmBtn} onPress={handleSaveForm}>
+                    <Text style={styles.dialogConfirmText}>
+                      {actionType === 'create_service' ? 'Create Service' : 'Update Service'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             ) : null}
           </View>
         </View>
@@ -2714,8 +3037,8 @@ export default function OperationScreen() {
             </View>
 
             <ScrollView style={styles.filterModalBody} showsVerticalScrollIndicator={false}>
-              {/* STUDENTS FILTERS */}
-              {opKey === 'students' && (
+              {/* ACADEMIC FILTERS (Students, Attendance & Reports) */}
+              {(opKey === 'students' || opKey === 'attendance' || opKey === 'reports') && (
                 <>
                   {/* Academic Year Filter */}
                   <Text style={styles.filterGroupTitle}>Academic Year</Text>
@@ -2922,24 +3245,40 @@ export default function OperationScreen() {
                 <>
                   <Text style={styles.filterGroupTitle}>Record Status</Text>
                   <View style={styles.filterChipRow}>
-                    {[
-                      { label: 'All Statuses', value: '' },
-                      { label: 'Pending', value: 'pending' },
-                      { label: 'Approved', value: 'approved' },
-                      { label: 'Rejected', value: 'rejected' },
-                      ...(opKey === 'services'
-                        ? [
-                            { label: 'Processing', value: 'processing' },
-                            { label: 'Completed', value: 'completed' },
-                          ]
-                        : []),
-                      ...(opKey === 'user-management'
-                        ? [
-                            { label: 'Active', value: 'active' },
-                            { label: 'Inactive', value: 'inactive' },
-                          ]
-                        : []),
-                    ].map((item) => (
+                    {(opKey === 'services' && activeSubTab === 'config'
+                      ? [
+                          { label: 'All Statuses', value: '' },
+                          { label: 'Active', value: 'active' },
+                          { label: 'Inactive', value: 'inactive' },
+                        ]
+                      : opKey === 'services' && activeSubTab === 'borrow'
+                      ? [
+                          { label: 'All Statuses', value: '' },
+                          { label: 'Pending', value: 'pending' },
+                          { label: 'Approved', value: 'approved' },
+                          { label: 'Issued', value: 'issued' },
+                          { label: 'Returned', value: 'returned' },
+                          { label: 'Rejected', value: 'rejected' },
+                        ]
+                      : [
+                          { label: 'All Statuses', value: '' },
+                          { label: 'Pending', value: 'pending' },
+                          { label: 'Approved', value: 'approved' },
+                          { label: 'Rejected', value: 'rejected' },
+                          ...(opKey === 'services'
+                            ? [
+                                { label: 'Processing', value: 'processing' },
+                                { label: 'Completed', value: 'completed' },
+                              ]
+                            : []),
+                          ...(opKey === 'user-management'
+                            ? [
+                                { label: 'Active', value: 'active' },
+                                { label: 'Inactive', value: 'inactive' },
+                              ]
+                            : []),
+                        ]
+                    ).map((item) => (
                       <TouchableOpacity
                         key={item.value}
                         style={[
@@ -4174,5 +4513,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     color: '#0F172A',
+  },
+  // SERVICES CONFIG STYLES
+  servicePriceBadge: {
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  servicePriceText: {
+    color: '#065F46',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  serviceDesc: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 4,
+    lineHeight: 17,
+  },
+  adminFieldsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+  },
+  adminFieldTag: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  adminFieldTagText: {
+    fontSize: 10,
+    color: '#64748B',
+    fontWeight: '600',
   },
 });

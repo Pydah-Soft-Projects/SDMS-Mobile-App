@@ -183,6 +183,56 @@ export const studentService = {
       services: true,
     };
   },
+
+  /**
+   * Fetch active campus clubs for student
+   * Endpoint: GET /api/clubs
+   */
+  async getClubs(): Promise<any[]> {
+    try {
+      const res = await api.get('/clubs');
+      return res.data?.data || res.data || [];
+    } catch (e: any) {
+      logger.warn('STUDENT_SERVICE', 'Failed to fetch clubs', e.message);
+      return [];
+    }
+  },
+
+  /**
+   * Join a student campus club
+   * Endpoint: POST /api/clubs/:clubId/join
+   */
+  async joinClub(clubId: number | string): Promise<any> {
+    const res = await api.post(`/clubs/${clubId}/join`);
+    return res.data;
+  },
+
+  /**
+   * Fetch campus events for student
+   * Endpoint: GET /api/events/student
+   */
+  async getEvents(): Promise<any[]> {
+    try {
+      const res = await api.get('/events/student');
+      return res.data?.data || res.data?.events || res.data || [];
+    } catch (e: any) {
+      logger.warn('STUDENT_SERVICE', 'Failed to fetch events', e.message);
+      return [];
+    }
+  },
+
+  /**
+   * Fetch academic content summary
+   * Endpoint: GET /api/academic-content
+   */
+  async getAcademicContent(): Promise<any> {
+    try {
+      const res = await api.get('/academic-content');
+      return res.data || null;
+    } catch {
+      return null;
+    }
+  },
 };
 
 export default studentService;

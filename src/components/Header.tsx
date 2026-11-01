@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { LogOut, Terminal, Menu } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Platform, StatusBar as RNStatusBar } from 'react-native';
+import { LogOut, Terminal, Menu, Bell } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { StudentSidebarDrawer } from './StudentSidebarDrawer';
 import { useAuth } from '../context/AuthContext';
 import { getStaticFileUrl } from '../config/api';
@@ -13,6 +15,9 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ title, subtitle, showLogout = true }) => {
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0, 16);
+  const router = useRouter();
   const { user, userType, logout } = useAuth();
   const [showSidebar, setShowSidebar] = useState(false);
   const isStudent = userType === 'student' || (!userType && !(user as any)?.role?.includes('admin') && !(user as any)?.role?.includes('staff'));
@@ -21,7 +26,7 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle, showLogout = tr
 
   return (
     <>
-      <View style={styles.container}>
+      <View style={[styles.container, { paddingTop: topInset + 8 }]}>
         {isStudent && (
           <TouchableOpacity
             style={styles.menuBtn}
@@ -37,6 +42,18 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle, showLogout = tr
           {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
         </View>
         <View style={styles.actions}>
+          {isStudent && (
+            <TouchableOpacity
+              onPress={() => router.push('/(tabs)/announcements' as any)}
+              style={styles.bellBtn}
+              hitSlop={8}
+            >
+              <Bell size={18} color="#1E3A8A" />
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>2</Text>
+              </View>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             onPress={() => setShowLogs(true)}
             style={styles.terminalBtn}
@@ -109,6 +126,29 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 8,
     backgroundColor: '#EEF2FF',
+  },
+  bellBtn: {
+    position: 'relative',
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: '#EF4444',
+    borderRadius: 7,
+    minWidth: 14,
+    height: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  bellBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
   },
   avatar: {
     width: 36,

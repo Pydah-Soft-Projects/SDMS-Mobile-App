@@ -82,7 +82,7 @@ eas build --profile preview --platform android
 ```
 
 ### 3. `production` Profile
-- **Target Backend**: Production API (`https://api.pydah.edu.in/api`)
+- **Target Backend**: Production API (`https://sdms.pydah.edu.in/api`)
 - **Distribution**: Google Play Store / Apple App Store (`.aab` / `.ipa`)
 ```bash
 eas build --profile production --platform all

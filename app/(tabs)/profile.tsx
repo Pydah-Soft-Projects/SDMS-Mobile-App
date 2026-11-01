@@ -1,3 +1,4 @@
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useState } from 'react';
 import {
   View,
@@ -16,6 +17,7 @@ import { getStaticFileUrl } from '../../src/config/api';
 import { ENV } from '../../src/config/env';
 
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
   const { user, userType, logout } = useAuth();
   const student = user as any;
   const avatarUrl = student?.avatarUrl ? getStaticFileUrl(student.avatarUrl) : null;
@@ -31,7 +33,7 @@ export default function ProfileScreen() {
     <View style={styles.container}>
       <Header title="My Profile" subtitle="Account & Academic Records" showLogout={false} />
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) + 84 }]}>
         {/* Profile Card */}
         <View style={styles.profileCard}>
           {avatarUrl ? (

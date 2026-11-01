@@ -1,3 +1,4 @@
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -20,6 +21,7 @@ import { StudentFeeDetails } from '../../src/types';
 import logger from '../../src/utils/logger';
 
 export default function FeesScreen() {
+  const insets = useSafeAreaInsets();
   const { user, userType } = useAuth();
 
   // If staff or admin user, render Staff Accounts & Fee Ledgers view
@@ -105,7 +107,7 @@ export default function FeesScreen() {
         </View>
       ) : (
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) + 84 }]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
           {/* Main Due Card */}

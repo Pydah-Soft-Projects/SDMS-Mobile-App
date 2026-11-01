@@ -10,7 +10,7 @@ import {
   Modal,
   Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   Users,
@@ -64,6 +64,7 @@ import logger from '../utils/logger';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const StaffDashboard: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
   const staff = user as any;
@@ -211,7 +212,7 @@ export const StaffDashboard: React.FC = () => {
 
       <ScrollView
         style={styles.container}
-        contentContainerStyle={styles.contentContainer}
+        contentContainerStyle={[styles.contentContainer, { paddingBottom: Math.max(insets.bottom, 16) + 84 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         {/* Top Control Bar with Menu Button */}

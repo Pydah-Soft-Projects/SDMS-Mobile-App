@@ -1,3 +1,4 @@
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -15,6 +16,7 @@ import announcementService from '../../src/services/announcementService';
 import { Announcement } from '../../src/types';
 
 export default function AnnouncementsScreen() {
+  const insets = useSafeAreaInsets();
   const { userType } = useAuth();
   const isStaff = userType === 'staff' || userType === 'admin';
 
@@ -70,7 +72,7 @@ export default function AnnouncementsScreen() {
         </View>
       ) : (
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) + 84 }]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
           {announcements.length > 0 ? (

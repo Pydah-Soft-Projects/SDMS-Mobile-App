@@ -1,3 +1,4 @@
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -17,6 +18,7 @@ import { StudentAttendanceData, AttendanceTotals } from '../../src/types';
 import logger from '../../src/utils/logger';
 
 export default function AttendanceScreen() {
+  const insets = useSafeAreaInsets();
   const { user, userType } = useAuth();
 
   // If staff or admin user, render Staff Attendance Monitoring view
@@ -127,7 +129,7 @@ export default function AttendanceScreen() {
         </View>
       ) : (
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) + 84 }]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
           {/* Main Attendance Score Card */}

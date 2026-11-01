@@ -1,9 +1,11 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Home, CalendarCheck, CreditCard, Bell, User, LayoutDashboard, ShieldCheck } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
   const { userType } = useAuth();
   const isStaff = userType === 'staff' || userType === 'admin';
 
@@ -16,8 +18,8 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
           borderTopColor: '#E2E8F0',
-          height: 60,
-          paddingBottom: 8,
+          height: 62 + (insets.bottom > 0 ? insets.bottom : 10),
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 10,
           paddingTop: 8,
         },
         tabBarLabelStyle: {

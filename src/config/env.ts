@@ -8,32 +8,37 @@ const appEnv =
   Constants.expoConfig?.extra?.APP_ENV ||
   (__DEV__ ? 'development' : 'production');
 
-// Smart host detection: Extract developer computer IP from Expo hostUri (e.g. 192.168.1.5:8081)
+// Smart host detection: Extract developer computer IP from Expo hostUri or use known LAN IP
 const getAutoDetectedHost = (): string => {
   try {
-    const hostUri = Constants.expoConfig?.hostUri || (Constants as any)?.manifest2?.extra?.expoGo?.debuggerHost;
+    const hostUri =
+      Constants.expoConfig?.hostUri ||
+      (Constants as any)?.manifest2?.extra?.expoGo?.debuggerHost;
     if (hostUri) {
       const ip = hostUri.split(':')[0];
       if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
-        return `http://${ip}:5000/api`;
+        return ip;
       }
     }
   } catch {
     // fallback
   }
 
-  if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:5000/api';
-  }
-  return 'http://localhost:5000/api';
+  // Developer local LAN IP
+  return '192.168.3.117';
 };
 
-const defaultDevUrl = getAutoDetectedHost();
-
-let resolvedApiUrl =
+let rawApiUrl =
   process.env.EXPO_PUBLIC_API_URL ||
   Constants.expoConfig?.extra?.API_URL ||
-  defaultDevUrl;
+  `http://${getAutoDetectedHost()}:5000/api`;
+
+// On native mobile devices (Android/iOS), "localhost" refers to the phone itself.
+// Automatically replace localhost/127.0.0.1 with the machine's local LAN IP so mobile can reach the backend.
+if (Platform.OS !== 'web' && (rawApiUrl.includes('localhost') || rawApiUrl.includes('127.0.0.1'))) {
+  const hostIp = getAutoDetectedHost();
+  rawApiUrl = rawApiUrl.replace('localhost', hostIp).replace('127.0.0.1', hostIp);
+}
 
 // Clean trailing slash and ensure it ends with /api
 const normalizeUrl = (url: string) => {
@@ -41,7 +46,7 @@ const normalizeUrl = (url: string) => {
   return clean.endsWith('/api') ? clean : `${clean}/api`;
 };
 
-export let API_BASE_URL = normalizeUrl(resolvedApiUrl);
+export let API_BASE_URL = normalizeUrl(rawApiUrl);
 export let STATIC_BASE_URL = API_BASE_URL.replace(/\/api$/, '');
 
 // Dynamic switcher for runtime URL adjustments
@@ -78,6 +83,6 @@ export const ENV = {
   isProd: appEnv === 'production',
 };
 
-logger.info('ENV', `Initialized environment [${appEnv}] -> API: ${API_BASE_URL}`);
+logger.info('ENV', `Resolved Target API [${appEnv}] -> ${API_BASE_URL}`);
 
 export default ENV;

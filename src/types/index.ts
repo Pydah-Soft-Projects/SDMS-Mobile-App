@@ -94,6 +94,15 @@ export interface StudentAttendanceData {
 }
 
 // Fee Types from SDMS /api/fees/students/:admissionNumber/details
+export interface FeeSummary {
+  totalFee: number;
+  paidFee: number;
+  dueFee: number;
+  dueDate?: string;
+  scholarship?: number;
+  concession?: number;
+}
+
 export interface FeeHeaderItem {
   id: number;
   name: string;

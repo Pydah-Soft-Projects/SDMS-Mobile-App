@@ -42,7 +42,7 @@ export const LogViewerModal: React.FC<LogViewerModalProps> = ({ visible, onClose
     );
   });
 
-  const getTagColor = (type: LogEntry['type']) => {
+  const getTagColor = (type: string) => {
     switch (type) {
       case 'API_ERR':
       case 'ERROR':

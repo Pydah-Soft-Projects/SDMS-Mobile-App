@@ -6,10 +6,10 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  SafeAreaView,
   TextInput,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, Trash2, Terminal, Filter, RefreshCw } from 'lucide-react-native';
 import logger, { LogEntry } from '../utils/logger';
 import { ENV, setRuntimeApiUrl } from '../config/env';

@@ -18,11 +18,12 @@ import api from '../config/api';
 import logger from '../utils/logger';
 
 interface FeeHeaderInfo {
-  id: number;
+  id: string | number;
   name: string;
   code?: string;
   category?: string;
   amount?: number;
+  _id?: string;
 }
 
 export const StaffFeesView: React.FC = () => {
@@ -39,17 +40,25 @@ export const StaffFeesView: React.FC = () => {
       const list = response.data?.headers || response.data?.data || response.data || [];
       if (Array.isArray(list)) {
         setHeaders(
-          list.map((h: any) => ({
-            id: h.id,
-            name: h.name || h.fee_head || 'Fee Head',
-            code: h.code,
-            category: h.category,
-            amount: h.amount ? Number(h.amount) : undefined,
-          }))
+          list
+            .filter(Boolean)
+            .map((h: any, idx: number) => ({
+              id: h?._id || h?.id || idx,
+              name: typeof h === 'string' ? h : (h?.name || h?.fee_head || 'Fee Head'),
+              code: typeof h === 'object' && h ? h.code : undefined,
+              category: typeof h === 'object' && h ? h.category : undefined,
+              amount:
+                typeof h === 'object' && h && h.amount != null && !isNaN(Number(h.amount))
+                  ? Number(h.amount)
+                  : undefined,
+            }))
         );
+      } else {
+        setHeaders([]);
       }
     } catch (e: any) {
       logger.error('STAFF_FEES', 'Failed to load fee headers', e.message);
+      setHeaders([]);
     } finally {
       setLoading(false);
     }
@@ -154,19 +163,19 @@ export const StaffFeesView: React.FC = () => {
               <View style={styles.dueCol}>
                 <Text style={styles.dueColLabel}>Total Assessment</Text>
                 <Text style={styles.dueColVal}>
-                  ₹{(searchedStudentFee.totalAmount || searchedStudentFee.total_amount || 0).toLocaleString('en-IN')}
+                  ₹{Number(searchedStudentFee.totalAmount ?? searchedStudentFee.total_amount ?? 0).toLocaleString('en-IN')}
                 </Text>
               </View>
               <View style={styles.dueCol}>
                 <Text style={styles.dueColLabel}>Paid</Text>
                 <Text style={[styles.dueColVal, { color: '#059669' }]}>
-                  ₹{(searchedStudentFee.paidAmount || searchedStudentFee.paid_amount || 0).toLocaleString('en-IN')}
+                  ₹{Number(searchedStudentFee.paidAmount ?? searchedStudentFee.paid_amount ?? 0).toLocaleString('en-IN')}
                 </Text>
               </View>
               <View style={styles.dueCol}>
                 <Text style={styles.dueColLabel}>Due</Text>
                 <Text style={[styles.dueColVal, { color: '#DC2626' }]}>
-                  ₹{(searchedStudentFee.dueAmount || searchedStudentFee.due_amount || 0).toLocaleString('en-IN')}
+                  ₹{Number(searchedStudentFee.dueAmount ?? searchedStudentFee.due_amount ?? 0).toLocaleString('en-IN')}
                 </Text>
               </View>
             </View>
@@ -180,21 +189,29 @@ export const StaffFeesView: React.FC = () => {
           <View style={styles.loader}>
             <ActivityIndicator size="small" color="#1E3A8A" />
           </View>
-        ) : headers.length > 0 ? (
-          headers.map((head) => (
-            <View key={head.id} style={styles.headCard}>
-              <View style={styles.headIcon}>
-                <Receipt size={18} color="#1E3A8A" />
+        ) : headers && headers.length > 0 ? (
+          headers.map((head, index) => {
+            if (!head) return null;
+            const headKey = head.id ? `fee-head-${head.id}` : `fee-head-idx-${index}`;
+            const headName = head.name || 'Fee Head';
+            const headCode = head.code;
+            const amountVal = typeof head.amount === 'number' && !isNaN(head.amount) ? head.amount : null;
+
+            return (
+              <View key={headKey} style={styles.headCard}>
+                <View style={styles.headIcon}>
+                  <Receipt size={18} color="#1E3A8A" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.headName}>{String(headName)}</Text>
+                  {headCode ? <Text style={styles.headCode}>Code: {String(headCode)}</Text> : null}
+                </View>
+                {amountVal !== null ? (
+                  <Text style={styles.headAmount}>₹{amountVal.toLocaleString('en-IN')}</Text>
+                ) : null}
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.headName}>{head.name}</Text>
-                {head.code && <Text style={styles.headCode}>Code: {head.code}</Text>}
-              </View>
-              {head.amount ? (
-                <Text style={styles.headAmount}>₹{head.amount.toLocaleString('en-IN')}</Text>
-              ) : null}
-            </View>
-          ))
+            );
+          })
         ) : (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyText}>No fee headers configured in SDMS.</Text>

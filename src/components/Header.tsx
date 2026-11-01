@@ -37,6 +37,7 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle, showLogout = tr
             <Menu size={22} color="#1E3A8A" />
           </TouchableOpacity>
         )}
+        <Image source={require("../../assets/pydah-logo.png")} style={styles.brandLogo} resizeMode="contain" />
         <View style={styles.titleContainer}>
           <Text style={styles.title}>{title}</Text>
           {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
@@ -97,6 +98,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
+  },
+  brandLogo: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    marginRight: 10,
   },
   menuBtn: {
     marginRight: 12,

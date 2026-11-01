@@ -123,7 +123,7 @@ export default function LoginScreen() {
         {/* College Logo / Header */}
         <View style={styles.header}>
           <Image
-            source={require('../../assets/icon.png')}
+            source={require('../../assets/pydah-logo.png')}
             style={styles.logo}
             resizeMode="contain"
           />
@@ -259,8 +259,9 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   logo: {
-    width: 76,
-    height: 76,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     marginBottom: 12,
   },
   appName: {

@@ -26,9 +26,8 @@ export interface LoginResponse {
 
 export const authService = {
   /**
-   * Student Login
-   * Endpoint: POST /api/students/login
-   * Expects: { username, password }
+   * Student Login - uses unified login matching web frontend
+   * Endpoint: POST /api/auth/unified-login (fallback: /api/students/login)
    */
   async studentLogin(payload: StudentLoginPayload): Promise<LoginResponse> {
     const identifier = (
@@ -39,114 +38,138 @@ export const authService = {
       ''
     ).trim();
 
-    logger.info('AUTH', `Attempting Student login for: "${identifier}"`);
+    logger.info('AUTH', `Logging in student: "${identifier}"`);
 
-    const response = await api.post('/students/login', {
-      username: identifier,
-      rollNumber: identifier,
-      password: payload.password,
-    });
+    let response;
+    try {
+      // Primary: Unified Login endpoint matching web frontend
+      response = await api.post('/auth/unified-login', {
+        username: identifier,
+        password: payload.password,
+        expectedRole: 'student',
+      });
+    } catch (err: any) {
+      logger.warn('AUTH', 'Unified login endpoint failed, falling back to /students/login', err.message);
+      // Fallback: direct student login route
+      response = await api.post('/students/login', {
+        username: identifier,
+        rollNumber: identifier,
+        password: payload.password,
+      });
+    }
 
     const data = response.data;
-    const user = data.user || data.student || data;
+    if (!data.success && data.message) {
+      throw new Error(data.message);
+    }
+
+    const rawUser = data.user || data.student || data;
     const token = data.token;
 
     if (!token) {
-      throw new Error(data.message || 'Authentication token missing in response');
+      throw new Error(data.message || 'Authentication token missing in server response');
     }
 
-    logger.info('AUTH', `Student login successful for "${identifier}"`, {
-      name: user.name || user.student_name,
-      pin: user.pin_no || user.admission_number,
-    });
+    const admissionNumber =
+      rawUser.admission_number ||
+      rawUser.admission_no ||
+      rawUser.pin_no ||
+      identifier;
+
+    const studentUser: StudentUser = {
+      id: rawUser.id,
+      admission_number: admissionNumber,
+      pin_no: rawUser.pin_no || rawUser.roll_number || admissionNumber,
+      rollNumber: rawUser.pin_no || rawUser.roll_number || admissionNumber,
+      username: rawUser.username || identifier,
+      name: rawUser.name || rawUser.student_name || rawUser.fullName || 'Student',
+      email: rawUser.email || '',
+      phone: rawUser.student_mobile || rawUser.phone || rawUser.mobile || '',
+      batch: rawUser.batch || '',
+      college: rawUser.college || rawUser.college_name || '',
+      college_name: rawUser.college || rawUser.college_name || '',
+      college_id: rawUser.college_id,
+      course: rawUser.course || rawUser.course_name || '',
+      course_name: rawUser.course || rawUser.course_name || '',
+      course_id: rawUser.course_id,
+      course_level: rawUser.course_level || '',
+      branch: rawUser.branch || rawUser.branch_name || '',
+      branch_name: rawUser.branch || rawUser.branch_name || '',
+      branch_id: rawUser.branch_id,
+      current_year: rawUser.current_year || 1,
+      current_semester: rawUser.current_semester || 1,
+      section: rawUser.section || '',
+      student_photo: rawUser.student_photo || rawUser.photo_url || '',
+      avatarUrl: rawUser.student_photo || rawUser.photo_url || '',
+      registration_status: rawUser.registration_status || 'Regular',
+      quota: rawUser.quota,
+      caste: rawUser.caste || rawUser.caste_category,
+      gender: rawUser.gender,
+      dob: rawUser.dob,
+      role: 'student',
+    };
+
+    logger.info('AUTH', `Student session verified for ${studentUser.name} (${studentUser.admission_number})`);
 
     return {
       success: true,
       token,
       userType: 'student',
-      user: {
-        id: user.id || 0,
-        rollNumber: user.pin_no || user.admission_number || user.rollNumber || identifier,
-        name: user.name || user.student_name || user.fullName || 'Student',
-        email: user.email || '',
-        phone: user.student_mobile || user.phone || user.mobile || '',
-        collegeId: user.college_id || user.collegeId,
-        collegeName: user.college || user.college_name || user.collegeName,
-        courseId: user.course_id || user.courseId,
-        courseName: user.course || user.course_name || user.courseName,
-        branchId: user.branch_id || user.branchId,
-        branchName: user.branch || user.branch_name || user.branchName,
-        academicYear: user.academic_year || user.current_year || user.academicYear,
-        currentSemester: user.current_semester || user.currentSemester || 1,
-        avatarUrl: user.student_photo || user.photo_url || user.avatarUrl,
-        quota: user.quota,
-        caste: user.caste_category || user.caste,
-      },
+      user: studentUser,
     };
   },
 
   /**
-   * Staff / Admin Unified Login
+   * Staff / Admin Login
    * Endpoint: POST /api/auth/unified-login
    */
   async staffLogin(payload: StaffLoginPayload): Promise<LoginResponse> {
     const identifier = (payload.username || payload.email || '').trim();
-    logger.info('AUTH', `Attempting Staff Unified login for: "${identifier}"`);
+    logger.info('AUTH', `Logging in staff: "${identifier}"`);
 
     const response = await api.post('/auth/unified-login', {
       username: identifier,
-      email: identifier,
       password: payload.password,
+      expectedRole: 'staff',
     });
 
     const data = response.data;
-    logger.info('AUTH', `Staff login successful for: "${identifier}"`, {
-      role: data.role || data.user?.role,
-    });
+    if (!data.success && data.message) {
+      throw new Error(data.message);
+    }
+
+    const rawUser = data.user || data;
+    const role = (rawUser.role || data.role || 'staff').toLowerCase();
+    const isAdmin = ['admin', 'super_admin', 'superadmin'].includes(role);
+
+    const staffUser: StaffUser = {
+      id: rawUser.id,
+      username: rawUser.username || identifier,
+      email: rawUser.email || '',
+      name: rawUser.name || rawUser.username || identifier,
+      role: rawUser.role || 'staff',
+      modules: rawUser.modules || data.modules || [],
+      permissions: rawUser.permissions || {},
+      collegeId: rawUser.collegeId || rawUser.college_id,
+      courseId: rawUser.courseId || rawUser.course_id,
+      branchId: rawUser.branchId || rawUser.branch_id,
+    };
+
+    logger.info('AUTH', `Staff login successful for ${staffUser.username} [Role: ${staffUser.role}]`);
 
     return {
       success: true,
       token: data.token,
-      userType: data.role === 'admin' ? 'admin' : 'staff',
-      user: {
-        id: data.user?.id || data.id,
-        username: data.user?.username || data.username || identifier,
-        email: data.user?.email || data.email,
-        name: data.user?.name || data.name || data.user?.username || identifier,
-        role: data.role || data.user?.role || 'staff',
-        modules: data.modules || data.user?.modules || [],
-        permissions: data.permissions || data.user?.permissions || {},
-        collegeId: data.collegeId || data.user?.collegeId,
-      },
+      userType: isAdmin ? 'admin' : 'staff',
+      user: staffUser,
     };
   },
 
   /**
-   * Parent Login: Send OTP
-   * Endpoint: POST /api/auth/parent/otp/send
-   */
-  async parentSendOtp(phone: string) {
-    logger.info('AUTH', `Sending Parent OTP to: ${phone}`);
-    const response = await api.post('/auth/parent/otp/send', { phone });
-    return response.data;
-  },
-
-  /**
-   * Parent Login: Verify OTP
-   * Endpoint: POST /api/auth/parent/otp/verify
-   */
-  async parentVerifyOtp(phone: string, otp: string) {
-    logger.info('AUTH', `Verifying Parent OTP for: ${phone}`);
-    const response = await api.post('/auth/parent/otp/verify', { phone, otp });
-    return response.data;
-  },
-
-  /**
-   * Verify Active Session Token
+   * Verify Active Session Token with Backend
    * Endpoint: GET /api/auth/verify
    */
   async verifyToken() {
-    logger.info('AUTH', 'Verifying session token with backend');
     const response = await api.get('/auth/verify');
     return response.data;
   },
@@ -156,7 +179,6 @@ export const authService = {
    * Endpoint: POST /api/students/change-password
    */
   async changePassword(currentPassword: string, newPassword: string) {
-    logger.info('AUTH', 'Submitting password change request');
     const response = await api.post('/students/change-password', {
       currentPassword,
       newPassword,
@@ -169,7 +191,6 @@ export const authService = {
    * Endpoint: POST /api/students/forgot-password
    */
   async forgotPassword(rollNumberOrEmail: string) {
-    logger.info('AUTH', `Requesting forgot password for: ${rollNumberOrEmail}`);
     const response = await api.post('/students/forgot-password', {
       username: rollNumberOrEmail,
       identifier: rollNumberOrEmail,

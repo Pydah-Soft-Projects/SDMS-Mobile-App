@@ -2,25 +2,37 @@
 export type UserRole = 'student' | 'staff' | 'admin' | 'parent';
 
 export interface StudentUser {
-  id: number;
-  rollNumber: string;
+  id?: number;
+  admission_number: string;
+  pin_no?: string;
+  rollNumber?: string;
   name: string;
-  email: string;
+  username: string;
+  email?: string;
   phone?: string;
+  batch?: string;
+  college?: string;
+  college_name?: string;
+  college_id?: number;
+  course?: string;
+  course_name?: string;
+  course_id?: number;
+  course_level?: string;
+  branch?: string;
+  branch_name?: string;
+  branch_id?: number;
+  current_year?: number | string;
+  current_semester?: number | string;
+  section?: string;
+  student_photo?: string;
   avatarUrl?: string;
-  collegeId?: number;
-  collegeName?: string;
-  courseId?: number;
-  courseName?: string;
-  branchId?: number;
-  branchName?: string;
-  academicYear?: string;
-  currentSemester?: number;
+  registration_status?: string;
   quota?: string;
   caste?: string;
   gender?: string;
   dob?: string;
-  parentPhone?: string;
+  parent_phone?: string;
+  role: 'student';
 }
 
 export interface StaffUser {
@@ -28,10 +40,12 @@ export interface StaffUser {
   username: string;
   email: string;
   name?: string;
-  role: 'staff' | 'admin';
+  role: string;
   modules?: string[];
   permissions?: Record<string, any>;
   collegeId?: number;
+  courseId?: number;
+  branchId?: number;
 }
 
 export interface AuthSession {
@@ -40,31 +54,53 @@ export interface AuthSession {
   user: StudentUser | StaffUser;
 }
 
-// Attendance Types
-export interface AttendanceSummary {
-  totalClasses: number;
-  attendedClasses: number;
+// Attendance Types from SDMS /api/attendance/student
+export interface AttendanceTotals {
   percentage: number;
-  lastUpdated?: string;
+  present: number;
+  absent: number;
+  workingDays: number;
+  holidays?: number;
 }
 
-export interface SubjectAttendance {
-  subjectCode: string;
-  subjectName: string;
-  totalClasses: number;
-  attendedClasses: number;
-  percentage: number;
-  facultyName?: string;
+export interface AttendanceSeriesItem {
+  date: string;
+  status: 'Present' | 'Absent' | 'Holiday' | 'Weekend';
+  isHoliday?: boolean;
+  holidayReason?: string;
 }
 
-// Fee Types
-export interface FeeSummary {
-  totalFee: number;
-  paidFee: number;
-  dueFee: number;
-  dueDate?: string;
-  concession?: number;
-  scholarship?: number;
+export interface StudentAttendanceData {
+  student: {
+    id: number;
+    name: string;
+    pin: string;
+    batch?: string;
+  };
+  weekly?: {
+    totals: AttendanceTotals;
+    series: AttendanceSeriesItem[];
+  };
+  monthly?: {
+    totals: AttendanceTotals;
+    series: AttendanceSeriesItem[];
+  };
+  semester?: {
+    startDate?: string;
+    endDate?: string;
+    totals: AttendanceTotals;
+    series?: AttendanceSeriesItem[];
+  };
+}
+
+// Fee Types from SDMS /api/fees/students/:admissionNumber/details
+export interface FeeHeaderItem {
+  id: number;
+  name: string;
+  amount: number;
+  paidAmount?: number;
+  dueAmount?: number;
+  year?: number;
 }
 
 export interface FeeTransaction {
@@ -77,7 +113,16 @@ export interface FeeTransaction {
   semester?: number;
 }
 
-// Announcement Types
+export interface StudentFeeDetails {
+  totalAmount: number;
+  paidAmount: number;
+  dueAmount: number;
+  dueDate?: string;
+  feeHeaders: FeeHeaderItem[];
+  transactions: FeeTransaction[];
+}
+
+// Announcement Type from SDMS /api/announcements/student
 export interface Announcement {
   id: number;
   title: string;
@@ -85,6 +130,6 @@ export interface Announcement {
   priority: 'low' | 'medium' | 'high' | 'urgent';
   createdAt: string;
   category?: string;
+  imageUrl?: string;
   attachmentUrl?: string;
 }
-

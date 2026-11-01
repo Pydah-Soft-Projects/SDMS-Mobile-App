@@ -6,65 +6,29 @@ import {
   ScrollView,
   RefreshControl,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
+import { Calendar, CheckCircle2, XCircle, Clock, AlertTriangle, CalendarDays } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import Header from '../../src/components/Header';
 import studentService from '../../src/services/studentService';
-import { AttendanceSummary, SubjectAttendance } from '../../src/types';
+import { StudentAttendanceData, AttendanceTotals } from '../../src/types';
+import logger from '../../src/utils/logger';
 
 export default function AttendanceScreen() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [summary, setSummary] = useState<AttendanceSummary>({
-    totalClasses: 120,
-    attendedClasses: 104,
-    percentage: 86.6,
-  });
-  const [subjects, setSubjects] = useState<SubjectAttendance[]>([
-    {
-      subjectCode: 'CS501',
-      subjectName: 'Design & Analysis of Algorithms',
-      totalClasses: 32,
-      attendedClasses: 29,
-      percentage: 90.6,
-      facultyName: 'Dr. Ramesh Kumar',
-    },
-    {
-      subjectCode: 'CS502',
-      subjectName: 'Database Management Systems',
-      totalClasses: 30,
-      attendedClasses: 25,
-      percentage: 83.3,
-      facultyName: 'Prof. Anitha S.',
-    },
-    {
-      subjectCode: 'CS503',
-      subjectName: 'Operating Systems',
-      totalClasses: 28,
-      attendedClasses: 24,
-      percentage: 85.7,
-      facultyName: 'Mr. P. Satyanarayana',
-    },
-    {
-      subjectCode: 'CS504',
-      subjectName: 'Software Engineering',
-      totalClasses: 30,
-      attendedClasses: 26,
-      percentage: 86.6,
-      facultyName: 'Mrs. K. Lakshmi',
-    },
-  ]);
+  const [activeTab, setActiveTab] = useState<'semester' | 'monthly' | 'weekly'>('semester');
+  const [attendanceData, setAttendanceData] = useState<StudentAttendanceData | null>(null);
 
   const fetchAttendance = async () => {
+    logger.info('ATTENDANCE_SCREEN', 'Fetching live attendance records');
     try {
-      if (user?.id) {
-        const res = await studentService.getAttendance(user.id);
-        if (res?.summary) setSummary(res.summary);
-        if (res?.subjects?.length) setSubjects(res.subjects);
-      }
-    } catch (e) {
-      console.warn('Could not load live attendance, using defaults', e);
+      const data = await studentService.getAttendance();
+      setAttendanceData(data);
+    } catch (e: any) {
+      logger.error('ATTENDANCE_SCREEN', 'Failed to fetch attendance', e.message);
     } finally {
       setLoading(false);
     }
@@ -80,103 +44,194 @@ export default function AttendanceScreen() {
     setRefreshing(false);
   };
 
+  // Resolve totals based on active tab
+  const getActiveTotals = (): AttendanceTotals => {
+    if (activeTab === 'weekly' && attendanceData?.weekly?.totals) {
+      return attendanceData.weekly.totals;
+    }
+    if (activeTab === 'monthly' && attendanceData?.monthly?.totals) {
+      return attendanceData.monthly.totals;
+    }
+    if (attendanceData?.semester?.totals) {
+      return attendanceData.semester.totals;
+    }
+    return {
+      percentage: 0,
+      present: 0,
+      absent: 0,
+      workingDays: 0,
+    };
+  };
+
+  const getActiveSeries = () => {
+    if (activeTab === 'weekly') return attendanceData?.weekly?.series || [];
+    if (activeTab === 'monthly') return attendanceData?.monthly?.series || [];
+    return attendanceData?.semester?.series || [];
+  };
+
+  const totals = getActiveTotals();
+  const series = getActiveSeries();
+  const isEligible = totals.percentage >= 75;
+
   return (
     <View style={styles.container}>
-      <Header title="Attendance Tracker" subtitle="Current Semester Attendance" />
+      <Header title="Attendance Tracker" subtitle="SDMS Live Academic Attendance" />
+
+      {/* Range Filter Selector */}
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          style={[styles.tabBtn, activeTab === 'semester' && styles.tabBtnActive]}
+          onPress={() => setActiveTab('semester')}
+        >
+          <Text style={[styles.tabText, activeTab === 'semester' && styles.tabTextActive]}>
+            Semester
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabBtn, activeTab === 'monthly' && styles.tabBtnActive]}
+          onPress={() => setActiveTab('monthly')}
+        >
+          <Text style={[styles.tabText, activeTab === 'monthly' && styles.tabTextActive]}>
+            This Month
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabBtn, activeTab === 'weekly' && styles.tabBtnActive]}
+          onPress={() => setActiveTab('weekly')}
+        >
+          <Text style={[styles.tabText, activeTab === 'weekly' && styles.tabTextActive]}>
+            This Week
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {loading ? (
         <View style={styles.loader}>
           <ActivityIndicator size="large" color="#1E3A8A" />
+          <Text style={styles.loaderText}>Loading attendance data...</Text>
         </View>
       ) : (
         <ScrollView
           contentContainerStyle={styles.content}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
-          {/* Main Attendance Card */}
+          {/* Main Attendance Score Card */}
           <View style={styles.overviewCard}>
-            <View style={styles.percentageCircle}>
-              <Text style={styles.percentageText}>{summary.percentage.toFixed(1)}%</Text>
-              <Text style={styles.percentageSub}>Overall</Text>
+            <View
+              style={[
+                styles.percentageCircle,
+                { borderColor: isEligible ? '#059669' : '#DC2626' },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.percentageText,
+                  { color: isEligible ? '#059669' : '#DC2626' },
+                ]}
+              >
+                {totals.percentage.toFixed(1)}%
+              </Text>
+              <Text style={styles.percentageSub}>
+                {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+              </Text>
             </View>
+
             <View style={styles.statsColumn}>
               <View style={styles.statRow}>
-                <Text style={styles.statLabel}>Total Classes:</Text>
-                <Text style={styles.statVal}>{summary.totalClasses}</Text>
+                <Text style={styles.statLabel}>Working Days:</Text>
+                <Text style={styles.statVal}>{totals.workingDays}</Text>
               </View>
               <View style={styles.statRow}>
-                <Text style={styles.statLabel}>Attended Classes:</Text>
-                <Text style={[styles.statVal, { color: '#059669' }]}>
-                  {summary.attendedClasses}
-                </Text>
+                <Text style={styles.statLabel}>Present Days:</Text>
+                <Text style={[styles.statVal, { color: '#059669' }]}>{totals.present}</Text>
               </View>
               <View style={styles.statRow}>
-                <Text style={styles.statLabel}>Missed Classes:</Text>
-                <Text style={[styles.statVal, { color: '#DC2626' }]}>
-                  {summary.totalClasses - summary.attendedClasses}
-                </Text>
+                <Text style={styles.statLabel}>Absent Days:</Text>
+                <Text style={[styles.statVal, { color: '#DC2626' }]}>{totals.absent}</Text>
               </View>
+
               <View
                 style={[
                   styles.statusBadge,
-                  summary.percentage >= 75 ? styles.badgeSuccess : styles.badgeDanger,
+                  isEligible ? styles.badgeSuccess : styles.badgeDanger,
                 ]}
               >
+                {isEligible ? (
+                  <CheckCircle2 size={12} color="#15803D" />
+                ) : (
+                  <AlertTriangle size={12} color="#B91C1C" />
+                )}
                 <Text
                   style={[
                     styles.statusBadgeText,
-                    summary.percentage >= 75 ? styles.badgeTextSuccess : styles.badgeTextDanger,
+                    isEligible ? styles.badgeTextSuccess : styles.badgeTextDanger,
                   ]}
                 >
-                  {summary.percentage >= 75 ? 'Eligible for Exams (>75%)' : 'Attendance Shortage'}
+                  {isEligible ? 'Examination Eligible (≥75%)' : 'Shortage of Attendance (<75%)'}
                 </Text>
               </View>
             </View>
           </View>
 
-          {/* Subject Wise Breakdown */}
-          <Text style={styles.sectionHeader}>Subject-wise Attendance</Text>
+          {/* Daily Records List */}
+          <Text style={styles.sectionHeader}>
+            {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Daily Log ({series.length} Days)
+          </Text>
 
-          {subjects.map((sub, idx) => {
-            const isGood = sub.percentage >= 75;
-            return (
-              <View key={sub.subjectCode || idx} style={styles.subjectCard}>
-                <View style={styles.subjectHeader}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.subjectTitle}>{sub.subjectName}</Text>
-                    <Text style={styles.subjectSub}>
-                      {sub.subjectCode} {sub.facultyName ? `• ${sub.facultyName}` : ''}
-                    </Text>
+          {series.length > 0 ? (
+            series.map((item, idx) => {
+              const isPresent = item.status === 'Present';
+              const isHoliday = item.isHoliday || item.status === 'Holiday';
+              const isAbsent = item.status === 'Absent';
+
+              return (
+                <View key={item.date || idx} style={styles.dayCard}>
+                  <View style={styles.dayLeft}>
+                    <CalendarDays size={18} color="#64748B" />
+                    <View>
+                      <Text style={styles.dayDate}>
+                        {new Date(item.date).toLocaleDateString('en-IN', {
+                          weekday: 'short',
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </Text>
+                      {item.holidayReason && (
+                        <Text style={styles.holidayReason}>{item.holidayReason}</Text>
+                      )}
+                    </View>
                   </View>
-                  <Text style={[styles.subjectPercent, { color: isGood ? '#059669' : '#DC2626' }]}>
-                    {sub.percentage.toFixed(1)}%
-                  </Text>
-                </View>
 
-                {/* Progress Bar */}
-                <View style={styles.progressBarBg}>
                   <View
                     style={[
-                      styles.progressBarFill,
-                      {
-                        width: `${Math.min(sub.percentage, 100)}%`,
-                        backgroundColor: isGood ? '#059669' : '#DC2626',
-                      },
+                      styles.dayStatusPill,
+                      isPresent && styles.pillPresent,
+                      isAbsent && styles.pillAbsent,
+                      isHoliday && styles.pillHoliday,
                     ]}
-                  />
+                  >
+                    <Text
+                      style={[
+                        styles.dayStatusText,
+                        isPresent && styles.textPresent,
+                        isAbsent && styles.textAbsent,
+                        isHoliday && styles.textHoliday,
+                      ]}
+                    >
+                      {item.status}
+                    </Text>
+                  </View>
                 </View>
-
-                <View style={styles.subjectFooter}>
-                  <Text style={styles.subDetail}>
-                    Classes: {sub.attendedClasses} / {sub.totalClasses}
-                  </Text>
-                  <Text style={[styles.subDetail, { color: isGood ? '#059669' : '#DC2626' }]}>
-                    {isGood ? 'On Track' : 'Needs Attention'}
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
+              );
+            })
+          ) : (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyText}>
+                No daily attendance logs found for this period.
+              </Text>
+            </View>
+          )}
         </ScrollView>
       )}
     </View>
@@ -188,10 +243,42 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    gap: 8,
+  },
+  tabBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+  },
+  tabBtnActive: {
+    backgroundColor: '#1E3A8A',
+  },
+  tabText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  tabTextActive: {
+    color: '#FFFFFF',
+  },
   loader: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+  },
+  loaderText: {
+    fontSize: 13,
+    color: '#64748B',
   },
   content: {
     padding: 16,
@@ -208,20 +295,18 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   percentageCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#EEF2FF',
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    backgroundColor: '#FFFFFF',
     borderWidth: 4,
-    borderColor: '#1E3A8A',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
   },
   percentageText: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '800',
-    color: '#1E3A8A',
   },
   percentageSub: {
     fontSize: 11,
@@ -246,7 +331,10 @@ const styles = StyleSheet.create({
     color: '#1E293B',
   },
   statusBadge: {
-    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 6,
@@ -269,58 +357,75 @@ const styles = StyleSheet.create({
     color: '#B91C1C',
   },
   sectionHeader: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: '#1E293B',
     marginBottom: 12,
   },
-  subjectCard: {
+  dayCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 10,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  subjectHeader: {
+  dayLeft: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 10,
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
   },
-  subjectTitle: {
-    fontSize: 14,
-    fontWeight: '700',
+  dayDate: {
+    fontSize: 13,
+    fontWeight: '600',
     color: '#0F172A',
   },
-  subjectSub: {
-    fontSize: 12,
-    color: '#64748B',
+  holidayReason: {
+    fontSize: 11,
+    color: '#94A3B8',
     marginTop: 2,
   },
-  subjectPercent: {
-    fontSize: 16,
-    fontWeight: '800',
-    marginLeft: 8,
+  dayStatusPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
-  progressBarBg: {
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#F1F5F9',
-    overflow: 'hidden',
-    marginBottom: 8,
+  pillPresent: {
+    backgroundColor: '#DCFCE7',
   },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 4,
+  pillAbsent: {
+    backgroundColor: '#FEE2E2',
   },
-  subjectFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  pillHoliday: {
+    backgroundColor: '#FEF3C7',
   },
-  subDetail: {
-    fontSize: 12,
-    color: '#64748B',
+  dayStatusText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  textPresent: {
+    color: '#15803D',
+  },
+  textAbsent: {
+    color: '#B91C1C',
+  },
+  textHoliday: {
+    color: '#B45309',
+  },
+  emptyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  emptyText: {
+    color: '#94A3B8',
+    fontSize: 13,
   },
 });
-

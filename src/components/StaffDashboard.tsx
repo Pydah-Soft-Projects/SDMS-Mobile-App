@@ -41,15 +41,14 @@ export const StaffDashboard: React.FC = () => {
     todayPresent: 0,
     todayAbsent: 0,
     attendancePercentage: 0,
-    totalCourses: 0,
-    totalColleges: 0,
+    colleges: [],
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [operations, setOperations] = useState<StaffOperation[]>([]);
 
   const loadStaffData = async () => {
     try {
-      logger.info('STAFF_DASHBOARD', 'Loading staff metrics and permitted modules');
+      logger.info('STAFF_DASHBOARD', 'Syncing real SDMS metrics and permitted operations');
       const data = await staffService.getDashboardStats();
       setStats(data);
 
@@ -99,15 +98,15 @@ export const StaffDashboard: React.FC = () => {
   const handleSearchSubmit = () => {
     if (!searchQuery.trim()) return;
     Alert.alert(
-      'Student Search',
-      `Searching database for: "${searchQuery.trim()}" across assigned campus scope.`
+      'SDMS Student Search',
+      `Searching student database for: "${searchQuery.trim()}" across permitted campus scopes.`
     );
   };
 
   const handleOperationPress = (op: StaffOperation) => {
     Alert.alert(
       op.label,
-      `${op.description}\n\nPermitted under your staff role: ${staff?.role?.toUpperCase() || 'STAFF'}`
+      `${op.description}\n\nAssigned module active for your role: ${(staff?.role || 'staff').toUpperCase()}`
     );
   };
 
@@ -115,14 +114,14 @@ export const StaffDashboard: React.FC = () => {
     <View style={styles.container}>
       <Header
         title={`Welcome, ${staff?.name || staff?.username || 'Staff'}`}
-        subtitle={`Role: ${(staff?.role || 'Staff').toUpperCase()} • Admin Portal`}
+        subtitle={`Role: ${(staff?.role || 'Staff').toUpperCase()} • Admin Console`}
       />
 
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {/* Staff Authority Banner */}
+        {/* Authority Level Card */}
         <View style={styles.banner}>
           <View style={styles.bannerTop}>
             <View style={styles.roleBadge}>
@@ -132,16 +131,16 @@ export const StaffDashboard: React.FC = () => {
               </Text>
             </View>
             <Text style={styles.bannerScope}>
-              {staff?.collegeId ? `College Scope #${staff.collegeId}` : 'Campus-Wide Master Access'}
+              {staff?.collegeId ? `College ID #${staff.collegeId}` : 'Institutional Master Access'}
             </Text>
           </View>
-          <Text style={styles.bannerHeadline}>Institution Management Console</Text>
+          <Text style={styles.bannerHeadline}>SDMS Institution Console</Text>
           <Text style={styles.bannerSub}>
-            Real-time synchronization with Pydah SDMS Master Database.
+            Live metrics from Pydah Student Database Management System.
           </Text>
         </View>
 
-        {/* Quick Student Search */}
+        {/* Search Student Bar */}
         <View style={styles.searchBar}>
           <Search size={18} color="#94A3B8" />
           <TextInput
@@ -159,13 +158,13 @@ export const StaffDashboard: React.FC = () => {
           )}
         </View>
 
-        {/* Institution Live Metrics */}
-        <Text style={styles.sectionTitle}>Institution Overview</Text>
+        {/* Institution Real Metrics */}
+        <Text style={styles.sectionTitle}>Real-time Campus Metrics</Text>
         <View style={styles.statsGrid}>
           <StatCard
-            label="Total Students"
+            label="Enrolled Regular"
             value={stats.totalStudents.toLocaleString()}
-            subValue="Enrolled Regular"
+            subValue="Active Students"
             icon={<Users size={18} color="#0284C7" />}
             color="#0284C7"
             style={styles.halfCard}
@@ -173,22 +172,45 @@ export const StaffDashboard: React.FC = () => {
           <StatCard
             label="Today's Attendance"
             value={`${stats.attendancePercentage}%`}
-            subValue={`${stats.todayPresent} Present • ${stats.todayAbsent} Absent`}
+            subValue={`${stats.todayPresent.toLocaleString()} Present / ${stats.todayAbsent.toLocaleString()} Absent`}
             icon={<TrendingUp size={18} color="#059669" />}
             color="#059669"
             style={styles.halfCard}
           />
         </View>
 
-        {/* Permitted Staff Modules */}
+        {/* College Breakdown (if available) */}
+        {stats.colleges.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>Colleges Breakdown</Text>
+            <View style={styles.collegesList}>
+              {stats.colleges.map((col, idx) => (
+                <View key={idx} style={styles.colCard}>
+                  <View style={styles.colTop}>
+                    <Building2 size={16} color="#1E3A8A" />
+                    <Text style={styles.colName} numberOfLines={1}>
+                      {col.college}
+                    </Text>
+                  </View>
+                  <View style={styles.colStatsRow}>
+                    <Text style={styles.colTotal}>{col.total.toLocaleString()} Students</Text>
+                    <Text style={styles.colRate}>{col.rate}% Present</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
+        {/* Permitted Operations Grid */}
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Permitted Operations</Text>
           <View style={styles.countBadge}>
-            <Text style={styles.countBadgeText}>{operations.length} Enabled</Text>
+            <Text style={styles.countBadgeText}>{operations.length} Permitted</Text>
           </View>
         </View>
         <Text style={styles.sectionSubtitle}>
-          Configured according to your assigned RBAC modules and permissions:
+          Configured according to your assigned RBAC modules and operations:
         </Text>
 
         <View style={styles.operationsGrid}>
@@ -281,7 +303,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    marginBottom: 20,
+    marginBottom: 16,
     gap: 10,
   },
   searchInput: {
@@ -305,18 +327,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#1E293B',
+    marginBottom: 8,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: 14,
     marginBottom: 4,
   },
   sectionSubtitle: {
     fontSize: 12,
     color: '#64748B',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   countBadge: {
     backgroundColor: '#EEF2FF',
@@ -332,11 +355,46 @@ const styles = StyleSheet.create({
   statsGrid: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 10,
-    marginBottom: 10,
+    marginBottom: 16,
   },
   halfCard: {
     flex: 1,
+  },
+  collegesList: {
+    gap: 8,
+    marginBottom: 16,
+  },
+  colCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  colTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  colName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+    flex: 1,
+  },
+  colStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  colTotal: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  colRate: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#059669',
   },
   operationsGrid: {
     gap: 10,
@@ -375,4 +433,3 @@ const styles = StyleSheet.create({
 });
 
 export default StaffDashboard;
-

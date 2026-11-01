@@ -39,6 +39,7 @@ function RootNavigation() {
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="operation/[key]" options={{ headerShown: false }} />
+        <Stack.Screen name="student-module/[id]" options={{ headerShown: false }} />
       </Stack>
     </>
   );

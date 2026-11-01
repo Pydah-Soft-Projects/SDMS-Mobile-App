@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   TextInput,
   Modal,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -61,10 +61,9 @@ import staffService, { StaffDashboardStats } from '../services/staffService';
 import { AdminNavItem, AdminNavSubItem } from '../utils/rbac';
 import logger from '../utils/logger';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
 export const StaffDashboard: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
   const router = useRouter();
   const { user } = useAuth();
   const staff = user as any;
@@ -258,7 +257,7 @@ export const StaffDashboard: React.FC = () => {
           <Text style={styles.sectionSub}>Live metrics from SDMS</Text>
         </View>
 
-        <View style={styles.statsGrid}>
+        <View style={[styles.statsGrid, screenWidth < 360 && styles.statsGridStacked]}>
           <StatCard
             label="Total Students"
             value={stats.totalStudents.toLocaleString()}
@@ -277,7 +276,7 @@ export const StaffDashboard: React.FC = () => {
           />
         </View>
 
-        <View style={styles.statsGrid}>
+        <View style={[styles.statsGrid, screenWidth < 360 && styles.statsGridStacked]}>
           <StatCard
             label="Present Today"
             value={stats.todayPresent.toLocaleString()}
@@ -589,6 +588,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     marginBottom: 12,
+  },
+  statsGridStacked: {
+    flexDirection: 'column',
   },
   modulesGrid: {
     gap: 12,

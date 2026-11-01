@@ -9,12 +9,15 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
+  Linking,
+  Alert,
 } from 'react-native';
-import { Bell, AlertCircle, Calendar } from 'lucide-react-native';
+import { Bell, AlertCircle, Calendar, ExternalLink } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import Header from '../../src/components/Header';
 import announcementService from '../../src/services/announcementService';
 import { Announcement } from '../../src/types';
+import { getStaticFileUrl } from '../../src/config/api';
 
 
 export default function AnnouncementsScreen() {
@@ -47,6 +50,14 @@ export default function AnnouncementsScreen() {
     setRefreshing(true);
     await loadNotices();
     setRefreshing(false);
+  };
+
+  const openAttachment = async (url: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch (error: any) {
+      Alert.alert('Unable to open attachment', error.message || 'Please try again later.');
+    }
   };
 
   const getPriorityStyle = (priority: string) => {
@@ -102,16 +113,28 @@ export default function AnnouncementsScreen() {
                   </View>
 
                   <Text style={styles.title}>{item.title}</Text>
-                  {item.imageUrl ? (
-                    <View style={styles.cardImageWrapper}>
+                  <View style={styles.cardImageWrapper}>
                     <Image
-                      source={{ uri: item.imageUrl }}
+                      source={
+                        item.imageUrl
+                          ? { uri: getStaticFileUrl(item.imageUrl) }
+                          : require('../../assets/announcement-fallback.jpg')
+                      }
                       style={styles.cardImage}
                       resizeMode="cover"
                     />
                   </View>
-                  ) : null}
                   <Text style={styles.body}>{item.content}</Text>
+                  {item.attachmentUrl ? (
+                    <TouchableOpacity
+                      style={styles.attachmentButton}
+                      onPress={() => openAttachment(item.attachmentUrl!)}
+                      activeOpacity={0.8}
+                    >
+                      <ExternalLink size={16} color="#FFFFFF" />
+                      <Text style={styles.attachmentButtonText}>Open Attachment</Text>
+                    </TouchableOpacity>
+                  ) : null}
 
                   {item.category && (
                     <View style={styles.footerRow}>
@@ -216,6 +239,21 @@ const styles = StyleSheet.create({
     color: '#475569',
     lineHeight: 20,
     marginBottom: 10,
+  },
+  attachmentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#1E3A8A',
+    borderRadius: 10,
+    paddingVertical: 11,
+    marginBottom: 10,
+  },
+  attachmentButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
   footerRow: {
     flexDirection: 'row',

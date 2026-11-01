@@ -7,7 +7,7 @@ import {
   RefreshControl,
   TouchableOpacity,
   ActivityIndicator,
-  Dimensions,
+  useWindowDimensions,
   Image,
   Modal,
   Alert,
@@ -58,13 +58,66 @@ import {
 } from '../../src/components/StudentSidebarDrawer';
 import { StudentModuleDetailModal, StudentModuleItem } from '../../src/components/StudentModuleDetailModal';
 import { getStaticFileUrl } from '../../src/config/api';
+const SafeEventImage: React.FC<{ uri?: string | null; style: any }> = ({ uri, style }) => {
+  const [loadError, setLoadError] = useState(false);
+  const fallback = require('../../assets/announcement-fallback.jpg');
 
+  if (!uri || loadError) {
+    return <Image source={fallback} style={style} resizeMode="cover" />;
+  }
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+  return (
+    <Image
+      source={{ uri: getStaticFileUrl(uri) }}
+      style={style}
+      resizeMode="cover"
+      onError={() => setLoadError(true)}
+    />
+  );
+};
+
+const SafeClubImage: React.FC<{ club: any; style: any }> = ({ club, style }) => {
+  const [loadError, setLoadError] = useState(false);
+  const fallback = require('../../assets/announcement-fallback.jpg');
+  const clubImg = club.image_url || club.image || club.club_image;
+  const clubUrl = clubImg
+    ? getStaticFileUrl(clubImg)
+    : club.id
+    ? getStaticFileUrl(`/api/clubs/${club.id}/image`)
+    : null;
+
+  if (!clubUrl || loadError) {
+    return (
+      <View style={[style, styles.clubCardImageFallback]}>
+        <Image source={fallback} style={[style, { opacity: 0.55 }]} resizeMode="cover" />
+        <View style={styles.clubFallbackOverlay}>
+          <Users size={26} color="#FFFFFF" />
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri: clubUrl }}
+      style={style}
+      resizeMode="cover"
+      onError={() => setLoadError(true)}
+    />
+  );
+};
 
 export default function DashboardScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+  const horizontalPadding = screenWidth < 360 ? 12 : 16;
+  const portalColumns = 3;
+  const portalCardWidth =
+    (screenWidth -
+      horizontalPadding * 2 -
+      10 * (portalColumns - 1)) /
+    portalColumns;
   const { user, userType } = useAuth();
 
   // If staff or admin user, render Staff Management Dashboard
@@ -182,11 +235,27 @@ export default function DashboardScreen() {
   }, [allFlattenedModules, layoutSettings]);
 
   // Compute live attendance percentage
-  const semesterTotals = attendance?.semester?.totals || attendance?.monthly?.totals;
-  const attendanceRate =
-    semesterTotals?.percentage !== undefined
-      ? semesterTotals.percentage
+  const semesterTotals = attendance?.semester?.totals ?? attendance?.monthly?.totals;
+  const attendanceRate = useMemo(() => {
+    if (!semesterTotals) return null;
+
+    const present = semesterTotals.present;
+    const absent = semesterTotals.absent;
+    if (
+      Number.isFinite(present) &&
+      Number.isFinite(absent) &&
+      present >= 0 &&
+      absent >= 0 &&
+      present + absent > 0
+    ) {
+      return (present / (present + absent)) * 100;
+    }
+
+    const percentage = semesterTotals.percentage;
+    return typeof percentage === 'number' && Number.isFinite(percentage)
+      ? percentage
       : null;
+  }, [semesterTotals]);
 
   // Today's Attendance calculation
   const todayAttendance = useMemo(() => {
@@ -243,21 +312,20 @@ export default function DashboardScreen() {
 
   // Overall Attendance Progress calculation
   const progressInfo = useMemo(() => {
-    const rawPct =
-      typeof attendanceRate === 'number' && Number.isFinite(attendanceRate)
-        ? attendanceRate
-        : 85.0;
+    if (attendanceRate === null) {
+      return { percentage: null, rating: 'No Data', color: '#64748B' };
+    }
 
     let rating = 'Good';
     let color = '#15803D';
-    if (rawPct < 65) {
+    if (attendanceRate < 65) {
       rating = 'Low';
       color = '#DC2626';
-    } else if (rawPct < 75) {
+    } else if (attendanceRate < 75) {
       rating = 'Average';
       color = '#D97706';
     }
-    return { percentage: rawPct.toFixed(1), rating, color };
+    return { percentage: attendanceRate.toFixed(1), rating, color };
   }, [attendanceRate]);
 
   // Combined feed of announcements and events
@@ -416,6 +484,7 @@ export default function DashboardScreen() {
         <ScrollView
           contentContainerStyle={[
             styles.content,
+            { paddingHorizontal: horizontalPadding },
             { paddingBottom: Math.max(insets.bottom, 16) + 84 },
           ]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
@@ -500,12 +569,12 @@ export default function DashboardScreen() {
               </View>
               <View style={styles.metricCardBody}>
                 <View style={styles.metricTextCol}>
-                  <Text style={[styles.metricMainValue, { color: '#6D28D9' }]}>
-                    {progressInfo.percentage}%
+                  <Text style={[styles.metricMainValue, { color: progressInfo.color }]}>
+                    {progressInfo.percentage === null ? '—' : `${progressInfo.percentage}%`}
                   </Text>
                   <View style={styles.metricDateRow}>
                     <ChevronRight size={10} color="#6D28D9" />
-                    <Text style={[styles.metricDateText, { color: '#6D28D9' }]}>
+                    <Text style={[styles.metricDateText, { color: progressInfo.color }]}>
                       {progressInfo.rating} Rating
                     </Text>
                   </View>
@@ -541,12 +610,17 @@ export default function DashboardScreen() {
               return (
                 <TouchableOpacity
                   key={mod.id}
-                  style={styles.portalCard}
+                  style={[
+                    styles.portalCard,
+                    {
+                      width: portalCardWidth,
+                    },
+                  ]}
                   onPress={() => {
                     if (mod.isTab && mod.tabRoute) {
                       router.push(mod.tabRoute as any);
                     } else {
-                      setActiveModule(mod);
+                      router.push(`/student-module/${mod.id}` as any);
                     }
                   }}
                   activeOpacity={0.7}
@@ -566,7 +640,11 @@ export default function DashboardScreen() {
 
             {/* All Portals Card */}
             <TouchableOpacity
-              style={[styles.portalCard, styles.allPortalsCard]}
+              style={[
+                styles.portalCard,
+                styles.allPortalsCard,
+                { width: portalCardWidth },
+              ]}
               onPress={() => setDrawerVisible(true)}
               activeOpacity={0.7}
             >
@@ -603,21 +681,11 @@ export default function DashboardScreen() {
                   <TouchableOpacity
                     key={item.id}
                     style={styles.eventCard}
-                    onPress={() => setSelectedFeedItem(item)}
+                    onPress={() => router.push(item.type === 'event' ? '/student-module/events' as any : '/(tabs)/announcements' as any)}
                     activeOpacity={0.85}
                   >
                     <View style={styles.eventCardBanner}>
-                      {item.imageUrl ? (
-                        <Image
-                          source={{ uri: item.imageUrl }}
-                          style={styles.eventCardImage}
-                          resizeMode="cover"
-                        />
-                      ) : (
-                        <View style={styles.eventCardPlaceholder}>
-                          <FileText size={28} color="#FFFFFF" style={{ opacity: 0.3 }} />
-                        </View>
-                      )}
+                      <SafeEventImage uri={item.imageUrl} style={styles.eventCardImage} />
                       <View
                         style={[
                           styles.eventCategoryBadge,
@@ -659,15 +727,7 @@ export default function DashboardScreen() {
               <View style={styles.sectionHeaderRow}>
                 <Text style={styles.sectionTitle}>Campus Clubs</Text>
                 <TouchableOpacity
-                  onPress={() =>
-                    setActiveModule({
-                      id: 'clubs',
-                      title: 'Clubs',
-                      subtitle: 'Student Activities & Circles',
-                      category: 'campus',
-                      iconName: 'Users',
-                    })
-                  }
+                  onPress={() => router.push('/student-module/clubs' as any)}
                   style={styles.viewAllRow}
                 >
                   <Text style={styles.viewAllText}>Explore</Text>
@@ -686,22 +746,29 @@ export default function DashboardScreen() {
                     <TouchableOpacity
                       key={club.id}
                       style={styles.clubCard}
-                      onPress={() => setSelectedClub(club)}
+                      onPress={() => router.push('/student-module/clubs' as any)}
                       activeOpacity={0.85}
                     >
-                      <View style={styles.clubCardTop}>
-                        <View style={styles.clubIconContainer}>
-                          <Users size={18} color="#0D9488" />
+                      {/* Club Banner Image with Fallback */}
+                      <View style={styles.clubCardBanner}>
+                        <SafeClubImage club={club} style={styles.clubCardImage} />
+                        <View style={[styles.clubStatusBadge, isJoined && { backgroundColor: '#15803D' }]}>
+                          <Sparkles size={9} color="#FFFFFF" />
+                          <Text style={styles.clubStatusBadgeText}>
+                            {isJoined ? 'JOINED' : 'OPEN TO JOIN'}
+                          </Text>
                         </View>
-                        <Text style={styles.clubCategoryText}>{club.category || 'CLUB'}</Text>
                       </View>
 
-                      <Text style={styles.clubTitle} numberOfLines={1}>
-                        {club.name}
-                      </Text>
-                      <Text style={styles.clubDesc} numberOfLines={2}>
-                        {club.description || 'Student group activities and technical projects.'}
-                      </Text>
+                      <View style={styles.clubCardContent}>
+                        <Text style={styles.clubCategoryText} numberOfLines={1}>{club.category || 'CAMPUS CLUB'}</Text>
+                        <Text style={styles.clubTitle} numberOfLines={1}>
+                          {club.name}
+                        </Text>
+                        <Text style={styles.clubDesc} numberOfLines={2}>
+                          {club.description || 'Student group activities and technical projects.'}
+                        </Text>
+                      </View>
 
                       <View style={styles.clubCardFooter}>
                         <Text style={styles.clubMemberCount}>
@@ -726,157 +793,6 @@ export default function DashboardScreen() {
         </ScrollView>
       )}
 
-      {/* FULL-SCREEN DETAIL VIEW FOR ANNOUNCEMENT / EVENT */}
-      <Modal
-        visible={!!selectedFeedItem}
-        animationType="slide"
-        presentationStyle="fullScreen"
-        onRequestClose={() => setSelectedFeedItem(null)}
-      >
-        <View style={[styles.fullScreenPageContainer, { paddingTop: insets.top }]}>
-          <View style={styles.fullScreenPageHeader}>
-            <TouchableOpacity
-              onPress={() => setSelectedFeedItem(null)}
-              style={styles.fullScreenBackBtn}
-              hitSlop={10}
-            >
-              <ArrowLeft size={22} color="#1E293B" />
-            </TouchableOpacity>
-            <View style={{ flex: 1, marginLeft: 8 }}>
-              <Text style={styles.fullScreenHeaderTitle} numberOfLines={1}>
-                {selectedFeedItem?.type === 'event' ? 'Campus Event' : 'Notice & Circular'}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.modalBadge,
-                {
-                  backgroundColor:
-                    selectedFeedItem?.type === 'event' ? '#F3E8FF' : '#EEF2FF',
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.modalBadgeText,
-                  {
-                    color:
-                      selectedFeedItem?.type === 'event' ? '#9333EA' : '#4F46E5',
-                  },
-                ]}
-              >
-                {selectedFeedItem?.category?.toUpperCase()}
-              </Text>
-            </View>
-          </View>
-
-          <ScrollView
-            style={styles.fullScreenPageScroll}
-            contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 24) + 20 }}
-            showsVerticalScrollIndicator={false}
-          >
-            {selectedFeedItem?.imageUrl ? (
-              <View style={styles.fullScreenImageContainer}>
-                <Image
-                  source={{ uri: selectedFeedItem.imageUrl }}
-                  style={styles.fullScreenBannerImage}
-                  resizeMode="cover"
-                />
-              </View>
-            ) : null}
-
-            <View style={styles.fullScreenPageContent}>
-              <Text style={styles.fullScreenDetailTitle}>{selectedFeedItem?.title}</Text>
-              <View style={styles.modalMetaRow}>
-                <Clock size={12} color="#64748B" />
-                <Text style={styles.modalMetaDate}>{selectedFeedItem?.dateFormatted}</Text>
-              </View>
-              <Text style={styles.fullScreenContentText}>
-                {selectedFeedItem?.content || 'No detailed description available.'}
-              </Text>
-            </View>
-          </ScrollView>
-
-          <View style={[styles.fullScreenFooter, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
-            <TouchableOpacity
-              style={styles.fullScreenDismissBtn}
-              onPress={() => setSelectedFeedItem(null)}
-            >
-              <Text style={styles.fullScreenDismissBtnText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* FULL-SCREEN DETAIL VIEW FOR CLUB */}
-      <Modal
-        visible={!!selectedClub}
-        animationType="slide"
-        presentationStyle="fullScreen"
-        onRequestClose={() => setSelectedClub(null)}
-      >
-        <View style={[styles.fullScreenPageContainer, { paddingTop: insets.top }]}>
-          <View style={styles.fullScreenPageHeader}>
-            <TouchableOpacity
-              onPress={() => setSelectedClub(null)}
-              style={styles.fullScreenBackBtn}
-              hitSlop={10}
-            >
-              <ArrowLeft size={22} color="#1E293B" />
-            </TouchableOpacity>
-            <View style={{ flex: 1, marginLeft: 8 }}>
-              <Text style={styles.fullScreenHeaderTitle} numberOfLines={1}>
-                {selectedClub?.name || 'Campus Club'}
-              </Text>
-            </View>
-            <View style={[styles.modalBadge, { backgroundColor: '#CCFBF1' }]}>
-              <Text style={[styles.modalBadgeText, { color: '#0F766E' }]}>
-                {selectedClub?.category?.toUpperCase() || 'STUDENT CLUB'}
-              </Text>
-            </View>
-          </View>
-
-          <ScrollView
-            style={styles.fullScreenPageScroll}
-            contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 24) + 20 }}
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={styles.fullScreenPageContent}>
-              <Text style={styles.fullScreenDetailTitle}>{selectedClub?.name}</Text>
-              {(selectedClub?.memberCount || selectedClub?.member_count) ? (
-                <View style={styles.clubMemberStatRow}>
-                  <Users size={14} color="#0F766E" />
-                  <Text style={styles.clubMemberStatText}>
-                    {selectedClub.memberCount || selectedClub.member_count} active members enrolled
-                  </Text>
-                </View>
-              ) : null}
-              <Text style={styles.fullScreenContentText}>
-                {selectedClub?.description ||
-                  'Join other enthusiastic students in workshops, coding hackathons, technical projects, and peer networking.'}
-              </Text>
-            </View>
-          </ScrollView>
-
-          <View style={[styles.fullScreenFooter, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
-            <TouchableOpacity
-              style={[
-                styles.modalActionBtn,
-                joinedClubIds[selectedClub?.id] && { backgroundColor: '#15803D' },
-              ]}
-              onPress={() => {
-                handleJoinClub(selectedClub);
-                setSelectedClub(null);
-              }}
-            >
-              <Text style={styles.modalActionBtnText}>
-                {joinedClubIds[selectedClub?.id] ? '✓ You Are Enrolled' : 'Submit Membership'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
       {/* SDMS Sidebar Drawer */}
       <StudentSidebarDrawer
         visible={drawerVisible}
@@ -884,12 +800,7 @@ export default function DashboardScreen() {
         layoutSettings={layoutSettings}
       />
 
-      {/* SDMS Module Detail Modal */}
-      <StudentModuleDetailModal
-        visible={!!activeModule}
-        module={activeModule}
-        onClose={() => setActiveModule(null)}
-      />
+
     </View>
   );
 }
@@ -910,7 +821,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   content: {
-    padding: 16,
+    paddingVertical: 16,
   },
   banner: {
     backgroundColor: '#1E3A8A',
@@ -975,9 +886,10 @@ const styles = StyleSheet.create({
   },
   metricCard: {
     flex: 1,
+    minWidth: 0,
     borderRadius: 14,
     borderWidth: 1,
-    padding: 12,
+    padding: 10,
   },
   metricCardHeader: {
     marginBottom: 4,
@@ -1059,7 +971,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   portalCard: {
-    width: (SCREEN_WIDTH - 32 - 20) / 3,
+    flexShrink: 0,
+    minHeight: 100,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 10,
@@ -1185,14 +1098,71 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#2563EB',
   },
+
   clubCard: {
-    width: 200,
+    width: 215,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    padding: 12,
+    overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
   },
+  clubCardBanner: {
+    width: '100%',
+    height: 100,
+    position: 'relative',
+    backgroundColor: '#0F172A',
+    overflow: 'hidden',
+  },
+  clubCardImage: {
+    width: '100%',
+    height: '100%',
+  },
+  clubCardImageFallback: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+    backgroundColor: '#0F172A',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  clubFallbackOverlay: {
+    position: 'absolute',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  clubStatusBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#10B981',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    zIndex: 2,
+  },
+  clubStatusBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  clubCardContent: {
+    padding: 10,
+  },
+
   clubCardTop: {
     flexDirection: 'row',
     alignItems: 'center',

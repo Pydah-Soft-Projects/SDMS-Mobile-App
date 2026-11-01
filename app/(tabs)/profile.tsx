@@ -8,19 +8,103 @@ import {
   TouchableOpacity,
   Alert,
   Image,
+  Modal,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { User, Mail, Phone, BookOpen, GraduationCap, ShieldAlert, LogOut, KeyRound } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import Header from '../../src/components/Header';
 import CustomButton from '../../src/components/CustomButton';
-import { getStaticFileUrl } from '../../src/config/api';
+import api, { getStaticFileUrl } from '../../src/config/api';
 import { ENV } from '../../src/config/env';
+import authService from '../../src/services/authService';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user, userType, logout } = useAuth();
   const student = user as any;
   const avatarUrl = student?.avatarUrl ? getStaticFileUrl(student.avatarUrl) : null;
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [profileEmail, setProfileEmail] = useState(student?.email || '');
+  const [profilePhone, setProfilePhone] = useState(student?.phone || '');
+  const [submittingProfileRequest, setSubmittingProfileRequest] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      Alert.alert('Missing details', 'Complete all password fields before submitting.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      Alert.alert('Password too short', 'Your new password must be at least 6 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Passwords do not match', 'Check the new password and confirmation.');
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      if (userType === 'student') {
+        await authService.changePassword(currentPassword, newPassword);
+      } else {
+        await api.post('/auth/change-password', { currentPassword, newPassword });
+      }
+      setPasswordModalVisible(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      Alert.alert('Password changed', 'Your password has been updated.');
+    } catch (error: any) {
+      Alert.alert(
+        'Password change failed',
+        error.response?.data?.message || 'Unable to change your password. Please try again.'
+      );
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const handleProfileRequest = async () => {
+    const requestedChanges: Record<string, string> = {};
+    if (profileEmail.trim() !== String(student?.email || '').trim()) {
+      requestedChanges.email = profileEmail.trim();
+    }
+    if (profilePhone.trim() !== String(student?.phone || '').trim()) {
+      requestedChanges.student_mobile = profilePhone.trim();
+    }
+    if (Object.keys(requestedChanges).length === 0) {
+      Alert.alert('No changes', 'Update your email or phone number before submitting.');
+      return;
+    }
+    if (requestedChanges.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(requestedChanges.email)) {
+      Alert.alert('Invalid email', 'Enter a valid email address.');
+      return;
+    }
+
+    setSubmittingProfileRequest(true);
+    try {
+      await api.post('/profile-changes/request', { requested_changes: requestedChanges });
+      setProfileModalVisible(false);
+      Alert.alert(
+        'Request submitted',
+        'Your profile update is awaiting approval from the college.'
+      );
+    } catch (error: any) {
+      Alert.alert(
+        'Request failed',
+        error.response?.data?.message || 'Unable to submit your profile update. Please try again.'
+      );
+    } finally {
+      setSubmittingProfileRequest(false);
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to log out of your session?', [
@@ -142,6 +226,19 @@ export default function ProfileScreen() {
               <Text style={styles.infoValue}>{student?.phone || 'N/A'}</Text>
             </View>
           </View>
+          {userType === 'student' ? (
+            <TouchableOpacity
+              style={styles.profileRequestButton}
+              onPress={() => {
+                setProfileEmail(student?.email || '');
+                setProfilePhone(student?.phone || '');
+                setProfileModalVisible(true);
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.profileRequestButtonText}>Request Profile Update</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         {/* Account Security */}
@@ -149,9 +246,7 @@ export default function ProfileScreen() {
         <View style={styles.infoCard}>
           <TouchableOpacity
             style={styles.actionRow}
-            onPress={() =>
-              Alert.alert('Change Password', 'Password change service ready in settings.')
-            }
+            onPress={() => setPasswordModalVisible(true)}
           >
             <View style={styles.actionRowLeft}>
               <KeyRound size={18} color="#64748B" />
@@ -186,6 +281,112 @@ export default function ProfileScreen() {
           style={{ marginTop: 24 }}
         />
       </ScrollView>
+      <Modal
+        visible={passwordModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPasswordModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Change Password</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Current password"
+              value={currentPassword}
+              onChangeText={setCurrentPassword}
+              secureTextEntry
+              autoCapitalize="none"
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="New password"
+              value={newPassword}
+              onChangeText={setNewPassword}
+              secureTextEntry
+              autoCapitalize="none"
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Confirm new password"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+              autoCapitalize="none"
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => setPasswordModalVisible(false)}
+                disabled={changingPassword}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalSubmitButton]}
+                onPress={handleChangePassword}
+                disabled={changingPassword}
+              >
+                {changingPassword ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Update Password</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        visible={profileModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setProfileModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Request Profile Update</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Email address"
+              value={profileEmail}
+              onChangeText={setProfileEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Phone number"
+              value={profilePhone}
+              onChangeText={setProfilePhone}
+              keyboardType="phone-pad"
+            />
+            <Text style={styles.modalHelpText}>
+              Profile changes are sent for approval before they appear on your account.
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => setProfileModalVisible(false)}
+                disabled={submittingProfileRequest}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalSubmitButton]}
+                onPress={handleProfileRequest}
+                disabled={submittingProfileRequest}
+              >
+                {submittingProfileRequest ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Submit Request</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -306,5 +507,78 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#334155',
   },
+  profileRequestButton: {
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    borderRadius: 10,
+    marginTop: 16,
+    paddingVertical: 11,
+  },
+  profileRequestButtonText: {
+    color: '#1E3A8A',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+  },
+  modalTitle: {
+    color: '#0F172A',
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 16,
+  },
+  modalInput: {
+    height: 48,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    color: '#0F172A',
+    marginBottom: 12,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  modalButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+  },
+  modalCancelButton: {
+    backgroundColor: '#F1F5F9',
+  },
+  modalSubmitButton: {
+    backgroundColor: '#1E3A8A',
+  },
+  modalCancelText: {
+    color: '#334155',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  modalSubmitText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  modalHelpText: {
+    color: '#64748B',
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 12,
+  },
 });
-

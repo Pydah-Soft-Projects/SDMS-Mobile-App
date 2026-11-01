@@ -57,6 +57,9 @@ export interface SDMSModuleItem extends StudentModuleItem {
 export const SDMS_STUDENT_SECTIONS: {
   categoryTitle: string;
   items: SDMSModuleItem[];
+
+
+
 }[] = [
   {
     categoryTitle: 'Core Academic Portals',
@@ -232,6 +235,21 @@ export const SDMS_STUDENT_SECTIONS: {
   },
 ];
 
+export const getStudentModuleById = (id: string): SDMSModuleItem => {
+  for (const section of SDMS_STUDENT_SECTIONS) {
+    const item = section.items.find((i) => i.id === id || i.layoutKey === id);
+    if (item) return item;
+  }
+  return {
+    id,
+    layoutKey: id,
+    title: id.charAt(0).toUpperCase() + id.slice(1).replace(/-/g, ' '),
+    subtitle: 'Academic Service Portal',
+    category: 'academics',
+    iconName: 'Layers',
+  };
+};
+
 interface StudentSidebarDrawerProps {
   visible: boolean;
   onClose: () => void;
@@ -299,8 +317,7 @@ export const StudentSidebarDrawer: React.FC<StudentSidebarDrawerProps> = ({
     if (item.isTab && item.tabRoute) {
       router.push(item.tabRoute as any);
     } else {
-      setSelectedModule(item);
-      setDetailModalVisible(true);
+      router.push(`/student-module/${item.id}` as any);
     }
   };
 
@@ -438,12 +455,7 @@ export const StudentSidebarDrawer: React.FC<StudentSidebarDrawerProps> = ({
         </View>
       </Modal>
 
-      {/* SDMS Module Detail Modal */}
-      <StudentModuleDetailModal
-        visible={detailModalVisible}
-        module={selectedModule}
-        onClose={() => setDetailModalVisible(false)}
-      />
+
     </>
   );
 };

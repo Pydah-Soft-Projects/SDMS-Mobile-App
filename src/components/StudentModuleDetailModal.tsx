@@ -7,7 +7,12 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
   Linking,
+  Image,
+  Platform,
+  StatusBar as RNStatusBar,
+  TextInput,
 } from 'react-native';
 import {
   X,
@@ -32,7 +37,8 @@ import {
   CheckCircle2,
   FolderOpen,
 } from 'lucide-react-native';
-import api from '../config/api';
+import { useRouter } from 'expo-router';
+import api, { getStaticFileUrl } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import logger from '../utils/logger';
@@ -47,24 +53,49 @@ export interface StudentModuleItem {
   badge?: string;
 }
 
+export interface StudentModuleViewProps {
+  module: StudentModuleItem;
+  onBack?: () => void;
+}
+
 interface StudentModuleDetailModalProps {
   visible: boolean;
   module: StudentModuleItem | null;
   onClose: () => void;
 }
 
-export const StudentModuleDetailModal: React.FC<StudentModuleDetailModalProps> = ({
-  visible,
+export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
   module,
-  onClose,
+  onBack,
 }) => {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
+  const topInset = Math.max(
+    insets.top,
+    Platform.OS === 'android' ? RNStatusBar.currentHeight || 24 : 0,
+    16
+  );
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+    } else {
+      router.back();
+    }
+  };
   const { user } = useAuth();
   const student = user as any;
   const admissionNo = student?.admission_number || student?.pin_no || '';
 
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<any>(null);
+  const [selectedService, setSelectedService] = useState<any>(null);
+  const [servicePurpose, setServicePurpose] = useState('');
+  const [submittingServiceRequest, setSubmittingServiceRequest] = useState(false);
+  const [selectedCertificate, setSelectedCertificate] = useState<any>(null);
+  const [borrowPurpose, setBorrowPurpose] = useState('');
+  const [borrowReturnDate, setBorrowReturnDate] = useState('');
+  const [submittingBorrowRequest, setSubmittingBorrowRequest] = useState(false);
+  const [joiningClubId, setJoiningClubId] = useState<number | string | null>(null);
 
   const course = student?.course || student?.course_name || '';
   const branch = student?.branch || student?.branch_name || '';
@@ -73,8 +104,119 @@ export const StudentModuleDetailModal: React.FC<StudentModuleDetailModalProps> =
   const batch = student?.batch || '';
   const quota = student?.quota || student?.stud_type || '';
 
+  const submitServiceRequest = async () => {
+    const purpose = servicePurpose.trim();
+    if (!selectedService || !purpose) {
+      Alert.alert('Purpose required', 'Please enter why you need this service.');
+      return;
+    }
+
+    setSubmittingServiceRequest(true);
+    try {
+      await api.post('/services/requests', {
+        service_id: selectedService.id,
+        purpose,
+      });
+      setData((current: any) => ({
+        ...current,
+        requests: [
+          {
+            service_name: selectedService.name || selectedService.title,
+            purpose,
+            status: 'pending',
+            created_at: new Date().toISOString(),
+          },
+          ...(current?.requests || []),
+        ],
+      }));
+      setSelectedService(null);
+      setServicePurpose('');
+      Alert.alert('Request submitted', 'Your service request has been submitted.');
+    } catch (error: any) {
+      logger.error('MODULE_DETAIL', 'Failed to submit student service request', error.message);
+      Alert.alert(
+        'Request failed',
+        error.response?.data?.message || 'Unable to submit the service request. Please try again.'
+      );
+    } finally {
+      setSubmittingServiceRequest(false);
+    }
+  };
+
+  const submitBorrowRequest = async () => {
+    const purpose = borrowPurpose.trim();
+    const returnDate = borrowReturnDate.trim();
+    if (!selectedCertificate || !purpose || !returnDate) {
+      Alert.alert('Details required', 'Enter a purpose and return date to continue.');
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(returnDate)) {
+      Alert.alert('Invalid date', 'Use YYYY-MM-DD for the return date.');
+      return;
+    }
+
+    setSubmittingBorrowRequest(true);
+    try {
+      await api.post('/certificate-borrow/student/request', {
+        admissionNumber: admissionNo,
+        certificateKey: selectedCertificate.key,
+        certificateName: selectedCertificate.name,
+        purpose,
+        returnDate,
+      });
+      setData((current: any) => ({
+        ...current,
+        history: [
+          {
+            certificate_name: selectedCertificate.name,
+            certificate_key: selectedCertificate.key,
+            status: 'pending',
+            purpose,
+            expected_return_date: returnDate,
+          },
+          ...(current?.history || []),
+        ],
+      }));
+      setSelectedCertificate(null);
+      setBorrowPurpose('');
+      setBorrowReturnDate('');
+      Alert.alert('Request submitted', 'Your original-certificate request has been submitted.');
+    } catch (error: any) {
+      logger.error('MODULE_DETAIL', 'Failed to submit certificate request', error.message);
+      Alert.alert(
+        'Request failed',
+        error.response?.data?.message || 'Unable to submit the certificate request. Please try again.'
+      );
+    } finally {
+      setSubmittingBorrowRequest(false);
+    }
+  };
+
+  const joinClub = async (club: any) => {
+    setJoiningClubId(club.id);
+    try {
+      const response = await studentService.joinClub(club.id);
+      setData((current: any[]) =>
+        current.map((item) =>
+          item.id === club.id
+            ? { ...item, userStatus: response?.status || response?.data?.status || 'pending' }
+            : item
+        )
+      );
+      Alert.alert('Request submitted', `Your request to join ${club.name || club.club_name || 'this club'} has been submitted.`);
+    } catch (error: any) {
+      logger.error('MODULE_DETAIL', 'Failed to submit club membership request', error.message);
+      Alert.alert(
+        'Request failed',
+        error.response?.data?.message || 'Unable to submit the membership request. Please try again.'
+      );
+    } finally {
+      setJoiningClubId(null);
+    }
+  };
+
   useEffect(() => {
-    if (!visible || !module) {
+    if (!module) {
       setData(null);
       return;
     }
@@ -193,16 +335,15 @@ export const StudentModuleDetailModal: React.FC<StudentModuleDetailModalProps> =
     };
 
     fetchModuleData();
-  }, [visible, module, admissionNo]);
+  }, [module?.id, admissionNo]);
 
   if (!module) return null;
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
-      <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, { paddingTop: topInset + 6, paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={onClose} style={styles.backBtn} hitSlop={10}>
+          <TouchableOpacity onPress={handleBack} style={styles.backBtn} hitSlop={10}>
             <ArrowLeft size={22} color="#1E293B" />
           </TouchableOpacity>
           <View style={styles.headerTitleRow}>
@@ -214,7 +355,7 @@ export const StudentModuleDetailModal: React.FC<StudentModuleDetailModalProps> =
               <Text style={styles.subtitle}>{module.subtitle}</Text>
             </View>
           </View>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={10}>
+          <TouchableOpacity onPress={handleBack} style={styles.closeBtn} hitSlop={10}>
             <X size={20} color="#64748B" />
           </TouchableOpacity>
         </View>
@@ -248,6 +389,17 @@ export const StudentModuleDetailModal: React.FC<StudentModuleDetailModalProps> =
                 {Array.isArray(data) && data.length > 0 ? (
                   data.map((item: any, idx: number) => (
                     <View key={item.id || idx} style={styles.card}>
+                      <View style={styles.cardBannerWrapper}>
+                        <Image
+                          source={
+                            item.image_url || item.banner_image
+                              ? { uri: getStaticFileUrl(item.image_url || item.banner_image) }
+                              : require('../../assets/announcement-fallback.jpg')
+                          }
+                          style={styles.cardBannerImg}
+                          resizeMode="cover"
+                        />
+                      </View>
                       <View style={styles.cardHeader}>
                         <Text style={styles.cardHighlight}>{item.day_of_week || 'SCHEDULE'}</Text>
                         <Text style={styles.cardTime}>Period {item.period_slot_id || item.slot_name || idx + 1}</Text>
@@ -545,6 +697,14 @@ export const StudentModuleDetailModal: React.FC<StudentModuleDetailModalProps> =
                           )}
                         </View>
                         <Text style={styles.cardSub}>{svc.description || 'Standard institutional certificate service.'}</Text>
+                        <TouchableOpacity
+                          style={styles.moduleActionButton}
+                          onPress={() => setSelectedService(svc)}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={styles.moduleActionButtonText}>Initiate Request</Text>
+                          <ChevronRight size={16} color="#FFFFFF" />
+                        </TouchableOpacity>
                       </View>
                     ))}
                   </>
@@ -580,6 +740,36 @@ export const StudentModuleDetailModal: React.FC<StudentModuleDetailModalProps> =
                         <Text style={styles.cardSub}>
                           {item.certificate_number ? `Doc No: ${item.certificate_number}` : 'Verified & Registered'}
                         </Text>
+                        {(() => {
+                          const certificateKey =
+                            item.certificate_key || item.certificateKey || item.key ||
+                            item.certificate_name || item.name;
+                          const certificateName = item.certificate_name || item.name || 'Certificate';
+                          const hasActiveRequest = (data.history || []).some(
+                            (request: any) =>
+                              String(request.certificate_key || request.certificateKey || '') === String(certificateKey) &&
+                              ['pending', 'approved', 'issued'].includes(String(request.status || '').toLowerCase())
+                          );
+
+                          return (
+                            <TouchableOpacity
+                              style={[
+                                styles.moduleActionButton,
+                                hasActiveRequest && styles.moduleActionButtonDisabled,
+                              ]}
+                              onPress={() =>
+                                setSelectedCertificate({ key: certificateKey, name: certificateName })
+                              }
+                              disabled={hasActiveRequest}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={styles.moduleActionButtonText}>
+                                {hasActiveRequest ? 'Request In Progress' : 'Request Original'}
+                              </Text>
+                              {!hasActiveRequest && <ChevronRight size={16} color="#FFFFFF" />}
+                            </TouchableOpacity>
+                          );
+                        })()}
                       </View>
                     ))}
                   </>
@@ -691,6 +881,19 @@ export const StudentModuleDetailModal: React.FC<StudentModuleDetailModalProps> =
                 {Array.isArray(data) && data.length > 0 ? (
                   data.map((item: any, idx: number) => (
                     <View key={item.id || idx} style={styles.card}>
+                      <View style={styles.cardBannerWrapper}>
+                        <Image
+                          source={
+                            item.image_url || item.image || item.club_image
+                              ? { uri: getStaticFileUrl(item.image_url || item.image || item.club_image) }
+                              : (item.has_image || item.id)
+                              ? { uri: getStaticFileUrl(`/api/clubs/${item.id}/image`) }
+                              : require('../../assets/announcement-fallback.jpg')
+                          }
+                          style={styles.cardBannerImg}
+                          resizeMode="cover"
+                        />
+                      </View>
                       <View style={styles.cardHeader}>
                         <Text style={styles.cardTitle}>{item.name || item.club_name || 'Student Club'}</Text>
                         <View
@@ -734,6 +937,23 @@ export const StudentModuleDetailModal: React.FC<StudentModuleDetailModalProps> =
                           {Number(item.membership_fee) > 0 ? `₹${item.membership_fee}` : 'Free'}
                         </Text>
                       </View>
+                      {item.userStatus !== 'approved' && item.userStatus !== 'pending' ? (
+                        <TouchableOpacity
+                          style={styles.moduleActionButton}
+                          onPress={() => joinClub(item)}
+                          disabled={joiningClubId === item.id}
+                          activeOpacity={0.8}
+                        >
+                          {joiningClubId === item.id ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                          ) : (
+                            <>
+                              <Text style={styles.moduleActionButtonText}>Request Membership</Text>
+                              <ChevronRight size={16} color="#FFFFFF" />
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      ) : null}
                     </View>
                   ))
                 ) : (
@@ -946,7 +1166,81 @@ export const StudentModuleDetailModal: React.FC<StudentModuleDetailModalProps> =
             )}
           </ScrollView>
         )}
+        <Modal
+          visible={Boolean(selectedService || selectedCertificate)}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            setSelectedService(null);
+            setSelectedCertificate(null);
+          }}
+        >
+          <View style={styles.actionModalBackdrop}>
+            <View style={styles.actionModalCard}>
+              <Text style={styles.actionModalTitle}>
+                {selectedService ? 'Request Service' : 'Request Original Certificate'}
+              </Text>
+              <Text style={styles.actionModalSubtitle}>
+                {selectedService
+                  ? selectedService.name || selectedService.title
+                  : selectedCertificate?.name}
+              </Text>
+              <TextInput
+                style={styles.actionModalInput}
+                placeholder="Purpose"
+                value={selectedService ? servicePurpose : borrowPurpose}
+                onChangeText={selectedService ? setServicePurpose : setBorrowPurpose}
+                multiline
+                textAlignVertical="top"
+              />
+              {selectedCertificate ? (
+                <TextInput
+                  style={styles.actionModalInput}
+                  placeholder="Return date (YYYY-MM-DD)"
+                  value={borrowReturnDate}
+                  onChangeText={setBorrowReturnDate}
+                  autoCapitalize="none"
+                />
+              ) : null}
+              <View style={styles.actionModalButtons}>
+                <TouchableOpacity
+                  style={[styles.actionModalButton, styles.actionModalCancelButton]}
+                  onPress={() => {
+                    setSelectedService(null);
+                    setSelectedCertificate(null);
+                  }}
+                  disabled={submittingServiceRequest || submittingBorrowRequest}
+                >
+                  <Text style={styles.actionModalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionModalButton, styles.actionModalSubmitButton]}
+                  onPress={selectedService ? submitServiceRequest : submitBorrowRequest}
+                  disabled={submittingServiceRequest || submittingBorrowRequest}
+                >
+                  {submittingServiceRequest || submittingBorrowRequest ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.actionModalSubmitText}>Submit Request</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
+  );
+};
+
+export const StudentModuleDetailModal: React.FC<StudentModuleDetailModalProps> = ({
+  visible,
+  module,
+  onClose,
+}) => {
+  if (!visible || !module) return null;
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+      <StudentModuleView module={module} onBack={onClose} />
     </Modal>
   );
 };
@@ -1052,6 +1346,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1E293B',
     marginBottom: 4,
+  },
+  cardBannerWrapper: {
+    width: '100%',
+    height: 120,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#0F172A',
+    marginBottom: 10,
+  },
+  cardBannerImg: {
+    width: '100%',
+    height: '100%',
   },
   card: {
     backgroundColor: '#FFFFFF',
@@ -1226,6 +1532,88 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  moduleActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#1E3A8A',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  moduleActionButtonDisabled: {
+    backgroundColor: '#64748B',
+  },
+  moduleActionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  actionModalBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+  },
+  actionModalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+  },
+  actionModalTitle: {
+    color: '#0F172A',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  actionModalSubtitle: {
+    color: '#64748B',
+    fontSize: 13,
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  actionModalInput: {
+    minHeight: 48,
+    maxHeight: 120,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#0F172A',
+    marginBottom: 12,
+  },
+  actionModalButtons: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  actionModalButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+  },
+  actionModalCancelButton: {
+    backgroundColor: '#F1F5F9',
+  },
+  actionModalSubmitButton: {
+    backgroundColor: '#1E3A8A',
+  },
+  actionModalCancelText: {
+    color: '#334155',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  actionModalSubmitText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
   crtFeatureBox: {
     backgroundColor: '#F8FAFC',

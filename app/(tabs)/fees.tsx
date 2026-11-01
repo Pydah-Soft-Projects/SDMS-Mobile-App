@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { CreditCard, CheckCircle2, Clock, ShieldCheck, Download, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
@@ -82,15 +83,15 @@ export default function FeesScreen() {
       });
 
       if (order?.checkoutUrl) {
-        Alert.alert(
-          'PPG Payment Gateway',
-          `Order #${order.paymentId || order.orderId} generated.\n\nOpening Checkout:\n${order.checkoutUrl}`
-        );
+        await Linking.openURL(order.checkoutUrl);
       } else {
         Alert.alert('Payment Order', 'Payment gateway order initiated.');
       }
     } catch (err: any) {
-      Alert.alert('Payment Error', err.response?.data?.message || 'Failed to initialize payment gateway.');
+      Alert.alert(
+        'Payment Error',
+        err.response?.data?.message || 'Failed to initialize or open the payment gateway.'
+      );
     } finally {
       setPaying(false);
     }

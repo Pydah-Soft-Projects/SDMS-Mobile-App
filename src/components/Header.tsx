@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, StatusBar as RNStatusBar } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Platform, StatusBar as RNStatusBar } from 'react-native';
 import { Menu, Bell } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -50,7 +50,7 @@ export const Header: React.FC<HeaderProps> = ({
         <Image source={require("../../assets/pydah-logo.png")} style={styles.brandLogo} resizeMode="contain" />
         <View style={styles.titleContainer}>
           <View style={styles.titleRow}>
-            <Text style={styles.title} numberOfLines={1}>
+            <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
               {title}
             </Text>
             {shouldShowPydian && (
@@ -59,7 +59,7 @@ export const Header: React.FC<HeaderProps> = ({
               </View>
             )}
           </View>
-          {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+          {subtitle && <Text style={styles.subtitle} numberOfLines={1} ellipsizeMode="tail">{subtitle}</Text>}
         </View>
 
         <View style={styles.actions}>
@@ -86,42 +86,44 @@ export const Header: React.FC<HeaderProps> = ({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 12,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 10,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
   brandLogo: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    marginRight: 10,
+    width: 32,
+    height: 32,
+    marginHorizontal: 8,
   },
   menuBtn: {
-    marginRight: 12,
-    padding: 6,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 8,
     backgroundColor: '#F1F5F9',
   },
   titleContainer: {
     flex: 1,
+    minWidth: 0,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
+    gap: 6,
   },
   title: {
-    fontSize: 20,
+    flexShrink: 1,
+    fontSize: 18,
     fontWeight: '700',
     color: '#0F172A',
   },
   pydianTag: {
+    flexShrink: 0,
     backgroundColor: '#FFF7ED',
     borderWidth: 1,
     borderColor: '#FDBA74',
@@ -136,18 +138,23 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#64748B',
     marginTop: 2,
   },
   actions: {
+    width: 36,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    justifyContent: 'flex-end',
+    marginLeft: 8,
   },
   bellBtn: {
     position: 'relative',
-    padding: 8,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 8,
     backgroundColor: '#F1F5F9',
   },

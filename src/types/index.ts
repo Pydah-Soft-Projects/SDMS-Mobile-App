@@ -56,7 +56,7 @@ export interface AuthSession {
 
 // Attendance Types from SDMS /api/attendance/student
 export interface AttendanceTotals {
-  percentage: number;
+  percentage?: number;
   present: number;
   absent: number;
   workingDays: number;

@@ -141,7 +141,11 @@ export default function DashboardScreen() {
           <View style={styles.statsGrid}>
             <StatCard
               label="Live Attendance"
-              value={attendanceRate !== null ? `${attendanceRate.toFixed(1)}%` : 'Active'}
+              value={
+                typeof attendanceRate === 'number' && Number.isFinite(attendanceRate)
+                  ? `${attendanceRate.toFixed(1)}%`
+                  : 'Active'
+              }
               subValue={
                 semesterTotals
                   ? `${semesterTotals.present} Present / ${semesterTotals.workingDays} Days`

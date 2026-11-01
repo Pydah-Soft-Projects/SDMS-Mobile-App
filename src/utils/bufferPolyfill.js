@@ -26,3 +26,4 @@ export const Buffer = BufferShim;
 export default {
   Buffer: BufferShim,
 };
+

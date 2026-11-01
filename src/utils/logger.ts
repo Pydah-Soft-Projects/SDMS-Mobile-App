@@ -1,9 +1,9 @@
-// Mobile In-App Action & Network Logger
+// Mobile In-App Action & Network Error Logger (Errors Only)
 
 export interface LogEntry {
   id: string;
   timestamp: string;
-  type: 'INFO' | 'API_REQ' | 'API_RES' | 'API_ERR' | 'WARN' | 'ERROR';
+  type: 'API_ERR' | 'ERROR';
   tag: string;
   message: string;
   details?: any;
@@ -31,15 +31,9 @@ class LoggerService {
       details,
     };
 
-    // Print to developer terminal
-    const prefix = `[${entry.timestamp}] [${type}] [${tag}]`;
-    if (type === 'API_ERR' || type === 'ERROR') {
-      console.error(prefix, message, details ? JSON.stringify(details) : '');
-    } else if (type === 'WARN') {
-      console.warn(prefix, message, details ? JSON.stringify(details) : '');
-    } else {
-      console.log(prefix, message, details ? JSON.stringify(details) : '');
-    }
+    // Print ONLY errors to developer terminal
+    const prefix = `[${entry.timestamp}] [ERROR] [${tag}]`;
+    console.error(prefix, message, details ? JSON.stringify(details) : '');
 
     this.logs.unshift(entry);
     if (this.logs.length > this.maxLogs) {
@@ -50,24 +44,25 @@ class LoggerService {
     this.listeners.forEach((listener) => listener([...this.logs]));
   }
 
-  info(tag: string, message: string, details?: any) {
-    this.addLog('INFO', tag, message, details);
+  // Routine tasks are ignored to keep terminal and UI clean
+  info(_tag: string, _message: string, _details?: any) {
+    // Suppressed: only errors are logged
   }
 
-  apiReq(method: string, url: string, data?: any) {
-    this.addLog('API_REQ', 'API', `${method.toUpperCase()} ${url}`, data);
+  apiReq(_method: string, _url: string, _data?: any) {
+    // Suppressed: only errors are logged
   }
 
-  apiRes(status: number, url: string, data?: any) {
-    this.addLog('API_RES', 'API', `HTTP ${status} <- ${url}`, data);
+  apiRes(_status: number, _url: string, _data?: any) {
+    // Suppressed: only errors are logged
+  }
+
+  warn(_tag: string, _message: string, _details?: any) {
+    // Suppressed: only errors are logged
   }
 
   apiErr(url: string, errorMsg: string, details?: any) {
     this.addLog('API_ERR', 'API', `FAILED <- ${url} : ${errorMsg}`, details);
-  }
-
-  warn(tag: string, message: string, details?: any) {
-    this.addLog('WARN', tag, message, details);
   }
 
   error(tag: string, message: string, details?: any) {
@@ -92,4 +87,3 @@ class LoggerService {
 
 export const logger = new LoggerService();
 export default logger;
-

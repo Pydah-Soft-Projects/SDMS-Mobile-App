@@ -76,7 +76,7 @@ export const LogViewerModal: React.FC<LogViewerModalProps> = ({ visible, onClose
         <View style={styles.header}>
           <View style={styles.headerTitleRow}>
             <Terminal size={20} color="#1E3A8A" />
-            <Text style={styles.headerTitle}>Mobile Action & Network Logs</Text>
+            <Text style={styles.headerTitle}>Mobile Error Logs</Text>
           </View>
           <View style={styles.headerActions}>
             <TouchableOpacity onPress={() => logger.clear()} style={styles.iconBtn}>
@@ -141,7 +141,7 @@ export const LogViewerModal: React.FC<LogViewerModalProps> = ({ visible, onClose
         <ScrollView style={styles.logList} contentContainerStyle={styles.logListContent}>
           {filteredLogs.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No logs recorded yet. Perform an action!</Text>
+              <Text style={styles.emptyText}>No errors recorded. All operations running smoothly!</Text>
             </View>
           ) : (
             filteredLogs.map((item) => (

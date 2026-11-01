@@ -26,7 +26,7 @@ export const setSessionExpiryHandler = (handler: SessionExpiryListener) => {
   onSessionExpiry = handler;
 };
 
-// Request Interceptor: Attach JWT bearer token & log outgoing call
+// Request Interceptor: Attach JWT bearer token
 api.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     // Keep baseURL synchronized with any runtime change
@@ -38,11 +38,8 @@ api.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
     } catch (e) {
-      logger.warn('API', 'Failed to retrieve auth token for request', e);
+      // Ignored
     }
-
-    const fullUrl = `${config.baseURL || ''}${config.url || ''}`;
-    logger.apiReq(config.method || 'GET', fullUrl, config.data);
 
     return config;
   },
@@ -54,11 +51,7 @@ api.interceptors.request.use(
 
 // Response Interceptor: Handle errors and 401 Unauthorized
 api.interceptors.response.use(
-  (response) => {
-    const fullUrl = `${response.config.baseURL || ''}${response.config.url || ''}`;
-    logger.apiRes(response.status, fullUrl, response.data);
-    return response;
-  },
+  (response) => response,
   async (error: AxiosError) => {
     if (axios.isCancel(error)) {
       logger.warn('API', 'Request canceled', error.message);

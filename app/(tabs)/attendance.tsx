@@ -44,22 +44,31 @@ export default function AttendanceScreen() {
     setRefreshing(false);
   };
 
-  // Resolve totals based on active tab
+  // Resolve totals safely based on active tab
   const getActiveTotals = (): AttendanceTotals => {
-    if (activeTab === 'weekly' && attendanceData?.weekly?.totals) {
-      return attendanceData.weekly.totals;
+    let rawTotals: any = null;
+    if (activeTab === 'weekly') {
+      rawTotals = attendanceData?.weekly?.totals;
+    } else if (activeTab === 'monthly') {
+      rawTotals = attendanceData?.monthly?.totals;
+    } else {
+      rawTotals = attendanceData?.semester?.totals;
     }
-    if (activeTab === 'monthly' && attendanceData?.monthly?.totals) {
-      return attendanceData.monthly.totals;
-    }
-    if (attendanceData?.semester?.totals) {
-      return attendanceData.semester.totals;
-    }
+
+    const present = Number(rawTotals?.present ?? 0);
+    const absent = Number(rawTotals?.absent ?? 0);
+    const workingDays = Number(rawTotals?.workingDays ?? (present + absent));
+    const rawPct = rawTotals?.percentage ?? rawTotals?.rate;
+    const computedPercentage =
+      rawPct !== undefined && rawPct !== null && !isNaN(Number(rawPct))
+        ? Number(rawPct)
+        : (workingDays > 0 ? (present / workingDays) * 100 : 0);
+
     return {
-      percentage: 0,
-      present: 0,
-      absent: 0,
-      workingDays: 0,
+      percentage: Number.isFinite(computedPercentage) ? computedPercentage : 0,
+      present,
+      absent,
+      workingDays,
     };
   };
 
@@ -71,7 +80,7 @@ export default function AttendanceScreen() {
 
   const totals = getActiveTotals();
   const series = getActiveSeries();
-  const isEligible = totals.percentage >= 75;
+  const isEligible = (totals.percentage || 0) >= 75;
 
   return (
     <View style={styles.container}>
@@ -129,7 +138,7 @@ export default function AttendanceScreen() {
                   { color: isEligible ? '#059669' : '#DC2626' },
                 ]}
               >
-                {totals.percentage.toFixed(1)}%
+                {(totals?.percentage ?? 0).toFixed(1)}%
               </Text>
               <Text style={styles.percentageSub}>
                 {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}

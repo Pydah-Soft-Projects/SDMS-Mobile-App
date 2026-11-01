@@ -9,6 +9,7 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import {
   Users,
   CalendarCheck,
@@ -32,6 +33,7 @@ import staffService, { StaffDashboardStats, StaffOperation } from '../services/s
 import logger from '../utils/logger';
 
 export const StaffDashboard: React.FC = () => {
+  const router = useRouter();
   const { user } = useAuth();
   const staff = user as any;
 
@@ -96,18 +98,23 @@ export const StaffDashboard: React.FC = () => {
   };
 
   const handleSearchSubmit = () => {
-    if (!searchQuery.trim()) return;
-    Alert.alert(
-      'SDMS Student Search',
-      `Searching student database for: "${searchQuery.trim()}" across permitted campus scopes.`
-    );
+    const q = searchQuery.trim();
+    if (!q) return;
+    router.push({
+      pathname: '/operation/students',
+      params: { search: q },
+    } as any);
   };
 
   const handleOperationPress = (op: StaffOperation) => {
-    Alert.alert(
-      op.label,
-      `${op.description}\n\nAssigned module active for your role: ${(staff?.role || 'staff').toUpperCase()}`
-    );
+    if (op.key === 'attendance') {
+      router.push('/(tabs)/attendance');
+      return;
+    }
+    if (op.key === 'dashboard') {
+      return;
+    }
+    router.push(`/operation/${op.key}` as any);
   };
 
   return (

@@ -1,8 +1,12 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Home, CalendarCheck, CreditCard, Bell, User } from 'lucide-react-native';
+import { Home, CalendarCheck, CreditCard, Bell, User, LayoutDashboard, ShieldCheck } from 'lucide-react-native';
+import { useAuth } from '../../src/context/AuthContext';
 
 export default function TabLayout() {
+  const { userType } = useAuth();
+  const isStaff = userType === 'staff' || userType === 'admin';
+
   return (
     <Tabs
       screenOptions={{
@@ -25,21 +29,22 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Dashboard',
-          tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
+          title: isStaff ? 'Console' : 'Dashboard',
+          tabBarIcon: ({ color, size }) =>
+            isStaff ? <LayoutDashboard size={size} color={color} /> : <Home size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="attendance"
         options={{
-          title: 'Attendance',
+          title: isStaff ? 'Attendance' : 'Attendance',
           tabBarIcon: ({ color, size }) => <CalendarCheck size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="fees"
         options={{
-          title: 'Fees',
+          title: isStaff ? 'Accounts' : 'Fees',
           tabBarIcon: ({ color, size }) => <CreditCard size={size} color={color} />,
         }}
       />
@@ -53,11 +58,11 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, size }) => <User size={size} color={color} />,
+          title: isStaff ? 'Staff Profile' : 'Profile',
+          tabBarIcon: ({ color, size }) =>
+            isStaff ? <ShieldCheck size={size} color={color} /> : <User size={size} color={color} />,
         }}
       />
     </Tabs>
   );
 }
-

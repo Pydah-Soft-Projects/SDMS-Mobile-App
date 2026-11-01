@@ -12,6 +12,7 @@ import { CalendarCheck, CreditCard, Bell, BookOpen, GraduationCap, ChevronRight 
 import { useAuth } from '../../src/context/AuthContext';
 import Header from '../../src/components/Header';
 import StatCard from '../../src/components/StatCard';
+import StaffDashboard from '../../src/components/StaffDashboard';
 import studentService from '../../src/services/studentService';
 import announcementService from '../../src/services/announcementService';
 import { Announcement } from '../../src/types';
@@ -19,7 +20,11 @@ import { ENV } from '../../src/config/env';
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, userType } = useAuth();
+
+  if (userType === 'staff' || userType === 'admin') {
+    return <StaffDashboard />;
+  }
 
   const [refreshing, setRefreshing] = useState(false);
   const [attendancePercent, setAttendancePercent] = useState<number>(85);

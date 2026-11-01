@@ -52,40 +52,72 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Academic Details */}
-        <Text style={styles.sectionHeader}>Academic Information</Text>
+        {/* Academic / Staff Role Details */}
+        <Text style={styles.sectionHeader}>
+          {userType === 'student' ? 'Academic Information' : 'Staff Scope & Authority'}
+        </Text>
         <View style={styles.infoCard}>
-          <View style={styles.infoRow}>
-            <GraduationCap size={18} color="#1E3A8A" />
-            <View style={styles.infoTextCol}>
-              <Text style={styles.infoLabel}>College</Text>
-              <Text style={styles.infoValue}>{student?.collegeName || 'Pydah College'}</Text>
-            </View>
-          </View>
+          {userType === 'student' ? (
+            <>
+              <View style={styles.infoRow}>
+                <GraduationCap size={18} color="#1E3A8A" />
+                <View style={styles.infoTextCol}>
+                  <Text style={styles.infoLabel}>College</Text>
+                  <Text style={styles.infoValue}>{student?.collegeName || 'Pydah College'}</Text>
+                </View>
+              </View>
 
-          <View style={styles.divider} />
+              <View style={styles.divider} />
 
-          <View style={styles.infoRow}>
-            <BookOpen size={18} color="#1E3A8A" />
-            <View style={styles.infoTextCol}>
-              <Text style={styles.infoLabel}>Course & Branch</Text>
-              <Text style={styles.infoValue}>
-                {student?.courseName || 'B.Tech'} - {student?.branchName || 'CSE'}
-              </Text>
-            </View>
-          </View>
+              <View style={styles.infoRow}>
+                <BookOpen size={18} color="#1E3A8A" />
+                <View style={styles.infoTextCol}>
+                  <Text style={styles.infoLabel}>Course & Branch</Text>
+                  <Text style={styles.infoValue}>
+                    {student?.courseName || 'B.Tech'} - {student?.branchName || 'CSE'}
+                  </Text>
+                </View>
+              </View>
 
-          <View style={styles.divider} />
+              <View style={styles.divider} />
 
-          <View style={styles.infoRow}>
-            <User size={18} color="#1E3A8A" />
-            <View style={styles.infoTextCol}>
-              <Text style={styles.infoLabel}>Semester & Year</Text>
-              <Text style={styles.infoValue}>
-                Semester {student?.currentSemester || 1} • {student?.academicYear || '2025-2026'}
-              </Text>
-            </View>
-          </View>
+              <View style={styles.infoRow}>
+                <User size={18} color="#1E3A8A" />
+                <View style={styles.infoTextCol}>
+                  <Text style={styles.infoLabel}>Semester & Year</Text>
+                  <Text style={styles.infoValue}>
+                    Semester {student?.currentSemester || 1} • {student?.academicYear || '2025-2026'}
+                  </Text>
+                </View>
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.infoRow}>
+                <ShieldAlert size={18} color="#1E3A8A" />
+                <View style={styles.infoTextCol}>
+                  <Text style={styles.infoLabel}>Role Permission Level</Text>
+                  <Text style={styles.infoValue}>
+                    {(student?.role || 'Staff').replace('_', ' ').toUpperCase()}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.divider} />
+
+              <View style={styles.infoRow}>
+                <BookOpen size={18} color="#1E3A8A" />
+                <View style={styles.infoTextCol}>
+                  <Text style={styles.infoLabel}>Assigned Modules ({Array.isArray(student?.modules) ? student.modules.length : 'All'})</Text>
+                  <Text style={styles.infoValue}>
+                    {Array.isArray(student?.modules) && student.modules.length > 0
+                      ? student.modules.join(', ')
+                      : 'All Operations Permitted'}
+                  </Text>
+                </View>
+              </View>
+            </>
+          )}
         </View>
 
         {/* Contact Details */}

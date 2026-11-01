@@ -302,6 +302,20 @@ export const SDMS_ADMIN_NAV_TREE: AdminNavItem[] = [
     iconName: 'Building2',
     permission: FRONTEND_MODULES.SEMINAR_HALLS,
     color: '#0D9488',
+    subItems: [
+      {
+        id: 'requests',
+        label: 'Booking Requests',
+        iconName: 'CalendarCheck',
+        permission: FRONTEND_MODULES.SEMINAR_HALLS,
+      },
+      {
+        id: 'halls',
+        label: 'Campus Halls',
+        iconName: 'Building2',
+        permission: FRONTEND_MODULES.SEMINAR_HALLS,
+      },
+    ],
   },
   {
     id: 'services',

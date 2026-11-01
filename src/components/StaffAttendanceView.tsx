@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import {
   Building2,
   CalendarCheck,
@@ -17,10 +18,14 @@ import {
   Clock,
   ChevronRight,
   ShieldCheck,
+  Send,
+  RotateCcw,
+  CheckSquare,
 } from 'lucide-react-native';
 import Header from './Header';
 import StatCard from './StatCard';
 import api from '../config/api';
+import staffService from '../services/staffService';
 import logger from '../utils/logger';
 
 interface CollegeAttendanceItem {
@@ -32,12 +37,68 @@ interface CollegeAttendanceItem {
 }
 
 export const StaffAttendanceView: React.FC = () => {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
   const [colleges, setColleges] = useState<CollegeAttendanceItem[]>([]);
   const [totalStudents, setTotalStudents] = useState(0);
   const [todayPresent, setTodayPresent] = useState(0);
   const [todayAbsent, setTodayAbsent] = useState(0);
+
+  const getTodayISO = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  const handleSendDayEndReport = () => {
+    const today = getTodayISO();
+    Alert.alert(
+      'Send Day-End SMS Reports',
+      `Dispatch day-end absentee SMS reports to parents for date ${today}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Send Reports',
+          onPress: async () => {
+            setActionLoading(true);
+            try {
+              const res = await staffService.sendDayEndReports({ date: today, college_id: 'all' });
+              Alert.alert('Success', res?.message || 'Day-end attendance SMS reports dispatched.');
+            } catch (err: any) {
+              Alert.alert('Send Failed', err.response?.data?.message || err.message || 'Error occurred');
+            } finally {
+              setActionLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRetryFailedSMS = () => {
+    Alert.alert(
+      'Retry Failed SMS',
+      'Attempt re-dispatch of all pending or failed attendance SMS messages?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Retry Now',
+          onPress: async () => {
+            setActionLoading(true);
+            try {
+              const res = await staffService.retrySms();
+              Alert.alert('Retry Completed', res?.message || 'Failed SMS queue re-processed.');
+            } catch (err: any) {
+              Alert.alert('Retry Failed', err.response?.data?.message || err.message || 'Error occurred');
+            } finally {
+              setActionLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const loadAttendanceStats = async () => {
     try {
@@ -138,6 +199,41 @@ export const StaffAttendanceView: React.FC = () => {
                   {todayAbsent.toLocaleString()}
                 </Text>
               </View>
+            </View>
+          </View>
+
+          {/* Quick Operations Toolbar */}
+          <View style={styles.toolbarCard}>
+            <Text style={styles.toolbarTitle}>Attendance Quick Actions</Text>
+            <View style={styles.toolbarGrid}>
+              <TouchableOpacity
+                style={[styles.toolbarBtn, { backgroundColor: '#1E3A8A' }]}
+                onPress={() => router.push('/operation/attendance?sub=daily')}
+                activeOpacity={0.8}
+              >
+                <CheckSquare size={16} color="#FFFFFF" />
+                <Text style={styles.toolbarBtnText}>Mark Roll Call</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.toolbarBtn, { backgroundColor: '#059669' }]}
+                onPress={handleSendDayEndReport}
+                disabled={actionLoading}
+                activeOpacity={0.8}
+              >
+                <Send size={16} color="#FFFFFF" />
+                <Text style={styles.toolbarBtnText}>Day-End Reports</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.toolbarBtn, { backgroundColor: '#7C3AED' }]}
+                onPress={handleRetryFailedSMS}
+                disabled={actionLoading}
+                activeOpacity={0.8}
+              >
+                <RotateCcw size={16} color="#FFFFFF" />
+                <Text style={styles.toolbarBtnText}>Retry SMS</Text>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -279,6 +375,39 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#0F172A',
+  },
+  toolbarCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  toolbarTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#334155',
+    marginBottom: 12,
+  },
+  toolbarGrid: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  toolbarBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    gap: 6,
+  },
+  toolbarBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
   },
   sectionTitle: {
     fontSize: 16,

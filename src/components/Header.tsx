@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { LogOut, Terminal } from 'lucide-react-native';
+import { LogOut, Terminal, Menu } from 'lucide-react-native';
+import { StudentSidebarDrawer } from './StudentSidebarDrawer';
 import { useAuth } from '../context/AuthContext';
 import { getStaticFileUrl } from '../config/api';
 import LogViewerModal from './LogViewerModal';
@@ -12,13 +13,25 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ title, subtitle, showLogout = true }) => {
-  const { user, logout } = useAuth();
+  const { user, userType, logout } = useAuth();
+  const [showSidebar, setShowSidebar] = useState(false);
+  const isStudent = userType === 'student' || (!userType && !(user as any)?.role?.includes('admin') && !(user as any)?.role?.includes('staff'));
   const [showLogs, setShowLogs] = useState(false);
   const avatarUrl = (user as any)?.avatarUrl ? getStaticFileUrl((user as any).avatarUrl) : null;
 
   return (
     <>
       <View style={styles.container}>
+        {isStudent && (
+          <TouchableOpacity
+            style={styles.menuBtn}
+            onPress={() => setShowSidebar(true)}
+            hitSlop={8}
+            activeOpacity={0.7}
+          >
+            <Menu size={22} color="#1E3A8A" />
+          </TouchableOpacity>
+        )}
         <View style={styles.titleContainer}>
           <Text style={styles.title}>{title}</Text>
           {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
@@ -51,6 +64,7 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle, showLogout = tr
       </View>
 
       <LogViewerModal visible={showLogs} onClose={() => setShowLogs(false)} />
+      <StudentSidebarDrawer visible={showSidebar} onClose={() => setShowSidebar(false)} />
     </>
   );
 };
@@ -66,6 +80,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
+  },
+  menuBtn: {
+    marginRight: 12,
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
   },
   titleContainer: {
     flex: 1,

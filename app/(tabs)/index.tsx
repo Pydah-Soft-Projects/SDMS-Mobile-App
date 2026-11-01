@@ -20,6 +20,11 @@ import {
   AlertCircle,
   Clock,
   Award,
+  Bus,
+  FileText,
+  Users,
+  Menu,
+  Layers,
 } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import Header from '../../src/components/Header';
@@ -28,6 +33,8 @@ import StaffDashboard from '../../src/components/StaffDashboard';
 import studentService from '../../src/services/studentService';
 import { StudentUser, StudentAttendanceData, StudentFeeDetails, Announcement } from '../../src/types';
 import logger from '../../src/utils/logger';
+import { StudentSidebarDrawer } from '../../src/components/StudentSidebarDrawer';
+import { StudentModuleDetailModal, StudentModuleItem } from '../../src/components/StudentModuleDetailModal';
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -45,6 +52,8 @@ export default function DashboardScreen() {
   const [feeDetails, setFeeDetails] = useState<StudentFeeDetails | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [layoutSettings, setLayoutSettings] = useState<Record<string, boolean>>({});
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [activeModule, setActiveModule] = useState<StudentModuleItem | null>(null);
 
   const loadAllStudentData = async () => {
     const admissionNo = (user as any)?.admission_number || (user as any)?.pin_no;
@@ -167,7 +176,13 @@ export default function DashboardScreen() {
           </View>
 
           {/* Quick Action Navigation */}
-          <Text style={styles.sectionTitle}>Academic Portals</Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Academic Portals & Services</Text>
+            <TouchableOpacity onPress={() => setDrawerVisible(true)} style={styles.allPagesPill}>
+              <Menu size={14} color="#1E3A8A" />
+              <Text style={styles.allPagesText}>Sidebar (20)</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.actionRow}>
             <TouchableOpacity
               style={styles.actionCard}
@@ -197,6 +212,111 @@ export default function DashboardScreen() {
                 <Bell size={22} color="#B45309" />
               </View>
               <Text style={styles.actionLabel}>Notices</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Extended Side Pages Grid */}
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={styles.actionCard}
+              onPress={() =>
+                setActiveModule({
+                  id: 'timetable',
+                  title: 'Class Timetable',
+                  subtitle: 'Period Slots & Weekly Grid',
+                  category: 'academics',
+                  iconName: 'Clock',
+                })
+              }
+            >
+              <View style={[styles.actionIcon, { backgroundColor: '#EEF2FF' }]}>
+                <Clock size={22} color="#4338CA" />
+              </View>
+              <Text style={styles.actionLabel}>Timetable</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionCard}
+              onPress={() =>
+                setActiveModule({
+                  id: 'marks',
+                  title: 'Internal Marks',
+                  subtitle: 'Mid-1 & Mid-2 Assessments',
+                  category: 'academics',
+                  iconName: 'Award',
+                })
+              }
+            >
+              <View style={[styles.actionIcon, { backgroundColor: '#FAF5FF' }]}>
+                <Award size={22} color="#7E22CE" />
+              </View>
+              <Text style={styles.actionLabel}>Marks</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionCard}
+              onPress={() =>
+                setActiveModule({
+                  id: 'library',
+                  title: 'Campus Library',
+                  subtitle: 'Book Issues & Catalog',
+                  category: 'campus',
+                  iconName: 'BookOpen',
+                })
+              }
+            >
+              <View style={[styles.actionIcon, { backgroundColor: '#ECFDF5' }]}>
+                <BookOpen size={22} color="#047857" />
+              </View>
+              <Text style={styles.actionLabel}>Library</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={styles.actionCard}
+              onPress={() =>
+                setActiveModule({
+                  id: 'transport',
+                  title: 'Transport & Bus',
+                  subtitle: 'Route & Vehicle Tracking',
+                  category: 'campus',
+                  iconName: 'Bus',
+                })
+              }
+            >
+              <View style={[styles.actionIcon, { backgroundColor: '#FFFBEB' }]}>
+                <Bus size={22} color="#B45309" />
+              </View>
+              <Text style={styles.actionLabel}>Transport</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionCard}
+              onPress={() =>
+                setActiveModule({
+                  id: 'services',
+                  title: 'Certificate Requests',
+                  subtitle: 'Bonafide, Custodian & TC',
+                  category: 'finance',
+                  iconName: 'FileText',
+                })
+              }
+            >
+              <View style={[styles.actionIcon, { backgroundColor: '#F0F9FF' }]}>
+                <FileText size={22} color="#0369A1" />
+              </View>
+              <Text style={styles.actionLabel}>Services</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionCard, { backgroundColor: '#F8FAFC', borderColor: '#CBD5E1' }]}
+              onPress={() => setDrawerVisible(true)}
+            >
+              <View style={[styles.actionIcon, { backgroundColor: '#F1F5F9' }]}>
+                <Layers size={22} color="#1E3A8A" />
+              </View>
+              <Text style={[styles.actionLabel, { color: '#1E3A8A', fontWeight: '700' }]}>All Pages</Text>
             </TouchableOpacity>
           </View>
 
@@ -248,6 +368,12 @@ export default function DashboardScreen() {
           )}
         </ScrollView>
       )}
+      <StudentSidebarDrawer visible={drawerVisible} onClose={() => setDrawerVisible(false)} />
+      <StudentModuleDetailModal
+        visible={!!activeModule}
+        module={activeModule}
+        onClose={() => setActiveModule(null)}
+      />
     </View>
   );
 }
@@ -304,6 +430,26 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 2,
     fontWeight: '600',
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  allPagesPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  allPagesText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1E3A8A',
   },
   sectionTitle: {
     fontSize: 16,

@@ -8,12 +8,14 @@ import {
   RefreshControl,
   TouchableOpacity,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { Bell, AlertCircle, Calendar } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import Header from '../../src/components/Header';
 import announcementService from '../../src/services/announcementService';
 import { Announcement } from '../../src/types';
+
 
 export default function AnnouncementsScreen() {
   const insets = useSafeAreaInsets();
@@ -100,6 +102,15 @@ export default function AnnouncementsScreen() {
                   </View>
 
                   <Text style={styles.title}>{item.title}</Text>
+                  {item.imageUrl ? (
+                    <View style={styles.cardImageWrapper}>
+                    <Image
+                      source={{ uri: item.imageUrl }}
+                      style={styles.cardImage}
+                      resizeMode="cover"
+                    />
+                  </View>
+                  ) : null}
                   <Text style={styles.body}>{item.content}</Text>
 
                   {item.category && (
@@ -180,6 +191,18 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: 12,
     color: '#94A3B8',
+  },
+  cardImageWrapper: {
+    width: '100%',
+    height: 160,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginVertical: 8,
+    backgroundColor: '#0F172A',
+  },
+  cardImage: {
+    width: '100%',
+    height: '100%',
   },
   title: {
     fontSize: 15,

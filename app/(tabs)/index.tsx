@@ -7,11 +7,10 @@ import {
   RefreshControl,
   TouchableOpacity,
   ActivityIndicator,
+  Dimensions,
   Image,
   Modal,
   Alert,
-  Platform,
-  StatusBar as RNStatusBar,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,11 +22,11 @@ import {
   GraduationCap,
   ChevronRight,
   TrendingUp,
-  AlertCircle,
   Clock,
   Award,
   Bus,
   FileText,
+  FolderOpen,
   Users,
   Menu,
   Layers,
@@ -35,14 +34,16 @@ import {
   CheckCircle2,
   BarChart3,
   ArrowRight,
+  ArrowLeft,
   User,
   X,
   Ticket,
   Calendar,
-  IndianRupee,
   ShieldCheck,
-  Bookmark,
-  Share2,
+  MessageSquare,
+  UserCheck,
+  Briefcase,
+  Home,
 } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import Header from '../../src/components/Header';
@@ -50,9 +51,16 @@ import StaffDashboard from '../../src/components/StaffDashboard';
 import studentService from '../../src/services/studentService';
 import { StudentUser, StudentAttendanceData, StudentFeeDetails, Announcement } from '../../src/types';
 import logger from '../../src/utils/logger';
-import { StudentSidebarDrawer } from '../../src/components/StudentSidebarDrawer';
+import {
+  StudentSidebarDrawer,
+  SDMS_STUDENT_SECTIONS,
+  SDMSModuleItem,
+} from '../../src/components/StudentSidebarDrawer';
 import { StudentModuleDetailModal, StudentModuleItem } from '../../src/components/StudentModuleDetailModal';
 import { getStaticFileUrl } from '../../src/config/api';
+
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -151,7 +159,36 @@ export default function DashboardScreen() {
     return 'Good Evening';
   }, []);
 
-  // Today's Attendance calculation matching web
+  // Derive active modules directly based on SDMS Student Portal Layout settings
+  const allFlattenedModules = useMemo(() => {
+    const list: SDMSModuleItem[] = [];
+    SDMS_STUDENT_SECTIONS.forEach((sec) => {
+      sec.items.forEach((item) => {
+        list.push(item);
+      });
+    });
+    return list;
+  }, []);
+
+  const activeModules = useMemo(() => {
+    if (!layoutSettings || Object.keys(layoutSettings).length === 0) {
+      return allFlattenedModules;
+    }
+    return allFlattenedModules.filter((item) => {
+      if (layoutSettings[item.layoutKey] === false) return false;
+      if (layoutSettings[item.id] === false) return false;
+      return true;
+    });
+  }, [allFlattenedModules, layoutSettings]);
+
+  // Compute live attendance percentage
+  const semesterTotals = attendance?.semester?.totals || attendance?.monthly?.totals;
+  const attendanceRate =
+    semesterTotals?.percentage !== undefined
+      ? semesterTotals.percentage
+      : null;
+
+  // Today's Attendance calculation
   const todayAttendance = useMemo(() => {
     const now = new Date();
     const isSunday = now.getDay() === 0;
@@ -206,23 +243,22 @@ export default function DashboardScreen() {
 
   // Overall Attendance Progress calculation
   const progressInfo = useMemo(() => {
-    const semesterTotals = attendance?.semester?.totals || attendance?.monthly?.totals;
     const rawPct =
-      typeof semesterTotals?.percentage === 'number' && Number.isFinite(semesterTotals.percentage)
-        ? semesterTotals.percentage
-        : 48.3; // Default realistic fallback if not yet marked
+      typeof attendanceRate === 'number' && Number.isFinite(attendanceRate)
+        ? attendanceRate
+        : 85.0;
 
-    let rating = 'Average';
-    let color = '#6D28D9';
-    if (rawPct >= 75) {
-      rating = 'Good';
-      color = '#15803D';
-    } else if (rawPct < 65) {
+    let rating = 'Good';
+    let color = '#15803D';
+    if (rawPct < 65) {
       rating = 'Low';
       color = '#DC2626';
+    } else if (rawPct < 75) {
+      rating = 'Average';
+      color = '#D97706';
     }
     return { percentage: rawPct.toFixed(1), rating, color };
-  }, [attendance]);
+  }, [attendanceRate]);
 
   // Combined feed of announcements and events
   const combinedFeed = useMemo(() => {
@@ -238,7 +274,7 @@ export default function DashboardScreen() {
           ? new Date(a.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
           : 'Recent',
         category: a.category || 'ANNOUNCEMENT',
-        imageUrl: a.imageUrl,
+        imageUrl: a.imageUrl ? getStaticFileUrl(a.imageUrl) : undefined,
         raw: a,
       });
     });
@@ -254,41 +290,10 @@ export default function DashboardScreen() {
           ? new Date(e.event_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
           : 'Upcoming',
         category: e.event_type || 'EVENT',
-        imageUrl: e.banner_image || e.image_url,
+        imageUrl: (e.banner_image || e.image_url) ? getStaticFileUrl(e.banner_image || e.image_url) : undefined,
         raw: e,
       });
     });
-
-    if (items.length === 0) {
-      items.push({
-        type: 'announcement',
-        id: 'default-1',
-        title: 'SEMESTER REGISTRATION & FEE PAYMENT NOTICE',
-        content:
-          'All students are requested to complete semester registration and clear term dues at the administrative office.',
-        dateFormatted: 'Oct 29',
-        category: 'ANNOUNCEMENT',
-        raw: {
-          title: 'SEMESTER REGISTRATION & FEE PAYMENT NOTICE',
-          content:
-            'All students are requested to complete semester registration and clear term dues at the administrative office before the deadline.',
-        },
-      });
-      items.push({
-        type: 'event',
-        id: 'default-2',
-        title: 'COLLEGE ANNUAL TECH HACKATHON & INNOVATION',
-        content:
-          'Join the campus innovation challenge and showcase your project prototypes with industry experts.',
-        dateFormatted: 'Oct 28',
-        category: 'CAMPUS EVENT',
-        raw: {
-          title: 'COLLEGE ANNUAL TECH HACKATHON & INNOVATION',
-          content:
-            'Join the campus innovation challenge and showcase your project prototypes with industry experts. Registrations open.',
-        },
-      });
-    }
 
     return items;
   }, [announcements, events]);
@@ -299,35 +304,27 @@ export default function DashboardScreen() {
     return [
       {
         id: 1,
-        name: 'Robotics & AI Club',
-        category: 'Hardware & IoT',
-        description: 'Hands-on IoT, ROS, robotics arms, and drone development workshops.',
-        userStatus: 'open',
-        member_count: 42,
-      },
-      {
-        id: 2,
-        name: 'Coding Society (SDG)',
+        name: 'Quantum Coders',
         category: 'Software Engineering',
         description: 'Web development, mobile apps, Cloud, and competitive programming.',
         userStatus: 'open',
-        member_count: 88,
+        memberCount: 88,
+      },
+      {
+        id: 2,
+        name: 'Aqua Green',
+        category: 'Environmental & Sustainability',
+        description: 'Green campus initiatives, botanical drives, and eco workshops.',
+        userStatus: 'open',
+        memberCount: 42,
       },
       {
         id: 3,
-        name: 'Designers Guild',
-        category: 'UI/UX & Creative',
-        description: 'UI/UX design, Figma sprints, digital illustration, and media production.',
+        name: 'Bibliophiles',
+        category: 'Literature & Arts',
+        description: 'Book reading circles, creative writing, and literary debates.',
         userStatus: 'open',
-        member_count: 35,
-      },
-      {
-        id: 4,
-        name: 'Literary & Debating Society',
-        category: 'Public Speaking',
-        description: 'Model UN, parliamentary debates, creative writing, and elocution contests.',
-        userStatus: 'open',
-        member_count: 29,
+        memberCount: 35,
       },
     ];
   }, [clubs]);
@@ -343,7 +340,6 @@ export default function DashboardScreen() {
         `Your membership request for ${club.name} has been submitted to the club coordinator.`
       );
     } catch (e: any) {
-      // Even if network fails or mock, provide pleasant feedback
       setJoinedClubIds((prev) => ({ ...prev, [club.id]: true }));
       Alert.alert(
         'Membership Active',
@@ -356,12 +352,59 @@ export default function DashboardScreen() {
 
   const studentPhotoUrl = student?.student_photo ? getStaticFileUrl(student.student_photo) : null;
 
+  // Filter modules for dashboard quick grid (show top portals, excluding dashboard itself)
+  const displayPortals = activeModules.filter((m) => m.id !== 'dashboard').slice(0, 8);
+
+  const course = student?.course || student?.course_name || '';
+  const branch = student?.branch || student?.branch_name || '';
+  const semester = student?.current_semester || '';
+  const section = student?.section || '';
+  const batch = student?.batch || '';
+  const quota = student?.quota || student?.stud_type || '';
+  const college = student?.college || student?.college_name || '';
+
+  const renderPortalIcon = (iconName: string, color = '#1E3A8A', size = 20) => {
+    switch (iconName) {
+      case 'Home': return <Home size={size} color={color} />;
+      case 'CalendarCheck': return <CalendarCheck size={size} color={color} />;
+      case 'CreditCard': return <CreditCard size={size} color={color} />;
+      case 'Bell': return <Bell size={size} color={color} />;
+      case 'Clock': return <Clock size={size} color={color} />;
+      case 'Award': return <Award size={size} color={color} />;
+      case 'BookOpen': return <BookOpen size={size} color={color} />;
+      case 'Calendar': return <Calendar size={size} color={color} />;
+      case 'ShieldCheck': return <ShieldCheck size={size} color={color} />;
+      case 'FileText': return <FileText size={size} color={color} />;
+      case 'FolderOpen': return <FolderOpen size={size} color={color} />;
+      case 'Bus': return <Bus size={size} color={color} />;
+      case 'Users': return <Users size={size} color={color} />;
+      case 'MessageSquare': return <MessageSquare size={size} color={color} />;
+      case 'Ticket': return <Ticket size={size} color={color} />;
+      case 'UserCheck': return <UserCheck size={size} color={color} />;
+      case 'Briefcase': return <Briefcase size={size} color={color} />;
+      case 'Sparkles': return <Sparkles size={size} color={color} />;
+      case 'User': return <User size={size} color={color} />;
+      default: return <Layers size={size} color={color} />;
+    }
+  };
+
+  const getPortalColors = (category: string) => {
+    switch (category) {
+      case 'academics': return { bg: '#EFF6FF', fg: '#1D4ED8' };
+      case 'finance': return { bg: '#F0FDF4', fg: '#15803D' };
+      case 'campus': return { bg: '#FEF3C7', fg: '#B45309' };
+      case 'support': return { bg: '#FAF5FF', fg: '#7E22CE' };
+      default: return { bg: '#F1F5F9', fg: '#1E3A8A' };
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* Dynamic Header */}
       <Header
-        title={`${greetingText}, Pydian`}
-        subtitle={`${student?.name?.split(' ')[0] || 'Student'} • PIN: ${student?.pin_no || student?.admission_number || 'N/A'}`}
+        title={greetingText}
+        subtitle={`PIN: ${student?.pin_no || student?.admission_number || 'N/A'}${semester ? ` • Sem ${semester}` : ''}`}
+        showPydianTag={true}
       />
 
       {loading ? (
@@ -378,47 +421,31 @@ export default function DashboardScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           showsVerticalScrollIndicator={false}
         >
-          {/* 1. STUDENT PROFILE HERO BANNER */}
-          <View style={styles.heroBanner}>
-            <View style={styles.heroLeftCol}>
-              {/* Avatar Photo */}
-              <View style={styles.heroAvatarContainer}>
+          {/* 1. STUDENT ACADEMIC INFO BANNER */}
+          <View style={styles.banner}>
+            <View style={styles.bannerLeftCol}>
+              <View style={styles.bannerAvatarBox}>
                 {studentPhotoUrl ? (
-                  <Image source={{ uri: studentPhotoUrl }} style={styles.heroAvatarImage} />
+                  <Image source={{ uri: studentPhotoUrl }} style={styles.bannerAvatarImg} />
                 ) : (
-                  <View style={styles.heroAvatarFallback}>
-                    <User size={24} color="#BFDBFE" />
-                  </View>
+                  <GraduationCap size={26} color="#FFFFFF" />
                 )}
               </View>
-
-              {/* Student Identity */}
-              <View style={styles.heroInfo}>
-                <Text style={styles.heroName} numberOfLines={1}>
-                  {student?.name || student?.student_name || 'Student Name'}
+              <View style={styles.bannerTextContainer}>
+                {college ? <Text style={styles.bannerCollege}>{college}</Text> : null}
+                <Text style={styles.bannerCourse}>
+                  {course ? `${course} - ${branch}` : 'Student Record'}
+                  {semester ? ` • Sem ${semester}` : ''}
+                  {section ? ` (Sec ${section})` : ''}
                 </Text>
-                <Text style={styles.heroCourse} numberOfLines={1}>
-                  {student?.course || 'B.Tech'} • {student?.branch || 'CSE'} • Year{' '}
-                  {student?.current_year || 1}
-                </Text>
-
-                {/* Status Badges Row */}
-                <View style={styles.heroBadgesRow}>
-                  <View style={styles.registeredBadge}>
-                    <CheckCircle2 size={11} color="#15803D" />
-                    <Text style={styles.registeredBadgeText}>Registered</Text>
-                  </View>
-                  <View style={styles.profileBadge}>
-                    <CheckCircle2 size={11} color="#1D4ED8" />
-                    <Text style={styles.profileBadgeText}>Profile 100%</Text>
-                  </View>
+                <View style={styles.bannerPillRow}>
+                  {batch ? <Text style={styles.bannerPill}>Batch {batch}</Text> : null}
+                  {quota ? <Text style={styles.bannerPill}>Quota: {quota}</Text> : null}
+                  <Text style={[styles.bannerPill, { backgroundColor: 'rgba(52, 211, 153, 0.25)', color: '#6EE7B7' }]}>
+                    {activeModules.length} Active Portals
+                  </Text>
                 </View>
               </View>
-            </View>
-
-            {/* Right Side Illustration */}
-            <View style={styles.heroIllustration}>
-              <GraduationCap size={48} color="#93C5FD" style={{ opacity: 0.85 }} />
             </View>
           </View>
 
@@ -468,7 +495,7 @@ export default function DashboardScreen() {
             >
               <View style={styles.metricCardHeader}>
                 <Text style={[styles.metricCardTitle, { color: '#6D28D9' }]}>
-                  Overall Progress
+                  Overall Attendance
                 </Text>
               </View>
               <View style={styles.metricCardBody}>
@@ -479,7 +506,7 @@ export default function DashboardScreen() {
                   <View style={styles.metricDateRow}>
                     <ChevronRight size={10} color="#6D28D9" />
                     <Text style={[styles.metricDateText, { color: '#6D28D9' }]}>
-                      {progressInfo.rating}
+                      {progressInfo.rating} Rating
                     </Text>
                   </View>
                 </View>
@@ -495,494 +522,369 @@ export default function DashboardScreen() {
             </View>
           </View>
 
-          {/* 3. QUICK ACTION TILES (HORIZONTAL SCROLL) */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.quickActionsContainer}
-            style={styles.quickActionsScroll}
-          >
-            {/* Attendance */}
-            <TouchableOpacity
-              style={styles.actionPill}
-              onPress={() => router.push('/(tabs)/attendance')}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.actionIconBox, { backgroundColor: '#ECFDF5' }]}>
-                <CalendarCheck size={20} color="#059669" />
-              </View>
-              <Text style={styles.actionPillLabel}>Attendance</Text>
+          {/* 3. DYNAMIC SDMS PORTALS SECTION */}
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.scopeHeaderTitleCol}>
+              <Text style={styles.sectionTitle}>SDMS Portals & Services</Text>
+              <Text style={styles.scopeSubTitle}>Synced with SDMS Student Portal Layout settings</Text>
+            </View>
+            <TouchableOpacity onPress={() => setDrawerVisible(true)} style={styles.allPagesPill}>
+              <Menu size={13} color="#1E3A8A" />
+              <Text style={styles.allPagesText}>Sidebar ({activeModules.length})</Text>
             </TouchableOpacity>
+          </View>
 
-            {/* Academic */}
-            <TouchableOpacity
-              style={styles.actionPill}
-              onPress={() =>
-                setActiveModule({
-                  id: 'academic',
-                  title: 'Academic Content',
-                  subtitle: 'Lecture Notes, Question Banks & Syllabus',
-                  category: 'academics',
-                  iconName: 'BookOpen',
-                })
-              }
-              activeOpacity={0.7}
-            >
-              <View style={[styles.actionIconBox, { backgroundColor: '#EEEFFE' }]}>
-                <BookOpen size={20} color="#5551FF" />
-              </View>
-              <Text style={styles.actionPillLabel}>Academic</Text>
-            </TouchableOpacity>
+          {/* 3-Column Portals Grid */}
+          <View style={styles.portalGrid}>
+            {displayPortals.map((mod) => {
+              const colors = getPortalColors(mod.category);
+              return (
+                <TouchableOpacity
+                  key={mod.id}
+                  style={styles.portalCard}
+                  onPress={() => {
+                    if (mod.isTab && mod.tabRoute) {
+                      router.push(mod.tabRoute as any);
+                    } else {
+                      setActiveModule(mod);
+                    }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.portalIconContainer, { backgroundColor: colors.bg }]}>
+                    {renderPortalIcon(mod.iconName, colors.fg, 20)}
+                  </View>
+                  <Text style={styles.portalLabel} numberOfLines={1}>
+                    {mod.title}
+                  </Text>
+                  <Text style={styles.portalScopeTag} numberOfLines={1}>
+                    {mod.subtitle}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
 
-            {/* Fees */}
+            {/* All Portals Card */}
             <TouchableOpacity
-              style={styles.actionPill}
-              onPress={() => router.push('/(tabs)/fees')}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.actionIconBox, { backgroundColor: '#FFEEF2' }]}>
-                <IndianRupee size={20} color="#FF3366" />
-              </View>
-              <Text style={styles.actionPillLabel}>Fees</Text>
-            </TouchableOpacity>
-
-            {/* Timetable */}
-            <TouchableOpacity
-              style={styles.actionPill}
-              onPress={() =>
-                setActiveModule({
-                  id: 'timetable',
-                  title: 'Class Timetable',
-                  subtitle: 'Daily Period Timings & Schedule',
-                  category: 'academics',
-                  iconName: 'Clock',
-                })
-              }
-              activeOpacity={0.7}
-            >
-              <View style={[styles.actionIconBox, { backgroundColor: '#EFF6FF' }]}>
-                <Clock size={20} color="#3B82F6" />
-              </View>
-              <Text style={styles.actionPillLabel}>Timetable</Text>
-            </TouchableOpacity>
-
-            {/* Services */}
-            <TouchableOpacity
-              style={styles.actionPill}
-              onPress={() =>
-                setActiveModule({
-                  id: 'services',
-                  title: 'Student Services',
-                  subtitle: 'Bonafide, TC, Custodian & Certs',
-                  category: 'finance',
-                  iconName: 'FileText',
-                })
-              }
-              activeOpacity={0.7}
-            >
-              <View style={[styles.actionIconBox, { backgroundColor: '#FCE7F3' }]}>
-                <FileText size={20} color="#DB2777" />
-              </View>
-              <Text style={styles.actionPillLabel}>Services</Text>
-            </TouchableOpacity>
-
-            {/* Clubs */}
-            <TouchableOpacity
-              style={styles.actionPill}
-              onPress={() =>
-                setActiveModule({
-                  id: 'clubs',
-                  title: 'Campus Student Clubs',
-                  subtitle: 'Technical, Cultural & Sports Groups',
-                  category: 'campus',
-                  iconName: 'Users',
-                })
-              }
-              activeOpacity={0.7}
-            >
-              <View style={[styles.actionIconBox, { backgroundColor: '#CCFBF1' }]}>
-                <Users size={20} color="#0D9488" />
-              </View>
-              <Text style={styles.actionPillLabel}>Clubs</Text>
-            </TouchableOpacity>
-
-            {/* Library */}
-            <TouchableOpacity
-              style={styles.actionPill}
-              onPress={() =>
-                setActiveModule({
-                  id: 'library',
-                  title: 'Campus Library',
-                  subtitle: 'Book Catalog & Dues',
-                  category: 'campus',
-                  iconName: 'BookOpen',
-                })
-              }
-              activeOpacity={0.7}
-            >
-              <View style={[styles.actionIconBox, { backgroundColor: '#ECFDF5' }]}>
-                <BookOpen size={20} color="#059669" />
-              </View>
-              <Text style={styles.actionPillLabel}>Library</Text>
-            </TouchableOpacity>
-
-            {/* Transport */}
-            <TouchableOpacity
-              style={styles.actionPill}
-              onPress={() =>
-                setActiveModule({
-                  id: 'transport',
-                  title: 'Campus Transport',
-                  subtitle: 'Bus Routes & Stops',
-                  category: 'campus',
-                  iconName: 'Bus',
-                })
-              }
-              activeOpacity={0.7}
-            >
-              <View style={[styles.actionIconBox, { backgroundColor: '#FFEDD5' }]}>
-                <Bus size={20} color="#C2410C" />
-              </View>
-              <Text style={styles.actionPillLabel}>Transport</Text>
-            </TouchableOpacity>
-
-            {/* All Pages Drawer Trigger */}
-            <TouchableOpacity
-              style={styles.actionPill}
+              style={[styles.portalCard, styles.allPortalsCard]}
               onPress={() => setDrawerVisible(true)}
               activeOpacity={0.7}
             >
-              <View style={[styles.actionIconBox, { backgroundColor: '#EEF2FF' }]}>
+              <View style={[styles.portalIconContainer, { backgroundColor: '#EFF6FF' }]}>
                 <Layers size={20} color="#1E3A8A" />
               </View>
-              <Text style={[styles.actionPillLabel, { color: '#1E3A8A', fontWeight: '800' }]}>
-                All Pages
+              <Text style={[styles.portalLabel, { color: '#1E3A8A', fontWeight: '800' }]} numberOfLines={1}>
+                All ({activeModules.length})
               </Text>
+              <Text style={[styles.portalScopeTag, { color: '#1D4ED8' }]}>View All</Text>
             </TouchableOpacity>
-          </ScrollView>
-
-          {/* 4. CAMPUS EVENTS & CIRCULARS SECTION */}
-          <View style={styles.sectionContainer}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Campus Events</Text>
-              <TouchableOpacity
-                onPress={() => router.push('/(tabs)/announcements')}
-                style={styles.viewAllRow}
-              >
-                <Text style={styles.viewAllText}>View All</Text>
-                <ArrowRight size={13} color="#2563EB" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalCardsScroll}
-            >
-              {combinedFeed.map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={styles.eventCard}
-                  onPress={() => setSelectedFeedItem(item)}
-                  activeOpacity={0.85}
-                >
-                  {/* Thumbnail / Header Banner */}
-                  <View style={styles.eventCardBanner}>
-                    <View
-                      style={[
-                        styles.eventCategoryBadge,
-                        {
-                          backgroundColor:
-                            item.type === 'event' ? '#9333EA' : '#4F46E5',
-                        },
-                      ]}
-                    >
-                      <Text style={styles.eventCategoryText}>
-                        {item.category.toUpperCase()}
-                      </Text>
-                    </View>
-                    <FileText size={32} color="#FFFFFF" style={{ opacity: 0.25 }} />
-                  </View>
-
-                  {/* Body Content */}
-                  <View style={styles.eventCardBody}>
-                    <Text style={styles.eventCardTitle} numberOfLines={2}>
-                      {item.title}
-                    </Text>
-                    <View style={styles.eventCardMeta}>
-                      <Clock size={11} color="#94A3B8" />
-                      <Text style={styles.eventCardDate}>{item.dateFormatted}</Text>
-                    </View>
-                  </View>
-
-                  {/* Footer Link */}
-                  <View style={styles.eventCardFooter}>
-                    <Text style={styles.readUpdateText}>Read Update</Text>
-                    <ArrowRight size={12} color="#2563EB" />
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
           </View>
 
-          {/* 5. EXPLORE LEARN BUILD BANNER */}
-          <TouchableOpacity
-            style={styles.exploreBanner}
-            onPress={() =>
-              setActiveModule({
-                id: 'clubs',
-                title: 'Campus Student Clubs',
-                subtitle: 'Join Clubs, Workshops and Maker Space',
-                category: 'campus',
-                iconName: 'Users',
-              })
-            }
-            activeOpacity={0.88}
-          >
-            <View style={styles.exploreBannerTextCol}>
-              <Text style={styles.exploreBannerTitle}>
-                Explore{'\n'}Learn{'\n'}Build
-              </Text>
-              <Text style={styles.exploreBannerSubtitle}>
-                Join Clubs, Workshops{'\n'}and Maker Space
-              </Text>
-            </View>
-            <View style={styles.exploreBannerGraphic}>
-              <Sparkles size={46} color="#60A5FA" style={{ opacity: 0.9 }} />
-            </View>
-          </TouchableOpacity>
-
-          {/* 6. CLUBS TO JOIN SECTION */}
-          <View style={styles.sectionContainer}>
-            <View style={styles.sectionHeaderRow}>
-              <View style={styles.sectionTitleWithPill}>
-                <Text style={styles.sectionTitle}>Clubs to Join</Text>
-                <View style={styles.countPill}>
-                  <Text style={styles.countPillText}>{displayClubs.length} Available</Text>
-                </View>
+          {/* 4. CAMPUS EVENTS & NOTICES SECTION */}
+          {combinedFeed.length > 0 && (
+            <View style={styles.sectionContainer}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionTitle}>Notices & Events</Text>
+                <TouchableOpacity
+                  onPress={() => router.push('/(tabs)/announcements')}
+                  style={styles.viewAllRow}
+                >
+                  <Text style={styles.viewAllText}>View All</Text>
+                  <ArrowRight size={13} color="#2563EB" />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                onPress={() =>
-                  setActiveModule({
-                    id: 'clubs',
-                    title: 'Campus Student Clubs',
-                    subtitle: 'Technical, Cultural & Sports Groups',
-                    category: 'campus',
-                    iconName: 'Users',
-                  })
-                }
-                style={styles.viewAllRow}
-              >
-                <Text style={styles.viewAllText}>View All</Text>
-                <ArrowRight size={13} color="#2563EB" />
-              </TouchableOpacity>
-            </View>
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalCardsScroll}
-            >
-              {displayClubs.map((club: any) => {
-                const isJoined = joinedClubIds[club.id] || club.userStatus === 'approved';
-                return (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalCardsScroll}
+              >
+                {combinedFeed.map((item) => (
                   <TouchableOpacity
-                    key={club.id}
-                    style={styles.clubCard}
-                    onPress={() => setSelectedClub(club)}
+                    key={item.id}
+                    style={styles.eventCard}
+                    onPress={() => setSelectedFeedItem(item)}
                     activeOpacity={0.85}
                   >
-                    {/* Club Header */}
-                    <View style={styles.clubCardHeader}>
-                      <View style={styles.clubCardHeaderBg}>
-                        <Users size={32} color="#FFFFFF" style={{ opacity: 0.3 }} />
-                      </View>
+                    <View style={styles.eventCardBanner}>
+                      {item.imageUrl ? (
+                        <Image
+                          source={{ uri: item.imageUrl }}
+                          style={styles.eventCardImage}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={styles.eventCardPlaceholder}>
+                          <FileText size={28} color="#FFFFFF" style={{ opacity: 0.3 }} />
+                        </View>
+                      )}
                       <View
                         style={[
-                          styles.openToJoinBadge,
-                          isJoined && { backgroundColor: '#15803D' },
+                          styles.eventCategoryBadge,
+                          {
+                            backgroundColor:
+                              item.type === 'event' ? '#9333EA' : '#4F46E5',
+                          },
                         ]}
                       >
-                        <Sparkles size={9} color="#FFFFFF" />
-                        <Text style={styles.openToJoinText}>
-                          {isJoined ? 'JOINED' : 'OPEN TO JOIN'}
+                        <Text style={styles.eventCategoryText}>
+                          {item.category.toUpperCase()}
                         </Text>
                       </View>
                     </View>
 
-                    {/* Club Details */}
-                    <View style={styles.clubCardBody}>
-                      <Text style={styles.clubName} numberOfLines={1}>
-                        {club.name}
+                    <View style={styles.eventCardBody}>
+                      <Text style={styles.eventCardTitle} numberOfLines={2}>
+                        {item.title}
                       </Text>
-                      <Text style={styles.clubCategory} numberOfLines={1}>
-                        {club.category || 'Student Community'}
-                      </Text>
-                      <Text style={styles.clubDesc} numberOfLines={2}>
-                        {club.description || 'Active campus student association & tech sprints.'}
-                      </Text>
+                      <View style={styles.eventCardMeta}>
+                        <Clock size={11} color="#94A3B8" />
+                        <Text style={styles.eventCardDate}>{item.dateFormatted}</Text>
+                      </View>
                     </View>
 
-                    {/* Club Join Action Button */}
-                    <View style={styles.clubCardFooter}>
-                      <TouchableOpacity
-                        style={[
-                          styles.joinClubBtn,
-                          isJoined && { backgroundColor: '#F1F5F9', borderColor: '#CBD5E1' },
-                        ]}
-                        onPress={() => handleJoinClub(club)}
-                        disabled={isJoined || joiningClubId === club.id}
-                        activeOpacity={0.8}
-                      >
-                        {joiningClubId === club.id ? (
-                          <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                          <Text
-                            style={[
-                              styles.joinClubBtnText,
-                              isJoined && { color: '#64748B' },
-                            ]}
-                          >
-                            {isJoined ? '✓ Joined' : 'Join Club'}
-                          </Text>
-                        )}
-                      </TouchableOpacity>
+                    <View style={styles.eventCardFooter}>
+                      <Text style={styles.readUpdateText}>Read Update</Text>
+                      <ArrowRight size={12} color="#2563EB" />
                     </View>
                   </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* 5. CAMPUS CLUBS SECTION */}
+          {displayClubs.length > 0 && (
+            <View style={styles.sectionContainer}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionTitle}>Campus Clubs</Text>
+                <TouchableOpacity
+                  onPress={() =>
+                    setActiveModule({
+                      id: 'clubs',
+                      title: 'Clubs',
+                      subtitle: 'Student Activities & Circles',
+                      category: 'campus',
+                      iconName: 'Users',
+                    })
+                  }
+                  style={styles.viewAllRow}
+                >
+                  <Text style={styles.viewAllText}>Explore</Text>
+                  <ArrowRight size={13} color="#2563EB" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalCardsScroll}
+              >
+                {displayClubs.map((club) => {
+                  const isJoined = joinedClubIds[club.id] || club.userStatus === 'approved';
+                  return (
+                    <TouchableOpacity
+                      key={club.id}
+                      style={styles.clubCard}
+                      onPress={() => setSelectedClub(club)}
+                      activeOpacity={0.85}
+                    >
+                      <View style={styles.clubCardTop}>
+                        <View style={styles.clubIconContainer}>
+                          <Users size={18} color="#0D9488" />
+                        </View>
+                        <Text style={styles.clubCategoryText}>{club.category || 'CLUB'}</Text>
+                      </View>
+
+                      <Text style={styles.clubTitle} numberOfLines={1}>
+                        {club.name}
+                      </Text>
+                      <Text style={styles.clubDesc} numberOfLines={2}>
+                        {club.description || 'Student group activities and technical projects.'}
+                      </Text>
+
+                      <View style={styles.clubCardFooter}>
+                        <Text style={styles.clubMemberCount}>
+                          {club.memberCount || club.member_count || 0} Members
+                        </Text>
+                        <TouchableOpacity
+                          style={[styles.joinBtn, isJoined && styles.joinedBtn]}
+                          onPress={() => handleJoinClub(club)}
+                          disabled={joiningClubId === club.id || isJoined}
+                        >
+                          <Text style={[styles.joinBtnText, isJoined && styles.joinedBtnText]}>
+                            {isJoined ? 'Joined' : 'Join'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
         </ScrollView>
       )}
 
-      {/* FULL-DETAIL MODAL FOR ANNOUNCEMENT / EVENT */}
+      {/* FULL-SCREEN DETAIL VIEW FOR ANNOUNCEMENT / EVENT */}
       <Modal
         visible={!!selectedFeedItem}
-        transparent
-        animationType="fade"
+        animationType="slide"
+        presentationStyle="fullScreen"
         onRequestClose={() => setSelectedFeedItem(null)}
       >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <View
+        <View style={[styles.fullScreenPageContainer, { paddingTop: insets.top }]}>
+          <View style={styles.fullScreenPageHeader}>
+            <TouchableOpacity
+              onPress={() => setSelectedFeedItem(null)}
+              style={styles.fullScreenBackBtn}
+              hitSlop={10}
+            >
+              <ArrowLeft size={22} color="#1E293B" />
+            </TouchableOpacity>
+            <View style={{ flex: 1, marginLeft: 8 }}>
+              <Text style={styles.fullScreenHeaderTitle} numberOfLines={1}>
+                {selectedFeedItem?.type === 'event' ? 'Campus Event' : 'Notice & Circular'}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.modalBadge,
+                {
+                  backgroundColor:
+                    selectedFeedItem?.type === 'event' ? '#F3E8FF' : '#EEF2FF',
+                },
+              ]}
+            >
+              <Text
                 style={[
-                  styles.modalBadge,
+                  styles.modalBadgeText,
                   {
-                    backgroundColor:
-                      selectedFeedItem?.type === 'event' ? '#F3E8FF' : '#EEF2FF',
+                    color:
+                      selectedFeedItem?.type === 'event' ? '#9333EA' : '#4F46E5',
                   },
                 ]}
               >
-                <Text
-                  style={[
-                    styles.modalBadgeText,
-                    {
-                      color:
-                        selectedFeedItem?.type === 'event' ? '#9333EA' : '#4F46E5',
-                    },
-                  ]}
-                >
-                  {selectedFeedItem?.category?.toUpperCase()}
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setSelectedFeedItem(null)}
-                style={styles.modalCloseBtn}
-                hitSlop={8}
-              >
-                <X size={18} color="#64748B" />
-              </TouchableOpacity>
+                {selectedFeedItem?.category?.toUpperCase()}
+              </Text>
             </View>
+          </View>
 
-            <ScrollView style={styles.modalScrollBody} showsVerticalScrollIndicator={false}>
-              <Text style={styles.modalTitle}>{selectedFeedItem?.title}</Text>
+          <ScrollView
+            style={styles.fullScreenPageScroll}
+            contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 24) + 20 }}
+            showsVerticalScrollIndicator={false}
+          >
+            {selectedFeedItem?.imageUrl ? (
+              <View style={styles.fullScreenImageContainer}>
+                <Image
+                  source={{ uri: selectedFeedItem.imageUrl }}
+                  style={styles.fullScreenBannerImage}
+                  resizeMode="cover"
+                />
+              </View>
+            ) : null}
+
+            <View style={styles.fullScreenPageContent}>
+              <Text style={styles.fullScreenDetailTitle}>{selectedFeedItem?.title}</Text>
               <View style={styles.modalMetaRow}>
                 <Clock size={12} color="#64748B" />
                 <Text style={styles.modalMetaDate}>{selectedFeedItem?.dateFormatted}</Text>
               </View>
-              <Text style={styles.modalContentText}>
+              <Text style={styles.fullScreenContentText}>
                 {selectedFeedItem?.content || 'No detailed description available.'}
               </Text>
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={styles.modalDismissBtn}
-                onPress={() => setSelectedFeedItem(null)}
-              >
-                <Text style={styles.modalDismissBtnText}>Close</Text>
-              </TouchableOpacity>
             </View>
+          </ScrollView>
+
+          <View style={[styles.fullScreenFooter, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
+            <TouchableOpacity
+              style={styles.fullScreenDismissBtn}
+              onPress={() => setSelectedFeedItem(null)}
+            >
+              <Text style={styles.fullScreenDismissBtnText}>Close</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* FULL-DETAIL MODAL FOR CLUB */}
+      {/* FULL-SCREEN DETAIL VIEW FOR CLUB */}
       <Modal
         visible={!!selectedClub}
-        transparent
-        animationType="fade"
+        animationType="slide"
+        presentationStyle="fullScreen"
         onRequestClose={() => setSelectedClub(null)}
       >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <View style={[styles.modalBadge, { backgroundColor: '#CCFBF1' }]}>
-                <Text style={[styles.modalBadgeText, { color: '#0F766E' }]}>
-                  {selectedClub?.category?.toUpperCase() || 'STUDENT CLUB'}
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setSelectedClub(null)}
-                style={styles.modalCloseBtn}
-                hitSlop={8}
-              >
-                <X size={18} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalScrollBody} showsVerticalScrollIndicator={false}>
-              <Text style={styles.modalTitle}>{selectedClub?.name}</Text>
-              <Text style={styles.modalContentText}>
-                {selectedClub?.description ||
-                  'Join other enthusiastic students in workshops, coding hackathons, technical projects, and peer networking.'}
+        <View style={[styles.fullScreenPageContainer, { paddingTop: insets.top }]}>
+          <View style={styles.fullScreenPageHeader}>
+            <TouchableOpacity
+              onPress={() => setSelectedClub(null)}
+              style={styles.fullScreenBackBtn}
+              hitSlop={10}
+            >
+              <ArrowLeft size={22} color="#1E293B" />
+            </TouchableOpacity>
+            <View style={{ flex: 1, marginLeft: 8 }}>
+              <Text style={styles.fullScreenHeaderTitle} numberOfLines={1}>
+                {selectedClub?.name || 'Campus Club'}
               </Text>
-              {selectedClub?.member_count && (
+            </View>
+            <View style={[styles.modalBadge, { backgroundColor: '#CCFBF1' }]}>
+              <Text style={[styles.modalBadgeText, { color: '#0F766E' }]}>
+                {selectedClub?.category?.toUpperCase() || 'STUDENT CLUB'}
+              </Text>
+            </View>
+          </View>
+
+          <ScrollView
+            style={styles.fullScreenPageScroll}
+            contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 24) + 20 }}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.fullScreenPageContent}>
+              <Text style={styles.fullScreenDetailTitle}>{selectedClub?.name}</Text>
+              {(selectedClub?.memberCount || selectedClub?.member_count) ? (
                 <View style={styles.clubMemberStatRow}>
                   <Users size={14} color="#0F766E" />
                   <Text style={styles.clubMemberStatText}>
-                    {selectedClub.member_count} active members enrolled
+                    {selectedClub.memberCount || selectedClub.member_count} active members enrolled
                   </Text>
                 </View>
-              )}
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={[
-                  styles.modalActionBtn,
-                  joinedClubIds[selectedClub?.id] && { backgroundColor: '#15803D' },
-                ]}
-                onPress={() => {
-                  handleJoinClub(selectedClub);
-                  setSelectedClub(null);
-                }}
-              >
-                <Text style={styles.modalActionBtnText}>
-                  {joinedClubIds[selectedClub?.id] ? '✓ You Are Enrolled' : 'Submit Membership'}
-                </Text>
-              </TouchableOpacity>
+              ) : null}
+              <Text style={styles.fullScreenContentText}>
+                {selectedClub?.description ||
+                  'Join other enthusiastic students in workshops, coding hackathons, technical projects, and peer networking.'}
+              </Text>
             </View>
+          </ScrollView>
+
+          <View style={[styles.fullScreenFooter, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
+            <TouchableOpacity
+              style={[
+                styles.modalActionBtn,
+                joinedClubIds[selectedClub?.id] && { backgroundColor: '#15803D' },
+              ]}
+              onPress={() => {
+                handleJoinClub(selectedClub);
+                setSelectedClub(null);
+              }}
+            >
+              <Text style={styles.modalActionBtnText}>
+                {joinedClubIds[selectedClub?.id] ? '✓ You Are Enrolled' : 'Submit Membership'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* ALL 20-MODULES STUDENT SIDEBAR DRAWER */}
-      <StudentSidebarDrawer visible={drawerVisible} onClose={() => setDrawerVisible(false)} />
+      {/* SDMS Sidebar Drawer */}
+      <StudentSidebarDrawer
+        visible={drawerVisible}
+        onClose={() => setDrawerVisible(false)}
+        layoutSettings={layoutSettings}
+      />
 
-      {/* SUB-MODULE DETAIL MODAL (TIMETABLE, LIBRARY, MARKS, ETC.) */}
+      {/* SDMS Module Detail Modal */}
       <StudentModuleDetailModal
         visible={!!activeModule}
         module={activeModule}
@@ -1006,116 +908,70 @@ const styles = StyleSheet.create({
   loaderText: {
     fontSize: 13,
     color: '#64748B',
-    fontWeight: '600',
   },
   content: {
     padding: 16,
-    paddingTop: 12,
   },
-
-  /* HERO BANNER */
-  heroBanner: {
-    backgroundColor: '#0B63E5',
-    borderRadius: 20,
+  banner: {
+    backgroundColor: '#1E3A8A',
+    borderRadius: 14,
     padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     marginBottom: 14,
-    shadowColor: '#0B63E5',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 4,
-    overflow: 'hidden',
   },
-  heroLeftCol: {
+  bannerLeftCol: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
     gap: 12,
   },
-  heroAvatarContainer: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
+  bannerAvatarBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
     overflow: 'hidden',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  heroAvatarImage: {
+  bannerAvatarImg: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
   },
-  heroAvatarFallback: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  heroInfo: {
+  bannerTextContainer: {
     flex: 1,
   },
-  heroName: {
+  bannerCollege: {
+    color: '#93C5FD',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  bannerCourse: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-  heroCourse: {
-    color: '#DBEAFE',
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 15,
+    fontWeight: '700',
     marginTop: 2,
-    marginBottom: 6,
   },
-  heroBadgesRow: {
+  bannerPillRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    marginTop: 6,
     flexWrap: 'wrap',
   },
-  registeredBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  registeredBadgeText: {
-    color: '#15803D',
+  bannerPill: {
     fontSize: 10,
     fontWeight: '700',
+    color: '#DBEAFE',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
-  profileBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#DBEAFE',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  profileBadgeText: {
-    color: '#1D4ED8',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  heroIllustration: {
-    paddingLeft: 4,
-  },
-
-  /* METRICS ROW (TODAY'S ATTENDANCE + OVERALL PROGRESS) */
   metricsRow: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 14,
+    marginBottom: 16,
   },
   metricCard: {
     flex: 1,
@@ -1146,8 +1002,8 @@ const styles = StyleSheet.create({
   metricDateRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 2,
     gap: 2,
+    marginTop: 2,
   },
   metricDateText: {
     fontSize: 10,
@@ -1156,81 +1012,87 @@ const styles = StyleSheet.create({
   metricIconBox: {
     width: 28,
     height: 28,
-    borderRadius: 7,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  /* QUICK ACTIONS HORIZONTAL SCROLL */
-  quickActionsScroll: {
-    marginBottom: 16,
-  },
-  quickActionsContainer: {
-    gap: 10,
-    paddingVertical: 2,
-  },
-  actionPill: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    minWidth: 72,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  actionIconBox: {
-    width: 42,
-    height: 42,
     borderRadius: 14,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
-  },
-  actionPillLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#334155',
-  },
-
-  /* SECTIONS COMMON */
-  sectionContainer: {
-    marginBottom: 18,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 12,
+  },
+  scopeHeaderTitleCol: {
+    flex: 1,
   },
   sectionTitle: {
     fontSize: 15,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.2,
+    fontWeight: '700',
+    color: '#1E293B',
   },
-  sectionTitleWithPill: {
+  scopeSubTitle: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  allPagesPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  countPill: {
+    gap: 5,
     backgroundColor: '#EEF2FF',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
   },
-  countPillText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#4338CA',
+  allPagesText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1E3A8A',
+  },
+  portalGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 20,
+  },
+  portalCard: {
+    width: (SCREEN_WIDTH - 32 - 20) / 3,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  allPortalsCard: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#CBD5E1',
+  },
+  portalIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  portalLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#1E293B',
+    textAlign: 'center',
+  },
+  portalScopeTag: {
+    fontSize: 9,
+    color: '#64748B',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  sectionContainer: {
+    marginBottom: 20,
   },
   viewAllRow: {
     flexDirection: 'row',
@@ -1246,27 +1108,35 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 2,
   },
-
-  /* CAMPUS EVENTS CARDS */
   eventCard: {
-    width: 210,
+    width: 220,
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     overflow: 'hidden',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
   },
   eventCardBanner: {
-    height: 96,
-    backgroundColor: '#1E293B',
+    height: 105,
+    backgroundColor: '#312E81',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  eventCardImage: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  eventCardPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#312E81',
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
   },
   eventCategoryBadge: {
     position: 'absolute',
@@ -1275,21 +1145,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: 6,
+    zIndex: 2,
   },
   eventCategoryText: {
-    color: '#FFFFFF',
     fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 0.5,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   eventCardBody: {
     padding: 10,
-    flex: 1,
   },
   eventCardTitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#0F172A',
+    color: '#1E293B',
     lineHeight: 16,
   },
   eventCardMeta: {
@@ -1300,153 +1169,166 @@ const styles = StyleSheet.create({
   },
   eventCardDate: {
     fontSize: 10,
-    color: '#94A3B8',
-    fontWeight: '600',
+    color: '#64748B',
   },
   eventCardFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 10,
-    paddingBottom: 10,
-    paddingTop: 4,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
   },
   readUpdateText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#2563EB',
   },
-
-  /* EXPLORE LEARN BUILD BANNER */
-  exploreBanner: {
-    backgroundColor: '#031338',
-    borderRadius: 20,
-    padding: 16,
+  clubCard: {
+    width: 200,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 12,
+  },
+  clubCardTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 18,
-    shadowColor: '#031338',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
+    marginBottom: 8,
   },
-  exploreBannerTextCol: {
-    flex: 1,
-  },
-  exploreBannerTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '900',
-    lineHeight: 22,
-    letterSpacing: -0.3,
-  },
-  exploreBannerSubtitle: {
-    color: '#94A3B8',
-    fontSize: 11,
-    fontWeight: '500',
-    marginTop: 6,
-    lineHeight: 15,
-  },
-  exploreBannerGraphic: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  clubIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#CCFBF1',
     alignItems: 'center',
     justifyContent: 'center',
   },
-
-  /* CLUBS CARDS */
-  clubCard: {
-    width: 220,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    overflow: 'hidden',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  clubCardHeader: {
-    height: 90,
-    backgroundColor: '#0F172A',
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  clubCardHeaderBg: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  openToJoinBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#10B981',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  openToJoinText: {
-    color: '#FFFFFF',
+  clubCategoryText: {
     fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 0.4,
+    fontWeight: '700',
+    color: '#0F766E',
   },
-  clubCardBody: {
-    padding: 10,
-    flex: 1,
-  },
-  clubName: {
+  clubTitle: {
     fontSize: 13,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  clubCategory: {
-    fontSize: 10,
-    color: '#64748B',
-    fontWeight: '600',
-    marginTop: 2,
+    fontWeight: '700',
+    color: '#1E293B',
     marginBottom: 4,
   },
   clubDesc: {
-    fontSize: 10,
-    color: '#475569',
-    lineHeight: 14,
+    fontSize: 11,
+    color: '#64748B',
+    lineHeight: 15,
+    marginBottom: 10,
   },
   clubCardFooter: {
-    paddingHorizontal: 10,
-    paddingBottom: 10,
-    paddingTop: 4,
-  },
-  joinClubBtn: {
-    backgroundColor: '#2563EB',
-    borderRadius: 10,
-    paddingVertical: 7,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#1D4ED8',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    paddingTop: 8,
   },
-  joinClubBtnText: {
+  clubMemberCount: {
+    fontSize: 10,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  joinBtn: {
+    backgroundColor: '#1E3A8A',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  joinBtnText: {
+    fontSize: 10,
+    fontWeight: '700',
     color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '800',
   },
-
-  /* MODALS */
+  joinedBtn: {
+    backgroundColor: '#DCFCE7',
+  },
+  joinedBtnText: {
+    color: '#15803D',
+  },
+  fullScreenPageContainer: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  fullScreenPageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  fullScreenBackBtn: {
+    padding: 6,
+    borderRadius: 8,
+    marginRight: 6,
+  },
+  fullScreenHeaderTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  fullScreenPageScroll: {
+    flex: 1,
+  },
+  fullScreenImageContainer: {
+    width: '100%',
+    height: 220,
+    backgroundColor: '#0F172A',
+  },
+  fullScreenBannerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  fullScreenPageContent: {
+    padding: 20,
+  },
+  fullScreenDetailTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0F172A',
+    lineHeight: 26,
+    marginBottom: 8,
+  },
+  fullScreenContentText: {
+    fontSize: 14,
+    color: '#334155',
+    lineHeight: 22,
+    marginTop: 10,
+  },
+  fullScreenFooter: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    flexDirection: 'row',
+    gap: 12,
+  },
+  fullScreenDismissBtn: {
+    flex: 1,
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  fullScreenDismissBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#475569',
+  },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -1455,106 +1337,102 @@ const styles = StyleSheet.create({
     width: '100%',
     maxHeight: '80%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 18,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 8,
+    borderRadius: 16,
+    padding: 16,
   },
   modalHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 12,
   },
   modalBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 6,
   },
   modalBadgeText: {
     fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.5,
+    fontWeight: '700',
   },
   modalCloseBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    padding: 6,
+    borderRadius: 12,
     backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   modalScrollBody: {
-    marginBottom: 16,
+    maxHeight: 300,
+  },
+  modalImageContainer: {
+    width: '100%',
+    height: 160,
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginBottom: 12,
+    backgroundColor: '#0F172A',
+  },
+  modalBannerImage: {
+    width: '100%',
+    height: '100%',
   },
   modalTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#0F172A',
-    marginBottom: 6,
-    lineHeight: 22,
+    marginBottom: 8,
   },
   modalMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   modalMetaDate: {
     fontSize: 11,
     color: '#64748B',
-    fontWeight: '600',
   },
   modalContentText: {
     fontSize: 13,
     color: '#334155',
-    lineHeight: 20,
+    lineHeight: 19,
   },
   clubMemberStatRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     marginTop: 12,
-    backgroundColor: '#F0FDFA',
-    padding: 8,
-    borderRadius: 8,
   },
   clubMemberStatText: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#0F766E',
-    fontWeight: '700',
+    fontWeight: '600',
   },
   modalFooter: {
-    flexDirection: 'row',
-    gap: 10,
+    marginTop: 14,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
   },
   modalDismissBtn: {
-    flex: 1,
     backgroundColor: '#F1F5F9',
-    borderRadius: 12,
     paddingVertical: 10,
+    borderRadius: 8,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   modalDismissBtnText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#475569',
   },
   modalActionBtn: {
-    flex: 1,
-    backgroundColor: '#2563EB',
-    borderRadius: 12,
+    backgroundColor: '#1E3A8A',
     paddingVertical: 10,
+    borderRadius: 8,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   modalActionBtnText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#FFFFFF',
   },
 });

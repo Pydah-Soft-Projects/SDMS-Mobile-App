@@ -1,28 +1,38 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Platform, StatusBar as RNStatusBar } from 'react-native';
-import { LogOut, Terminal, Menu, Bell } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, StatusBar as RNStatusBar } from 'react-native';
+import { Menu, Bell } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { StudentSidebarDrawer } from './StudentSidebarDrawer';
 import { useAuth } from '../context/AuthContext';
-import { getStaticFileUrl } from '../config/api';
-import LogViewerModal from './LogViewerModal';
 
 interface HeaderProps {
   title: string;
   subtitle?: string;
   showLogout?: boolean;
+  showPydianTag?: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ title, subtitle, showLogout = true }) => {
+export const Header: React.FC<HeaderProps> = ({
+  title,
+  subtitle,
+  showLogout = false,
+  showPydianTag,
+}) => {
   const insets = useSafeAreaInsets();
-  const topInset = Math.max(insets.top, Platform.OS === 'android' ? (RNStatusBar.currentHeight || 24) : 0, 16);
+  const topInset = Math.max(
+    insets.top,
+    Platform.OS === 'android' ? RNStatusBar.currentHeight || 24 : 0,
+    16
+  );
   const router = useRouter();
-  const { user, userType, logout } = useAuth();
+  const { user, userType } = useAuth();
   const [showSidebar, setShowSidebar] = useState(false);
-  const isStudent = userType === 'student' || (!userType && !(user as any)?.role?.includes('admin') && !(user as any)?.role?.includes('staff'));
-  const [showLogs, setShowLogs] = useState(false);
-  const avatarUrl = (user as any)?.avatarUrl ? getStaticFileUrl((user as any).avatarUrl) : null;
+  const isStudent =
+    userType === 'student' ||
+    (!userType && !(user as any)?.role?.includes('admin') && !(user as any)?.role?.includes('staff'));
+
+  const shouldShowPydian = showPydianTag || title.toLowerCase().includes('good');
 
   return (
     <>
@@ -38,9 +48,19 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle, showLogout = tr
           </TouchableOpacity>
         )}
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>{title}</Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.title} numberOfLines={1}>
+              {title}
+            </Text>
+            {shouldShowPydian && (
+              <View style={styles.pydianTag}>
+                <Text style={styles.pydianTagText}>Pydian</Text>
+              </View>
+            )}
+          </View>
           {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
         </View>
+
         <View style={styles.actions}>
           {isStudent && (
             <TouchableOpacity
@@ -54,33 +74,9 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle, showLogout = tr
               </View>
             </TouchableOpacity>
           )}
-          <TouchableOpacity
-            onPress={() => setShowLogs(true)}
-            style={styles.terminalBtn}
-            hitSlop={8}
-          >
-            <Terminal size={18} color="#1E3A8A" />
-          </TouchableOpacity>
-
-          {avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarText}>
-                {(user?.name || (user as any)?.username || 'U')[0].toUpperCase()}
-              </Text>
-            </View>
-          )}
-
-          {showLogout && (
-            <TouchableOpacity onPress={logout} style={styles.logoutBtn} hitSlop={10}>
-              <LogOut size={18} color="#EF4444" />
-            </TouchableOpacity>
-          )}
         </View>
       </View>
 
-      <LogViewerModal visible={showLogs} onClose={() => setShowLogs(false)} />
       <StudentSidebarDrawer visible={showSidebar} onClose={() => setShowSidebar(false)} />
     </>
   );
@@ -107,10 +103,30 @@ const styles = StyleSheet.create({
   titleContainer: {
     flex: 1,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
   title: {
     fontSize: 20,
     fontWeight: '700',
     color: '#0F172A',
+  },
+  pydianTag: {
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  pydianTagText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#EA580C',
+    letterSpacing: 0.3,
   },
   subtitle: {
     fontSize: 13,
@@ -121,11 +137,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-  },
-  terminalBtn: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#EEF2FF',
   },
   bellBtn: {
     position: 'relative',
@@ -149,31 +160,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 9,
     fontWeight: '800',
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: '#1E3A8A',
-  },
-  avatarPlaceholder: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#EEF2FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1E3A8A',
-  },
-  logoutBtn: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#FEE2E2',
   },
 });
 

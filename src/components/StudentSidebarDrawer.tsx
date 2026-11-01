@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -34,27 +34,36 @@ import {
   ChevronRight,
   LogOut,
   Layers,
+  GraduationCap,
+  Sparkles,
 } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { getStaticFileUrl } from '../config/api';
+import studentService from '../services/studentService';
 import { StudentModuleItem, StudentModuleDetailModal } from './StudentModuleDetailModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-interface StudentSidebarDrawerProps {
-  visible: boolean;
-  onClose: () => void;
+export interface SDMSModuleItem extends StudentModuleItem {
+  layoutKey: string;
+  isTab?: boolean;
+  tabRoute?: string;
 }
 
-export const STUDENT_SIDEBAR_MODULES: {
-  category: string;
-  items: (StudentModuleItem & { isTab?: boolean; tabRoute?: string })[];
+/**
+ * All student-side SDMS modules mapped to their exact keys in SDMS Student Portal Layout Settings.
+ * Exactly corresponds to the 18 items in frontend/src/components/Layout/StudentLayout.jsx
+ */
+export const SDMS_STUDENT_SECTIONS: {
+  categoryTitle: string;
+  items: SDMSModuleItem[];
 }[] = [
   {
-    category: 'Core Academic Portals',
+    categoryTitle: 'Core Academic Portals',
     items: [
       {
         id: 'dashboard',
+        layoutKey: 'dashboard',
         title: 'Dashboard',
         subtitle: 'Main Academic Overview',
         category: 'academics',
@@ -64,7 +73,8 @@ export const STUDENT_SIDEBAR_MODULES: {
       },
       {
         id: 'attendance',
-        title: 'Attendance Tracker',
+        layoutKey: 'attendance',
+        title: 'Attendance',
         subtitle: 'Live Biometric Records',
         category: 'academics',
         iconName: 'CalendarCheck',
@@ -73,48 +83,38 @@ export const STUDENT_SIDEBAR_MODULES: {
       },
       {
         id: 'timetable',
-        title: 'Class Timetable',
-        subtitle: 'Period Slots & Weekly Grid',
+        layoutKey: 'timetable',
+        title: 'Time Table',
+        subtitle: 'Weekly Academic Schedule',
         category: 'academics',
         iconName: 'Clock',
       },
       {
-        id: 'marks',
-        title: 'Internal Marks',
-        subtitle: 'Mid-1, Mid-2 & Assignments',
-        category: 'academics',
-        iconName: 'Award',
-      },
-      {
-        id: 'content',
-        title: 'Academic Content',
-        subtitle: 'Lecture Handouts & Notes',
-        category: 'academics',
-        iconName: 'BookOpen',
-      },
-      {
-        id: 'calendar',
-        title: 'Academic Calendar',
-        subtitle: 'Semester Working Days',
+        id: 'events',
+        layoutKey: 'events',
+        title: 'Events',
+        subtitle: 'College Events & Schedule',
         category: 'academics',
         iconName: 'Calendar',
       },
       {
-        id: 'registration',
-        title: 'Semester Registration',
-        subtitle: 'Progression & Verification',
+        id: 'semester-registration',
+        layoutKey: 'semester-registration',
+        title: 'Sem Registration',
+        subtitle: 'Enrollment & Documentation',
         category: 'academics',
         iconName: 'ShieldCheck',
       },
     ],
   },
   {
-    category: 'Finance & Administration',
+    categoryTitle: 'Finance & Administration',
     items: [
       {
         id: 'fees',
+        layoutKey: 'fees',
         title: 'Fee Management',
-        subtitle: 'Dues & PPG Online Payment',
+        subtitle: 'Ledgers, Payments & Receipts',
         category: 'finance',
         iconName: 'CreditCard',
         isTab: true,
@@ -122,117 +122,179 @@ export const STUDENT_SIDEBAR_MODULES: {
       },
       {
         id: 'scholarship',
-        title: 'Scholarship Status',
-        subtitle: 'JVD / RTF Disbursement',
+        layoutKey: 'scholarship',
+        title: 'Scholarship',
+        subtitle: 'JVD / RTF Status & History',
         category: 'finance',
         iconName: 'Award',
       },
       {
         id: 'services',
-        title: 'Certificate Requests',
-        subtitle: 'Bonafide, Custodian & TC',
+        layoutKey: 'services',
+        title: 'Services',
+        subtitle: 'Bonafide, Custodian & Slips',
         category: 'finance',
         iconName: 'FileText',
       },
       {
-        id: 'documents',
-        title: 'Document Vault',
-        subtitle: 'SSC, Inter & Certificates',
+        id: 'my-documents',
+        layoutKey: 'my-documents',
+        title: 'My Documents',
+        subtitle: 'Submitted Certificates in Custody',
         category: 'finance',
         iconName: 'FolderOpen',
       },
     ],
   },
   {
-    category: 'Campus Facilities & Life',
+    categoryTitle: 'Campus Facilities & Life',
     items: [
       {
-        id: 'library',
-        title: 'Campus Library',
-        subtitle: 'Book Issues & Catalog',
-        category: 'campus',
-        iconName: 'BookOpen',
-      },
-      {
-        id: 'transport',
-        title: 'Transport & Bus',
-        subtitle: 'Route & Vehicle Tracking',
-        category: 'campus',
-        iconName: 'Bus',
-      },
-      {
-        id: 'clubs',
-        title: 'Student Clubs',
-        subtitle: 'Life Savers & Committees',
-        category: 'campus',
-        iconName: 'Users',
-      },
-      {
         id: 'announcements',
-        title: 'Campus Circulars',
-        subtitle: 'Official Notices & Exams',
+        layoutKey: 'announcements',
+        title: 'Announcements',
+        subtitle: 'Official College & Dept Notices',
         category: 'campus',
         iconName: 'Bell',
         isTab: true,
         tabRoute: '/(tabs)/announcements',
       },
+      {
+        id: 'clubs',
+        layoutKey: 'clubs',
+        title: 'Clubs',
+        subtitle: 'Student Activities & Circles',
+        category: 'campus',
+        iconName: 'Users',
+      },
+      {
+        id: 'transport',
+        layoutKey: 'transport',
+        title: 'Transport',
+        subtitle: 'Bus Routes, Stops & Passes',
+        category: 'campus',
+        iconName: 'Bus',
+      },
+      {
+        id: 'library',
+        layoutKey: 'library',
+        title: 'Library',
+        subtitle: 'Book Search & Central Catalog',
+        category: 'campus',
+        iconName: 'BookOpen',
+      },
     ],
   },
   {
-    category: 'Support & Career',
+    categoryTitle: 'Career & Student Support',
     items: [
       {
-        id: 'feedback',
-        title: 'Feedback Portal',
-        subtitle: 'Faculty Rating & Surveys',
-        category: 'support',
-        iconName: 'MessageSquare',
-      },
-      {
-        id: 'tickets',
-        title: 'Helpdesk Tickets',
-        subtitle: 'Service & Maintenance',
-        category: 'support',
-        iconName: 'Ticket',
-      },
-      {
-        id: 'profile-requests',
-        title: 'Profile Requests',
-        subtitle: 'Mobile & Photo Changes',
-        category: 'support',
-        iconName: 'UserCheck',
-      },
-      {
-        id: 'crt',
-        title: 'CRT Training Portal',
-        subtitle: 'Placement Training Workspace',
+        id: 'internship',
+        layoutKey: 'internship',
+        title: 'Internship',
+        subtitle: 'Industry Assignments & Logs',
         category: 'support',
         iconName: 'Briefcase',
       },
       {
-        id: 'profile',
-        title: 'My Profile',
-        subtitle: 'Institutional KYC Details',
+        id: 'crt',
+        layoutKey: 'crt',
+        title: 'CRT Training Portal',
+        subtitle: 'Campus Recruitment Training (SSO)',
         category: 'support',
-        iconName: 'User',
-        isTab: true,
-        tabRoute: '/(tabs)/profile',
+        iconName: 'Briefcase',
+      },
+      {
+        id: 'feedback',
+        layoutKey: 'feedback',
+        title: 'Feed Back',
+        subtitle: 'Faculty & Course Surveys',
+        category: 'support',
+        iconName: 'MessageSquare',
+      },
+      {
+        id: 'my-tickets',
+        layoutKey: 'my-tickets',
+        title: 'Maintenance',
+        subtitle: 'Raise & Track Support Tickets',
+        category: 'support',
+        iconName: 'Ticket',
+      },
+      {
+        id: 'ai-assistant',
+        layoutKey: 'ai-assistant',
+        title: 'AI Assistant',
+        subtitle: 'Pydah Academic Assistant',
+        category: 'support',
+        iconName: 'Sparkles',
       },
     ],
   },
 ];
 
-export const StudentSidebarDrawer: React.FC<StudentSidebarDrawerProps> = ({ visible, onClose }) => {
+interface StudentSidebarDrawerProps {
+  visible: boolean;
+  onClose: () => void;
+  layoutSettings?: Record<string, boolean>;
+}
+
+export const StudentSidebarDrawer: React.FC<StudentSidebarDrawerProps> = ({
+  visible,
+  onClose,
+  layoutSettings: externalLayoutSettings,
+}) => {
   const router = useRouter();
   const { user, logout } = useAuth();
   const student = user as any;
 
+  const [internalLayout, setInternalLayout] = useState<Record<string, boolean> | null>(
+    externalLayoutSettings || null
+  );
   const [selectedModule, setSelectedModule] = useState<StudentModuleItem | null>(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
 
-  const avatarUrl = student?.avatarUrl ? getStaticFileUrl(student.avatarUrl) : null;
+  // Directly fetch SDMS Student Portal Layout settings if not provided
+  useEffect(() => {
+    if (externalLayoutSettings) {
+      setInternalLayout(externalLayoutSettings);
+    } else if (visible) {
+      studentService.getLayoutSettings().then((settings) => {
+        if (settings) setInternalLayout(settings);
+      });
+    }
+  }, [externalLayoutSettings, visible]);
 
-  const handleItemPress = (item: (typeof STUDENT_SIDEBAR_MODULES)[0]['items'][0]) => {
+  // Filter modules directly based on SDMS Student Portal Layout settings
+  const activeSections = useMemo(() => {
+    const layout = internalLayout || externalLayoutSettings;
+    if (!layout) {
+      return SDMS_STUDENT_SECTIONS;
+    }
+    return SDMS_STUDENT_SECTIONS.map((sectionGroup) => {
+      const activeItems = sectionGroup.items.filter((item) => {
+        // Direct layout toggle check from SDMS database settings
+        if (layout[item.layoutKey] === false) return false;
+        if (layout[item.id] === false) return false;
+        return true;
+      });
+      return {
+        ...sectionGroup,
+        items: activeItems,
+      };
+    }).filter((sectionGroup) => sectionGroup.items.length > 0);
+  }, [internalLayout, externalLayoutSettings]);
+
+  const totalActiveCount = activeSections.reduce((sum, s) => sum + s.items.length, 0);
+
+  const avatarUrl = student?.avatarUrl || student?.student_photo ? getStaticFileUrl(student.avatarUrl || student.student_photo) : null;
+  const course = student?.course || student?.course_name || '';
+  const branch = student?.branch || student?.branch_name || '';
+  const semester = student?.current_semester || '';
+  const section = student?.section || '';
+  const batch = student?.batch || '';
+  const quota = student?.quota || student?.stud_type || '';
+
+  const handleItemPress = (item: SDMSModuleItem) => {
     onClose();
     if (item.isTab && item.tabRoute) {
       router.push(item.tabRoute as any);
@@ -261,6 +323,7 @@ export const StudentSidebarDrawer: React.FC<StudentSidebarDrawerProps> = ({ visi
       case 'Ticket': return <Ticket size={size} color={color} />;
       case 'UserCheck': return <UserCheck size={size} color={color} />;
       case 'Briefcase': return <Briefcase size={size} color={color} />;
+      case 'Sparkles': return <Sparkles size={size} color={color} />;
       case 'User': return <User size={size} color={color} />;
       default: return <Layers size={size} color={color} />;
     }
@@ -274,7 +337,7 @@ export const StudentSidebarDrawer: React.FC<StudentSidebarDrawerProps> = ({ visi
 
           <View style={styles.drawerContainer}>
             <SafeAreaView style={styles.safeArea}>
-              {/* Drawer Student Profile Banner */}
+              {/* Student Profile Header */}
               <View style={styles.profileHeader}>
                 <View style={styles.profileRow}>
                   {avatarUrl ? (
@@ -282,33 +345,61 @@ export const StudentSidebarDrawer: React.FC<StudentSidebarDrawerProps> = ({ visi
                   ) : (
                     <View style={styles.avatarPlaceholder}>
                       <Text style={styles.avatarText}>
-                        {(student?.name || student?.username || 'S')[0].toUpperCase()}
+                        {(student?.name || student?.student_name || student?.username || 'S')[0].toUpperCase()}
                       </Text>
                     </View>
                   )}
                   <View style={styles.profileInfo}>
                     <Text style={styles.studentName} numberOfLines={1}>
-                      {student?.name || 'Student'}
+                      {student?.name || student?.student_name || 'Student Portal'}
                     </Text>
                     <Text style={styles.studentPin}>
                       PIN: {student?.pin_no || student?.admission_number || 'N/A'}
                     </Text>
                     <Text style={styles.studentCourse} numberOfLines={1}>
-                      {student?.course || 'B.Tech'} - {student?.branch || 'Branch'} (Sem {student?.current_semester || 1})
+                      {course ? `${course} - ${branch}` : 'Student Record'}
+                      {semester ? ` • Sem ${semester}` : ''}
+                      {section ? ` (Sec ${section})` : ''}
                     </Text>
                   </View>
                   <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={10}>
-                    <X size={20} color="#FFFFFF" />
+                    <X size={18} color="#FFFFFF" />
                   </TouchableOpacity>
+                </View>
+
+                {/* SDMS Metadata Pills */}
+                <View style={styles.scopeBadgeContainer}>
+                  {batch ? (
+                    <View style={styles.scopePill}>
+                      <GraduationCap size={11} color="#93C5FD" />
+                      <Text style={styles.scopePillText}>Batch {batch}</Text>
+                    </View>
+                  ) : null}
+                  {quota ? (
+                    <View style={styles.scopePill}>
+                      <ShieldCheck size={11} color="#93C5FD" />
+                      <Text style={styles.scopePillText}>Quota: {quota}</Text>
+                    </View>
+                  ) : null}
+                  <View style={[styles.scopePill, { backgroundColor: 'rgba(5, 150, 105, 0.3)' }]}>
+                    <Sparkles size={11} color="#34D399" />
+                    <Text style={[styles.scopePillText, { color: '#6EE7B7' }]}>
+                      {totalActiveCount} SDMS Portals
+                    </Text>
+                  </View>
                 </View>
               </View>
 
-              {/* All Student Pages List */}
+              {/* Dynamic SDMS Portals List */}
               <ScrollView contentContainerStyle={styles.scrollList} showsVerticalScrollIndicator={false}>
-                {STUDENT_SIDEBAR_MODULES.map((section, sIdx) => (
+                {activeSections.map((sectionGroup, sIdx) => (
                   <View key={sIdx} style={styles.section}>
-                    <Text style={styles.sectionHeader}>{section.category}</Text>
-                    {section.items.map((item) => (
+                    <View style={styles.sectionHeaderRow}>
+                      <Text style={styles.sectionHeader}>{sectionGroup.categoryTitle}</Text>
+                      <Text style={styles.sectionCountTag}>{sectionGroup.items.length}</Text>
+                    </View>
+
+                    {sectionGroup.items.map((item) => (
                       <TouchableOpacity
                         key={item.id}
                         style={styles.moduleItem}
@@ -320,9 +411,11 @@ export const StudentSidebarDrawer: React.FC<StudentSidebarDrawerProps> = ({ visi
                         </View>
                         <View style={styles.itemTextContainer}>
                           <Text style={styles.itemTitle}>{item.title}</Text>
-                          <Text style={styles.itemSub}>{item.subtitle}</Text>
+                          <Text style={styles.itemSub} numberOfLines={1}>
+                            {item.subtitle}
+                          </Text>
                         </View>
-                        <ChevronRight size={16} color="#CBD5E1" />
+                        <ChevronRight size={15} color="#CBD5E1" />
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -336,7 +429,7 @@ export const StudentSidebarDrawer: React.FC<StudentSidebarDrawerProps> = ({ visi
                     logout();
                   }}
                 >
-                  <LogOut size={18} color="#EF4444" />
+                  <LogOut size={16} color="#EF4444" />
                   <Text style={styles.logoutText}>Sign Out of Student Account</Text>
                 </TouchableOpacity>
               </ScrollView>
@@ -345,7 +438,7 @@ export const StudentSidebarDrawer: React.FC<StudentSidebarDrawerProps> = ({ visi
         </View>
       </Modal>
 
-      {/* Module Detail Modal */}
+      {/* SDMS Module Detail Modal */}
       <StudentModuleDetailModal
         visible={detailModalVisible}
         module={selectedModule}
@@ -365,11 +458,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
   },
   drawerContainer: {
-    width: Math.min(SCREEN_WIDTH * 0.85, 340),
+    width: Math.min(SCREEN_WIDTH * 0.86, 350),
     backgroundColor: '#FFFFFF',
     height: '100%',
     shadowColor: '#000',
-    shadowOffset: { width: -2, height: 0 },
+    shadowOffset: { width: -3, height: 0 },
     shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 16,
@@ -381,7 +474,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1E3A8A',
     paddingHorizontal: 16,
     paddingTop: 24,
-    paddingBottom: 18,
+    paddingBottom: 16,
   },
   profileRow: {
     flexDirection: 'row',
@@ -421,32 +514,72 @@ const styles = StyleSheet.create({
     color: '#BFDBFE',
     marginTop: 2,
     fontWeight: '500',
+    fontFamily: 'monospace',
   },
   studentCourse: {
     fontSize: 11,
     color: '#93C5FD',
     marginTop: 1,
+    fontWeight: '500',
   },
   closeBtn: {
     padding: 6,
     borderRadius: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
+  scopeBadgeContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  scopePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  scopePillText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#DBEAFE',
+  },
   scrollList: {
     padding: 14,
     paddingBottom: 40,
   },
   section: {
-    marginBottom: 18,
+    marginBottom: 16,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+    marginLeft: 4,
+    marginRight: 4,
   },
   sectionHeader: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#94A3B8',
+    color: '#64748B',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 8,
-    marginLeft: 4,
+  },
+  sectionCountTag: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#1E3A8A',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
   },
   moduleItem: {
     flexDirection: 'row',
@@ -460,8 +593,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   itemIconContainer: {
-    width: 32,
-    height: 32,
+    width: 34,
+    height: 34,
     borderRadius: 8,
     backgroundColor: '#EFF6FF',
     alignItems: 'center',
@@ -491,7 +624,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF2F2',
     borderWidth: 1,
     borderColor: '#FEE2E2',
-    marginTop: 10,
+    marginTop: 8,
   },
   logoutText: {
     fontSize: 12,
@@ -499,4 +632,3 @@ const styles = StyleSheet.create({
     color: '#EF4444',
   },
 });
-

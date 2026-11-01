@@ -11,7 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { User, Lock, Mail, Eye, EyeOff, Terminal, Settings } from 'lucide-react-native';
+import { User, Lock, Eye, EyeOff, Terminal } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import CustomInput from '../../src/components/CustomInput';
 import CustomButton from '../../src/components/CustomButton';
@@ -21,9 +21,8 @@ import logger from '../../src/utils/logger';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { studentLogin, staffLogin } = useAuth();
+  const { studentLogin } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'student' | 'staff'>('student');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -36,7 +35,7 @@ export default function LoginScreen() {
     const cleanId = identifier.trim();
 
     if (!cleanId) {
-      const err = activeTab === 'student' ? 'Please enter your Roll Number or Email' : 'Please enter your Username or Email';
+      const err = 'Please enter your Roll Number, PIN, or Email';
       setError(err);
       logger.warn('LOGIN_UI', `Validation failed: ${err}`);
       return;
@@ -48,22 +47,14 @@ export default function LoginScreen() {
     }
 
     setLoading(true);
-    logger.info('LOGIN_UI', `User initiated ${activeTab.toUpperCase()} login for "${cleanId}" targeting ${ENV.apiUrl}`);
+    logger.info('LOGIN_UI', `User initiated STUDENT login for "${cleanId}" targeting ${ENV.apiUrl}`);
 
     try {
-      if (activeTab === 'student') {
-        await studentLogin({
-          rollNumber: cleanId,
-          username: cleanId,
-          password,
-        });
-      } else {
-        await staffLogin({
-          username: cleanId,
-          email: cleanId,
-          password,
-        });
-      }
+      await studentLogin({
+        rollNumber: cleanId,
+        username: cleanId,
+        password,
+      });
       logger.info('LOGIN_UI', `Login flow completed successfully! Redirecting...`);
     } catch (err: any) {
       const status = err.response?.status;
@@ -77,7 +68,7 @@ export default function LoginScreen() {
       setError(formattedError);
 
       logger.error('LOGIN_UI', `Login failed: ${formattedError}`, {
-        url: `${ENV.apiUrl}${activeTab === 'student' ? '/students/login' : '/auth/unified-login'}`,
+        url: `${ENV.apiUrl}/students/login`,
         status,
         response: err.response?.data,
       });
@@ -86,7 +77,7 @@ export default function LoginScreen() {
       if (!err.response) {
         Alert.alert(
           'Network Connection Error',
-          `Could not connect to backend server at:\n${ENV.apiUrl}\n\nMake sure your backend is running and that your mobile device is on the same Wi-Fi network. Tap "View Logs / Config" at the top to change the server IP.`,
+          `Could not connect to backend server at:\n${ENV.apiUrl}\n\nMake sure your backend is running and that your mobile device is on the same Wi-Fi network. Tap "View Logs / IP" at the top to check connection settings.`,
           [
             { text: 'View Logs', onPress: () => setShowLogs(true) },
             { text: 'OK' },
@@ -128,35 +119,7 @@ export default function LoginScreen() {
             resizeMode="contain"
           />
           <Text style={styles.appName}>Pydah Educational Academy</Text>
-          <Text style={styles.appSubtitle}>Student & Staff Management Portal</Text>
-        </View>
-
-        {/* Segmented Switcher */}
-        <View style={styles.segmentContainer}>
-          <TouchableOpacity
-            style={[styles.segmentBtn, activeTab === 'student' && styles.segmentBtnActive]}
-            onPress={() => {
-              setActiveTab('student');
-              setError(null);
-              logger.info('LOGIN_UI', 'Switched tab to: Student');
-            }}
-          >
-            <Text style={[styles.segmentText, activeTab === 'student' && styles.segmentTextActive]}>
-              Student Portal
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.segmentBtn, activeTab === 'staff' && styles.segmentBtnActive]}
-            onPress={() => {
-              setActiveTab('staff');
-              setError(null);
-              logger.info('LOGIN_UI', 'Switched tab to: Staff');
-            }}
-          >
-            <Text style={[styles.segmentText, activeTab === 'staff' && styles.segmentTextActive]}>
-              Staff / Admin
-            </Text>
-          </TouchableOpacity>
+          <Text style={styles.appSubtitle}>Student Portal</Text>
         </View>
 
         {/* Error Alert */}
@@ -168,12 +131,12 @@ export default function LoginScreen() {
 
         {/* Inputs */}
         <CustomInput
-          label={activeTab === 'student' ? 'Roll Number / PIN / Email' : 'Username / Email'}
-          placeholder={activeTab === 'student' ? 'e.g. 21A91A0501 or PIN' : 'e.g. staff_username'}
+          label="Roll Number / PIN / Email"
+          placeholder="e.g. 246T1A0301 or PIN"
           value={identifier}
           onChangeText={setIdentifier}
           autoCapitalize="none"
-          leftIcon={activeTab === 'student' ? <User size={20} color="#64748B" /> : <Mail size={20} color="#64748B" />}
+          leftIcon={<User size={20} color="#64748B" />}
         />
 
         <CustomInput
@@ -197,7 +160,7 @@ export default function LoginScreen() {
 
         {/* Submit Button */}
         <CustomButton
-          title={activeTab === 'student' ? 'Sign In as Student' : 'Sign In as Staff'}
+          title="Sign In as Student"
           onPress={handleLogin}
           isLoading={loading}
           style={styles.submitBtn}
@@ -290,35 +253,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#334155',
-  },
-  segmentContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#F1F5F9',
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 20,
-  },
-  segmentBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 8,
-  },
-  segmentBtnActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  segmentText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  segmentTextActive: {
-    color: '#1E3A8A',
   },
   errorBanner: {
     backgroundColor: '#FEE2E2',

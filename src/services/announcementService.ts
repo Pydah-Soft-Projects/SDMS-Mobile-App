@@ -1,4 +1,4 @@
-import api from '../config/api';
+import api, { getStaticFileUrl } from '../config/api';
 import { Announcement } from '../types';
 import logger from '../utils/logger';
 
@@ -11,15 +11,23 @@ export const announcementService = {
     try {
       const response = await api.get('/announcements/student');
       const list = response.data?.data || (Array.isArray(response.data) ? response.data : []);
-      return (list || []).map((item: any) => ({
-        id: item.id,
-        title: item.title,
-        content: item.content || item.description || '',
-        priority: item.priority || 'medium',
-        createdAt: item.created_at || item.createdAt || new Date().toISOString(),
-        category: item.category || 'General',
-        attachmentUrl: item.attachment_url || item.image_url,
-      }));
+      return (list || []).map((item: any) => {
+        const rawImg =
+          item.image_url ||
+          item.imageUrl ||
+          (item.has_image ? `/api/announcements/${item.id}/image` : null) ||
+          item.attachment_url;
+        return {
+          id: item.id,
+          title: item.title,
+          content: item.content || item.description || '',
+          priority: item.priority || 'medium',
+          createdAt: item.created_at || item.createdAt || new Date().toISOString(),
+          category: item.category || 'General',
+          imageUrl: rawImg ? getStaticFileUrl(rawImg) : undefined,
+          attachmentUrl: item.attachment_url ? getStaticFileUrl(item.attachment_url) : undefined,
+        };
+      });
     } catch (e: any) {
       logger.error('ANNOUNCEMENTS', 'Failed to fetch student circulars', e.message);
       return [];

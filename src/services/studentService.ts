@@ -1,4 +1,4 @@
-import api from '../config/api';
+import api, { getStaticFileUrl } from '../config/api';
 import logger from '../utils/logger';
 import {
   StudentUser,
@@ -146,16 +146,23 @@ export const studentService = {
 
       if (!Array.isArray(list)) return [];
 
-      return list.map((item: any) => ({
-        id: item.id,
-        title: item.title,
-        content: item.content || item.description || '',
-        priority: item.priority || 'medium',
-        createdAt: item.created_at || item.createdAt || new Date().toISOString(),
-        category: item.category || 'General',
-        imageUrl: item.image_url || item.attachment_url,
-        attachmentUrl: item.attachment_url,
-      }));
+      return list.map((item: any) => {
+        const rawImg =
+          item.image_url ||
+          item.imageUrl ||
+          (item.has_image ? `/api/announcements/${item.id}/image` : null) ||
+          item.attachment_url;
+        return {
+          id: item.id,
+          title: item.title,
+          content: item.content || item.description || '',
+          priority: item.priority || 'medium',
+          createdAt: item.created_at || item.createdAt || new Date().toISOString(),
+          category: item.category || 'General',
+          imageUrl: rawImg ? getStaticFileUrl(rawImg) : undefined,
+          attachmentUrl: item.attachment_url ? getStaticFileUrl(item.attachment_url) : undefined,
+        };
+      });
     } catch (e: any) {
       logger.warn('STUDENT_SERVICE', 'Failed to fetch announcements', e.message);
       return [];
@@ -174,13 +181,24 @@ export const studentService = {
       }
     } catch {}
     return {
-      attendance: true,
-      fees: true,
+      dashboard: true,
+      'ai-assistant': false,
       announcements: true,
       clubs: true,
       events: true,
-      library: true,
+      attendance: true,
+      internship: true,
+      timetable: true,
+      'semester-registration': true,
       services: true,
+      'my-tickets': true,
+      feedback: true,
+      transport: true,
+      fees: true,
+      scholarship: true,
+      library: false,
+      'my-documents': true,
+      crt: true,
     };
   },
 
@@ -229,6 +247,41 @@ export const studentService = {
     try {
       const res = await api.get('/academic-content');
       return res.data || null;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Fetch student\'s transport pass status
+   * Endpoint: GET /api/transport/my-details
+   */
+  async getTransportDetails(): Promise<{ hasActivePass: boolean; route?: any } | null> {
+    try {
+      const response = await api.get('/transport/my-details');
+      if (response.data) {
+        return {
+          hasActivePass: Boolean(response.data.hasActivePass || response.data.activePass),
+          route: response.data.activePass || response.data.route || null,
+        };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Fetch student\'s internship assignment
+   * Endpoint: GET /api/internship/my-assignment
+   */
+  async getInternshipAssignment(): Promise<any | null> {
+    try {
+      const response = await api.get('/internship/my-assignment');
+      if (response.data?.success && response.data?.assignment) {
+        return response.data.assignment;
+      }
+      return null;
     } catch {
       return null;
     }

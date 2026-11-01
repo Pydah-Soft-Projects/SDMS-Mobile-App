@@ -25,7 +25,7 @@ const getAutoDetectedHost = (): string => {
   }
 
   // Developer local LAN IP
-  return '192.168.3.117';
+  return '192.168.2.25';
 };
 
 let rawApiUrl =

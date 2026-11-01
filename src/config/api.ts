@@ -99,8 +99,20 @@ api.interceptors.response.use(
 // Helper function to resolve static file/upload URLs
 export const getStaticFileUrl = (path?: string | null): string => {
   if (!path) return '';
-  if (path.startsWith('http://') || path.startsWith('https://')) return path;
   if (path.startsWith('data:')) return path;
+
+  // Rewrite localhost / 127.0.0.1 to active host for mobile devices
+  if (path.includes('localhost:') || path.includes('127.0.0.1:')) {
+    return path.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, STATIC_BASE_URL);
+  }
+
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+
+  // Handle direct API paths like /api/announcements/1/image
+  if (path.startsWith('/api/') || path.startsWith('api/')) {
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    return `${STATIC_BASE_URL}${cleanPath}`;
+  }
 
   const cleanPath = path.startsWith('/') ? path.substring(1) : path;
   if (cleanPath.startsWith('uploads/')) {

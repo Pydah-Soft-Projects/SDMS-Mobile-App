@@ -337,6 +337,21 @@ export const SDMS_ADMIN_NAV_TREE: AdminNavItem[] = [
     iconName: 'Settings',
     permission: FRONTEND_MODULES.COURSES,
     color: '#475569',
+    subItems: [
+      { id: 'courses', label: 'Colleges & Programs', iconName: 'Layers', permission: FRONTEND_MODULES.COURSES },
+      { id: 'calendar', label: 'Attendance Calendar', iconName: 'CalendarCheck', permission: FRONTEND_MODULES.COURSES },
+      { id: 'academic-calendar', label: 'Academic Calendar', iconName: 'Calendar', permission: FRONTEND_MODULES.COURSES },
+      { id: 'forms', label: 'Registration Form', iconName: 'FileText', permission: FRONTEND_MODULES.COURSES },
+      { id: 'quotas', label: 'Student Quotas', iconName: 'Tags', permission: FRONTEND_MODULES.COURSES },
+      { id: 'caste-categories', label: 'Categories & Castes', iconName: 'Users', permission: FRONTEND_MODULES.COURSES },
+      { id: 'notifications', label: 'Notifications', iconName: 'Bell', permission: FRONTEND_MODULES.COURSES },
+      { id: 'college-transfer', label: 'College Transfer', iconName: 'TrendingUp', permission: FRONTEND_MODULES.COURSES },
+      { id: 'student-layout', label: 'Student Portal Layout', iconName: 'Layout', permission: FRONTEND_MODULES.COURSES },
+      { id: 'qr-config', label: 'QR Code Config', iconName: 'QrCode', permission: FRONTEND_MODULES.COURSES },
+      { id: 'rtf-amount', label: 'RTF Amount Setup', iconName: 'GraduationCap', permission: FRONTEND_MODULES.COURSES },
+      { id: 'freeze-database', label: 'Freeze Database', iconName: 'Lock', permission: FRONTEND_MODULES.COURSES },
+      { id: 'campus', label: 'Campus Creation', iconName: 'MapPin', permission: FRONTEND_MODULES.COURSES },
+    ],
   },
 ];
 

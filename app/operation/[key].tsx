@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Modal,
   Alert,
+  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -54,6 +55,18 @@ import {
   PieChart,
   Filter,
   CheckSquare,
+  Square,
+  Layers,
+  Calendar,
+  Tags,
+  Bell,
+  Layout,
+  QrCode,
+  Lock,
+  Unlock,
+  MapPin,
+  Landmark,
+  TrendingUp,
 } from 'lucide-react-native';
 import api from '../../src/config/api';
 import { useAuth } from '../../src/context/AuthContext';
@@ -188,6 +201,15 @@ export default function OperationScreen() {
     | 'create_hall_item'
     | 'create_service'
     | 'edit_service'
+    | 'create_college'
+    | 'create_course'
+    | 'create_branch'
+    | 'create_holiday'
+    | 'create_quota'
+    | 'create_caste_category'
+    | 'create_caste'
+    | 'create_campus'
+    | 'set_semester_dates'
     | 'reject_prompt'
     | 'update_pin'
     | null
@@ -221,6 +243,31 @@ export default function OperationScreen() {
   const [formHallCapacity, setFormHallCapacity] = useState('250');
   const [formHallOpenTime, setFormHallOpenTime] = useState('08:00');
   const [formHallCloseTime, setFormHallCloseTime] = useState('20:00');
+
+  // Settings specific Form & Data State
+  const [formCode, setFormCode] = useState('');
+  const [formDegreeLevel, setFormDegreeLevel] = useState('DEGREE');
+  const [formTotalYears, setFormTotalYears] = useState('4');
+  const [formSemsPerYear, setFormSemsPerYear] = useState('2');
+  const [formStartDate, setFormStartDate] = useState('');
+  const [formEndDate, setFormEndDate] = useState('');
+  const [formSemesterNo, setFormSemesterNo] = useState('1');
+
+  const [settingsColleges, setSettingsColleges] = useState<any[]>([]);
+  const [settingsBatches, setSettingsBatches] = useState<any[]>([]);
+  const [settingsCourses, setSettingsCourses] = useState<any[]>([]);
+  const [settingsBranches, setSettingsBranches] = useState<any[]>([]);
+  const [selectedCollegeId, setSelectedCollegeId] = useState<any>(null);
+  const [selectedCourseId, setSelectedCourseId] = useState<any>(null);
+  const [selectedCasteCategoryId, setSelectedCasteCategoryId] = useState<any>(null);
+  const [newBatchInput, setNewBatchInput] = useState('');
+  const [studentLayout, setStudentLayout] = useState<any[]>([]);
+  const [qrRole, setQrRole] = useState<'attender' | 'faculty' | 'cashier' | 'principal' | 'admin'>('attender');
+  const [qrRoleConfig, setQrRoleConfig] = useState<any>({});
+  const [frozenBatches, setFrozenBatches] = useState<string[]>([]);
+  const [sourceCollegeId, setSourceCollegeId] = useState<any>(null);
+  const [targetCollegeId, setTargetCollegeId] = useState<any>(null);
+  const [selectedTransferStudentIds, setSelectedTransferStudentIds] = useState<(number | string)[]>([]);
 
   // Attendance marking state
   const [attendanceRecords, setAttendanceRecords] = useState<Record<number, 'Present' | 'Absent'>>({});
@@ -536,8 +583,115 @@ export default function OperationScreen() {
             rawList = res.data?.data || [];
           }
         } else if (opKey === 'courses') {
-          const res = await api.get('/courses');
-          rawList = res.data?.data || res.data || [];
+          if (activeSubTab === 'calendar') {
+            const holidays = await staffService.getHolidays();
+            rawList = holidays;
+          } else if (activeSubTab === 'academic-calendar') {
+            const sems = await staffService.getSemesters();
+            rawList = sems;
+          } else if (activeSubTab === 'forms') {
+            const forms = await staffService.getRegistrationForms();
+            rawList = forms;
+          } else if (activeSubTab === 'quotas') {
+            const quotas = await staffService.getQuotas();
+            rawList = quotas;
+          } else if (activeSubTab === 'caste-categories') {
+            const categories = await staffService.getCasteCategories();
+            rawList = categories;
+          } else if (activeSubTab === 'notifications') {
+            const notifs = await staffService.getNotificationSettings();
+            rawList = Array.isArray(notifs) ? notifs : (notifs?.settings || []);
+          } else if (activeSubTab === 'college-transfer') {
+            const colList = await staffService.getColleges();
+            setSettingsColleges(colList);
+            const curSource = sourceCollegeId || (colList[0]?.id);
+            if (!sourceCollegeId && colList.length > 0) {
+              setSourceCollegeId(colList[0].id);
+            }
+            if (!targetCollegeId && colList.length > 1) {
+              setTargetCollegeId(colList[1].id);
+            }
+            if (curSource) {
+              const stuRes = await staffService.getPaginatedStudents({
+                college: curSource,
+                limit: 50,
+              });
+              rawList = stuRes.students || [];
+            } else {
+              rawList = [];
+            }
+          } else if (activeSubTab === 'student-layout') {
+            const layout = await staffService.getStudentLayout();
+            const layoutArr = Array.isArray(layout) && layout.length > 0 ? layout : [
+              { id: 'dashboard', label: 'Dashboard', enabled: true },
+              { id: 'attendance', label: 'Attendance', enabled: true },
+              { id: 'fees', label: 'Fee Receipts', enabled: true },
+              { id: 'announcements', label: 'Announcements & Notices', enabled: true },
+              { id: 'services', label: 'Services & Certificates', enabled: true },
+              { id: 'seminar-halls', label: 'Seminar Halls', enabled: true },
+              { id: 'clubs', label: 'Student Clubs', enabled: true },
+              { id: 'profile', label: 'Profile Update', enabled: true },
+            ];
+            setStudentLayout(layoutArr);
+            rawList = layoutArr;
+          } else if (activeSubTab === 'qr-config') {
+            const qr = await staffService.getQrConfig();
+            setQrRoleConfig(qr);
+            rawList = [
+              { key: 'photo', label: 'Student Photo', defaultEnabled: true },
+              { key: 'pin_no', label: 'PIN / Roll Number', defaultEnabled: true },
+              { key: 'student_name', label: 'Student Full Name', defaultEnabled: true },
+              { key: 'father_name', label: 'Father Name', defaultEnabled: true },
+              { key: 'college', label: 'College Name', defaultEnabled: true },
+              { key: 'course', label: 'Program / Course', defaultEnabled: true },
+              { key: 'branch', label: 'Branch / Specialization', defaultEnabled: true },
+              { key: 'current_year', label: 'Current Year', defaultEnabled: true },
+              { key: 'fee_cleared', label: 'Fee Clearance Status', defaultEnabled: false },
+            ];
+          } else if (activeSubTab === 'rtf-amount') {
+            const rtf = await staffService.getRtfAmountConfig();
+            rawList = rtf?.entries || [];
+          } else if (activeSubTab === 'freeze-database') {
+            const frozen = await staffService.getFrozenBatches();
+            const allBatches = await staffService.getBatches();
+            const frozenList = Array.isArray(frozen) ? frozen : [];
+            setFrozenBatches(frozenList);
+            rawList = allBatches.map((b: any) => {
+              const bName = typeof b === 'string' ? b : (b.academic_year || b.batch || String(b));
+              return { batch: bName, is_frozen: frozenList.includes(bName) };
+            });
+          } else if (activeSubTab === 'campus') {
+            const campuses = await staffService.getCampuses();
+            rawList = campuses;
+          } else {
+            // 'courses' (Colleges & Programs)
+            const [allColleges, allBatches, allCourses] = await Promise.all([
+              staffService.getColleges(),
+              staffService.getBatches(),
+              staffService.getCourses(),
+            ]);
+            setSettingsColleges(allColleges);
+            setSettingsBatches(allBatches);
+            setSettingsCourses(allCourses);
+            const activeColId = selectedCollegeId || (allColleges[0]?.id);
+            if (!selectedCollegeId && allColleges.length > 0) {
+              setSelectedCollegeId(allColleges[0].id);
+            }
+            const activeCourses = allCourses.filter((c: any) => !activeColId || String(c.college_id) === String(activeColId));
+            const activeCourseId = selectedCourseId || (activeCourses[0]?.id);
+            if (!selectedCourseId && activeCourses.length > 0) {
+              setSelectedCourseId(activeCourses[0].id);
+            }
+            if (activeCourseId) {
+              try {
+                const branches = await staffService.getBranches(activeCourseId);
+                setSettingsBranches(branches);
+              } catch (err) {
+                setSettingsBranches([]);
+              }
+            }
+            rawList = allColleges;
+          }
         } else {
           const res = await api.get('/colleges/dashboard-stats');
           rawList = res.data?.data || [];
@@ -631,6 +785,32 @@ export default function OperationScreen() {
       setFormTitle('');
       setFormContent('');
       setFormPrice('0');
+    } else if (opKey === 'courses') {
+      if (activeSubTab === 'calendar') {
+        setActionType('create_holiday');
+        setFormTitle('');
+        setFormBookingDate(new Date().toISOString().split('T')[0]);
+        setFormContent('');
+      } else if (activeSubTab === 'quotas') {
+        setActionType('create_quota');
+        setFormTitle('');
+        setFormCode('');
+      } else if (activeSubTab === 'caste-categories') {
+        setActionType('create_caste_category');
+        setFormTitle('');
+      } else if (activeSubTab === 'campus') {
+        setActionType('create_campus');
+        setFormTitle('');
+        setFormHallLocation('');
+        setFormContent('');
+      } else {
+        // 'courses' (Colleges & Programs)
+        setActionType('create_college');
+        setFormName('');
+        setFormCode('');
+        setFormPhone('');
+        setFormEmail('');
+      }
     }
     setActionModalVisible(true);
   };
@@ -794,6 +974,96 @@ export default function OperationScreen() {
         const admission = actionTargetItem?.admission_number || actionTargetItem?.pin_no;
         await staffService.updateStudentPin(admission, formPin.trim());
         Alert.alert('PIN Updated', `New PIN assigned: ${formPin.trim()}`);
+      } else if (actionType === 'create_college') {
+        if (!formName.trim()) {
+          Alert.alert('Required', 'College Name is required');
+          return;
+        }
+        await staffService.createCollege({
+          name: formName.trim(),
+          code: formCode.trim(),
+          phone: formPhone.trim(),
+          email: formEmail.trim(),
+        });
+        Alert.alert('Success', `College "${formName}" created`);
+      } else if (actionType === 'create_course') {
+        if (!formName.trim()) {
+          Alert.alert('Required', 'Program / Course Name is required');
+          return;
+        }
+        await staffService.createCourse({
+          name: formName.trim(),
+          code: formCode.trim(),
+          college_id: selectedCollegeId || 1,
+          degree_level: formDegreeLevel || 'DEGREE',
+          total_years: Number(formTotalYears) || 4,
+          semesters_per_year: Number(formSemsPerYear) || 2,
+        });
+        Alert.alert('Success', `Program "${formName}" created`);
+      } else if (actionType === 'create_branch') {
+        if (!formName.trim()) {
+          Alert.alert('Required', 'Branch Name is required');
+          return;
+        }
+        await staffService.createBranch(selectedCourseId || 1, {
+          name: formName.trim(),
+          code: formCode.trim() || formName.trim().toUpperCase(),
+        });
+        Alert.alert('Success', `Branch "${formName}" created`);
+      } else if (actionType === 'create_holiday') {
+        if (!formTitle.trim() || !formBookingDate.trim()) {
+          Alert.alert('Required', 'Holiday Name and Date are required');
+          return;
+        }
+        await staffService.createHoliday({
+          holiday_name: formTitle.trim(),
+          holiday_date: formBookingDate.trim(),
+          description: formContent.trim(),
+        });
+        Alert.alert('Success', `Holiday "${formTitle}" recorded`);
+      } else if (actionType === 'create_quota') {
+        if (!formTitle.trim() || !formCode.trim()) {
+          Alert.alert('Required', 'Quota Name and Code are required');
+          return;
+        }
+        await staffService.createQuota({
+          name: formTitle.trim(),
+          code: formCode.trim(),
+          is_active: true,
+        });
+        Alert.alert('Success', `Quota "${formTitle}" created`);
+      } else if (actionType === 'create_caste_category') {
+        if (!formTitle.trim()) {
+          Alert.alert('Required', 'Category Name is required');
+          return;
+        }
+        await staffService.createCasteCategory(formTitle.trim());
+        Alert.alert('Success', `Category "${formTitle}" created`);
+      } else if (actionType === 'create_caste') {
+        if (!formTitle.trim()) {
+          Alert.alert('Required', 'Caste Name is required');
+          return;
+        }
+        await staffService.createCaste(actionTargetItem?.id, formTitle.trim());
+        Alert.alert('Success', `Caste "${formTitle}" created`);
+      } else if (actionType === 'create_campus') {
+        if (!formTitle.trim()) {
+          Alert.alert('Required', 'Campus Name is required');
+          return;
+        }
+        await staffService.createCampus({
+          name: formTitle.trim(),
+          location: formHallLocation.trim(),
+          description: formContent.trim(),
+        });
+        Alert.alert('Success', `Campus "${formTitle}" created`);
+      } else if (actionType === 'set_semester_dates') {
+        await staffService.saveSemester({
+          ...actionTargetItem,
+          start_date: formStartDate,
+          end_date: formEndDate,
+        });
+        Alert.alert('Success', 'Academic semester dates updated');
       }
 
       setActionModalVisible(false);
@@ -1193,6 +1463,1185 @@ export default function OperationScreen() {
     }
   };
 
+  // SDMS SETTINGS 13 SECTIONS CATALOG (Matches Web Settings 1:1)
+  const SETTINGS_CARDS = [
+    { id: 'courses', label: 'Colleges & Programs', sub: 'Manage colleges, programs & branches', icon: 'Layers', color: '#2563EB', bg: '#EFF6FF' },
+    { id: 'calendar', label: 'Attendance Calendar', sub: 'Holidays & attendance calendar', icon: 'CalendarCheck', color: '#0284C7', bg: '#F0F9FF' },
+    { id: 'academic-calendar', label: 'Academic Calendar', sub: 'Manage semester dates', icon: 'Calendar', color: '#16A34A', bg: '#F0FDF4' },
+    { id: 'forms', label: 'Registration Form', sub: 'Student registration form fields', icon: 'FileText', color: '#9333EA', bg: '#FAF5FF' },
+    { id: 'quotas', label: 'Student Quotas', sub: 'Quota names & codes', icon: 'Tags', color: '#7C3AED', bg: '#F5F3FF' },
+    { id: 'caste-categories', label: 'Categories & Castes', sub: 'Categories & castes', icon: 'Users', color: '#D97706', bg: '#FFFBEB' },
+    { id: 'notifications', label: 'Notifications', sub: 'SMS & Email templates', icon: 'Bell', color: '#4F46E5', bg: '#EEF2FF' },
+    { id: 'college-transfer', label: 'College Transfer', sub: 'Manual student transfers', icon: 'TrendingUp', color: '#EA580C', bg: '#FFF7ED' },
+    { id: 'student-layout', label: 'Student Portal Layout', sub: 'Enable/Disable sidebar items', icon: 'Layout', color: '#2563EB', bg: '#EFF6FF' },
+    { id: 'qr-config', label: 'QR Code Config', sub: 'Per-role student field visibility', icon: 'QrCode', color: '#0D9488', bg: '#F0FDFA' },
+    { id: 'rtf-amount', label: 'RTF Amount Setup', sub: 'Scholarship sanctioned amounts per batch', icon: 'GraduationCap', color: '#DB2777', bg: '#FDF2F8' },
+    { id: 'freeze-database', label: 'Freeze Database', sub: 'Lock records by batch', icon: 'Lock', color: '#DC2626', bg: '#FEF2F2' },
+    { id: 'campus', label: 'Campus Creation', sub: 'Group colleges under campuses', icon: 'MapPin', color: '#059669', bg: '#ECFDF5' },
+  ];
+
+  const renderSettingsIcon = (name: string, color: string, size = 18) => {
+    switch (name) {
+      case 'Layers': return <Layers size={size} color={color} />;
+      case 'CalendarCheck': return <CalendarCheck size={size} color={color} />;
+      case 'Calendar': return <Calendar size={size} color={color} />;
+      case 'FileText': return <FileText size={size} color={color} />;
+      case 'Tags': return <Tags size={size} color={color} />;
+      case 'Users': return <Users size={size} color={color} />;
+      case 'Bell': return <Bell size={size} color={color} />;
+      case 'TrendingUp': return <TrendingUp size={size} color={color} />;
+      case 'Layout': return <Layout size={size} color={color} />;
+      case 'QrCode': return <QrCode size={size} color={color} />;
+      case 'GraduationCap': return <GraduationCap size={size} color={color} />;
+      case 'Lock': return <Lock size={size} color={color} />;
+      case 'MapPin': return <MapPin size={size} color={color} />;
+      default: return <Settings size={size} color={color} />;
+    }
+  };
+
+  // SETTINGS ACTION HANDLERS
+  const handleSelectCollege = (colId: any) => {
+    setSelectedCollegeId(colId);
+    const activeCourses = settingsCourses.filter((c: any) => String(c.college_id) === String(colId));
+    if (activeCourses.length > 0) {
+      setSelectedCourseId(activeCourses[0].id);
+      staffService.getBranches(activeCourses[0].id).then((b) => setSettingsBranches(b)).catch(() => setSettingsBranches([]));
+    } else {
+      setSelectedCourseId(null);
+      setSettingsBranches([]);
+    }
+  };
+
+  const handleSelectCourse = (cId: any) => {
+    setSelectedCourseId(cId);
+    staffService.getBranches(cId).then((b) => setSettingsBranches(b)).catch(() => setSettingsBranches([]));
+  };
+
+  const handleAddBatch = async () => {
+    if (!newBatchInput.trim()) {
+      Alert.alert('Required', 'Enter batch year (e.g. 2027)');
+      return;
+    }
+    try {
+      await staffService.createAcademicYear(newBatchInput.trim());
+      setNewBatchInput('');
+      Alert.alert('Success', `Batch "${newBatchInput.trim()}" added`);
+      loadData();
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    }
+  };
+
+  const handleDeleteBatch = (id: any, name: string) => {
+    Alert.alert('Delete Batch', `Remove academic batch ${name}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await staffService.deleteAcademicYear(id);
+            Alert.alert('Deleted', 'Batch removed');
+            loadData();
+          } catch (e: any) {
+            Alert.alert('Error', e.message);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleDeleteCollege = (id: any, name: string) => {
+    Alert.alert('Delete College', `Permanently delete "${name}"? This cascades to programs and branches.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await staffService.deleteCollege(id);
+            Alert.alert('Deleted', 'College removed');
+            loadData();
+          } catch (e: any) {
+            Alert.alert('Delete Failed', e.message);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleDeleteCourse = (id: any, name: string) => {
+    Alert.alert('Delete Program', `Remove academic program "${name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await staffService.deleteCourse(id);
+            Alert.alert('Deleted', 'Program removed');
+            loadData();
+          } catch (e: any) {
+            Alert.alert('Delete Failed', e.message);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleDeleteBranch = (courseId: any, branchId: any, name: string) => {
+    Alert.alert('Delete Branch', `Remove branch "${name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await staffService.deleteBranch(courseId, branchId);
+            Alert.alert('Deleted', 'Branch removed');
+            if (selectedCourseId) {
+              const b = await staffService.getBranches(selectedCourseId);
+              setSettingsBranches(b);
+            }
+          } catch (e: any) {
+            Alert.alert('Delete Failed', e.message);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleDeleteHoliday = (id: any, name: string) => {
+    Alert.alert('Delete Holiday', `Remove holiday "${name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await staffService.deleteHoliday(id);
+            Alert.alert('Deleted', 'Holiday removed');
+            loadData();
+          } catch (e: any) {
+            Alert.alert('Error', e.message);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleToggleQuota = async (quota: any) => {
+    try {
+      await staffService.toggleQuota(quota.id, !quota.is_active);
+      loadData();
+    } catch (e: any) {
+      Alert.alert('Failed', e.message);
+    }
+  };
+
+  const handleDeleteQuota = (id: any, name: string) => {
+    Alert.alert('Delete Quota', `Remove student quota "${name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await staffService.deleteQuota(id);
+            Alert.alert('Deleted', 'Quota removed');
+            loadData();
+          } catch (e: any) {
+            Alert.alert('Error', e.message);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleDeleteCasteCategory = (id: any, name: string) => {
+    Alert.alert('Delete Category', `Remove category "${name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await staffService.deleteCasteCategory(id);
+            Alert.alert('Deleted', 'Category removed');
+            loadData();
+          } catch (e: any) {
+            Alert.alert('Error', e.message);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleDeleteCaste = (catId: any, casteId: any, name: string) => {
+    Alert.alert('Delete Caste', `Remove caste "${name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await staffService.deleteCaste(catId, casteId);
+            Alert.alert('Deleted', 'Caste removed');
+            loadData();
+          } catch (e: any) {
+            Alert.alert('Error', e.message);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleToggleFrozenBatch = async (batchName: string, isCurrentlyFrozen: boolean) => {
+    try {
+      const next = isCurrentlyFrozen
+        ? frozenBatches.filter((b) => b !== batchName)
+        : [...frozenBatches, batchName];
+      await staffService.updateFrozenBatches(next);
+      setFrozenBatches(next);
+      Alert.alert(
+        isCurrentlyFrozen ? 'Batch Unlocked' : 'Batch Frozen',
+        `Batch ${batchName} is now ${isCurrentlyFrozen ? 'Unlocked' : 'Locked'}`
+      );
+      loadData();
+    } catch (e: any) {
+      Alert.alert('Failed', e.message);
+    }
+  };
+
+  const handleToggleStudentLayoutItem = async (itemId: string) => {
+    const updated = studentLayout.map((item) =>
+      item.id === itemId ? { ...item, enabled: !item.enabled } : item
+    );
+    setStudentLayout(updated);
+    try {
+      await staffService.updateStudentLayout(updated);
+    } catch (e: any) {
+      Alert.alert('Update Failed', e.message);
+    }
+  };
+
+  const handleToggleQrField = async (fieldKey: string) => {
+    const curRoles = qrRoleConfig?.roleConfigs || {};
+    const curForRole = curRoles[qrRole] || [];
+    const nextForRole = curForRole.includes(fieldKey)
+      ? curForRole.filter((k: string) => k !== fieldKey)
+      : [...curForRole, fieldKey];
+    const updatedConfigs = { ...curRoles, [qrRole]: nextForRole };
+    setQrRoleConfig({ ...qrRoleConfig, roleConfigs: updatedConfigs });
+    try {
+      await staffService.saveQrConfig({
+        roleConfigs: updatedConfigs,
+        publicFields: qrRoleConfig?.publicFields || [],
+      });
+    } catch (e: any) {
+      Alert.alert('Update Failed', e.message);
+    }
+  };
+
+  const handleExecuteTransfer = async () => {
+    if (selectedTransferStudentIds.length === 0) {
+      Alert.alert('Selection Required', 'Please select at least one student to transfer');
+      return;
+    }
+    if (!targetCollegeId) {
+      Alert.alert('Target Required', 'Please choose the destination college');
+      return;
+    }
+    Alert.alert(
+      'Confirm Transfer',
+      `Transfer ${selectedTransferStudentIds.length} student(s) to destination college?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Transfer',
+          onPress: async () => {
+            try {
+              await staffService.transferStudents({
+                studentIds: selectedTransferStudentIds,
+                targetCollegeId,
+                remarks: 'Transferred via SDMS Mobile Settings',
+              });
+              setSelectedTransferStudentIds([]);
+              Alert.alert('Transferred', 'Students transferred successfully');
+              loadData();
+            } catch (e: any) {
+              Alert.alert('Transfer Failed', e.message);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteCampus = (id: any, name: string) => {
+    Alert.alert('Delete Campus', `Remove campus "${name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await staffService.deleteCampus(id);
+            Alert.alert('Deleted', 'Campus removed');
+            loadData();
+          } catch (e: any) {
+            Alert.alert('Error', e.message);
+          }
+        },
+      },
+    ]);
+  };
+
+  const renderActiveSettingsSection = () => {
+    const curTab = activeSubTab || 'courses';
+
+    // 1. COLLEGES & PROGRAMS
+    if (curTab === 'courses') {
+      const activeCourses = settingsCourses.filter(
+        (c: any) => !selectedCollegeId || String(c.college_id) === String(selectedCollegeId)
+      );
+      const selectedProgram = settingsCourses.find((c: any) => c.id === selectedCourseId);
+
+      return (
+        <View style={{ marginTop: 14 }}>
+          {/* Summary counters bar matching Web */}
+          <View style={styles.settingsSummaryRow}>
+            <View style={styles.settingsSummaryBadge}>
+              <Text style={styles.settingsSummaryLabel}>Colleges: </Text>
+              <Text style={styles.settingsSummaryVal}>{settingsColleges.length}</Text>
+            </View>
+            <View style={styles.settingsSummaryBadge}>
+              <Text style={styles.settingsSummaryLabel}>Batches: </Text>
+              <Text style={styles.settingsSummaryVal}>{settingsBatches.length}</Text>
+            </View>
+            <View style={styles.settingsSummaryBadge}>
+              <Text style={styles.settingsSummaryLabel}>Programs: </Text>
+              <Text style={styles.settingsSummaryVal}>{settingsCourses.length}</Text>
+            </View>
+            <View style={styles.settingsSummaryBadge}>
+              <Text style={styles.settingsSummaryLabel}>Branches: </Text>
+              <Text style={styles.settingsSummaryVal}>{settingsBranches.length}</Text>
+            </View>
+          </View>
+
+          {/* 1. COLLEGES PANEL */}
+          <View style={styles.settingsSectionBox}>
+            <View style={styles.settingsSectionHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Landmark size={16} color="#1E3A8A" />
+                <Text style={styles.settingsSectionTitle}>COLLEGES ({settingsColleges.length})</Text>
+              </View>
+              {canWrite && (
+                <TouchableOpacity
+                  style={styles.settingsAddBtn}
+                  onPress={() => {
+                    setActionType('create_college');
+                    setFormName('');
+                    setFormCode('');
+                    setFormPhone('');
+                    setFormEmail('');
+                    setActionModalVisible(true);
+                  }}
+                >
+                  <Plus size={13} color="#FFFFFF" />
+                  <Text style={styles.settingsAddBtnText}>Add College</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {settingsColleges.map((col: any) => {
+              const isSel = selectedCollegeId === col.id;
+              return (
+                <TouchableOpacity
+                  key={col.id}
+                  style={[styles.settingsColCard, isSel && styles.settingsColCardActive]}
+                  onPress={() => handleSelectCollege(col.id)}
+                  activeOpacity={0.7}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                    <View style={[styles.colDot, { backgroundColor: col.is_active !== false ? '#10B981' : '#94A3B8' }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.settingsColTitle, isSel && { color: '#1E3A8A', fontWeight: '800' }]}>
+                        {col.name}
+                      </Text>
+                      {col.code && <Text style={styles.settingsColCode}>Code: {col.code}</Text>}
+                    </View>
+                  </View>
+                  {canWrite && (
+                    <TouchableOpacity onPress={() => handleDeleteCollege(col.id, col.name)} hitSlop={8}>
+                      <Trash2 size={15} color="#DC2626" />
+                    </TouchableOpacity>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* 2. BATCHES PANEL */}
+          <View style={styles.settingsSectionBox}>
+            <View style={styles.settingsSectionHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Calendar size={16} color="#059669" />
+                <Text style={styles.settingsSectionTitle}>BATCHES ({settingsBatches.length})</Text>
+              </View>
+            </View>
+
+            {canWrite && (
+              <View style={styles.settingsBatchInputRow}>
+                <TextInput
+                  style={styles.settingsBatchInput}
+                  placeholder="e.g. 2027"
+                  value={newBatchInput}
+                  onChangeText={setNewBatchInput}
+                  keyboardType="numeric"
+                />
+                <TouchableOpacity style={styles.settingsBatchAddBtn} onPress={handleAddBatch} activeOpacity={0.8}>
+                  <Plus size={16} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <View style={styles.settingsBatchChipsRow}>
+              {settingsBatches.map((b: any, bIdx: number) => {
+                const bName = typeof b === 'string' ? b : (b.academic_year || b.batch || String(b));
+                const bId = typeof b === 'object' ? b.id : bName;
+                return (
+                  <View key={bIdx} style={styles.settingsBatchChip}>
+                    <Text style={styles.settingsBatchChipText}>{bName}</Text>
+                    {canWrite && (
+                      <TouchableOpacity onPress={() => handleDeleteBatch(bId, bName)} hitSlop={6}>
+                        <X size={12} color="#DC2626" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* 3. PROGRAMS / COURSES PANEL */}
+          <View style={styles.settingsSectionBox}>
+            <View style={styles.settingsSectionHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <BookOpen size={16} color="#7C3AED" />
+                <Text style={styles.settingsSectionTitle}>SELECT PROGRAM ({activeCourses.length})</Text>
+              </View>
+              {canWrite && (
+                <TouchableOpacity
+                  style={[styles.settingsAddBtn, { backgroundColor: '#7C3AED' }]}
+                  onPress={() => {
+                    setActionType('create_course');
+                    setFormName('');
+                    setFormCode('');
+                    setFormDegreeLevel('DEGREE');
+                    setFormTotalYears('4');
+                    setFormSemsPerYear('2');
+                    setActionModalVisible(true);
+                  }}
+                >
+                  <Plus size={13} color="#FFFFFF" />
+                  <Text style={styles.settingsAddBtnText}>Add Program</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {activeCourses.length === 0 ? (
+              <Text style={{ fontSize: 12, color: '#94A3B8', padding: 8 }}>
+                No programs configured for selected college. Tap "+ Add Program" above.
+              </Text>
+            ) : (
+              activeCourses.map((crs: any) => {
+                const isSel = selectedCourseId === crs.id;
+                return (
+                  <TouchableOpacity
+                    key={crs.id}
+                    style={[styles.settingsCourseCard, isSel && styles.settingsCourseCardActive]}
+                    onPress={() => handleSelectCourse(crs.id)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.settingsCourseTitle, isSel && { color: '#7C3AED', fontWeight: '800' }]}>
+                        {crs.name}
+                      </Text>
+                      <Text style={styles.settingsCourseMeta}>
+                        {crs.degree_level || 'DEGREE'} • {crs.total_years || 4}yr • {crs.semesters_per_year || 2} sem/year
+                      </Text>
+                    </View>
+                    {canWrite && (
+                      <TouchableOpacity onPress={() => handleDeleteCourse(crs.id, crs.name)} hitSlop={8}>
+                        <Trash2 size={15} color="#DC2626" />
+                      </TouchableOpacity>
+                    )}
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </View>
+
+          {/* 4. BRANCHES PANEL */}
+          <View style={styles.settingsSectionBox}>
+            <View style={styles.settingsSectionHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Split size={16} color="#0D9488" />
+                <Text style={styles.settingsSectionTitle} numberOfLines={1}>
+                  {selectedProgram?.name || 'Program'} - Branches
+                </Text>
+              </View>
+              {canWrite && selectedCourseId && (
+                <TouchableOpacity
+                  style={[styles.settingsAddBtn, { backgroundColor: '#0D9488' }]}
+                  onPress={() => {
+                    setActionType('create_branch');
+                    setFormName('');
+                    setFormCode('');
+                    setActionModalVisible(true);
+                  }}
+                >
+                  <Plus size={13} color="#FFFFFF" />
+                  <Text style={styles.settingsAddBtnText}>Add Branch</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {settingsBranches.length === 0 ? (
+              <Text style={{ fontSize: 12, color: '#94A3B8', padding: 8 }}>
+                No branches registered under this program.
+              </Text>
+            ) : (
+              <View style={styles.settingsBatchChipsRow}>
+                {settingsBranches.map((br: any) => (
+                  <View key={br.id} style={[styles.settingsBranchChip, { backgroundColor: '#F0FDFA', borderColor: '#CCFBF1' }]}>
+                    <Text style={[styles.settingsBranchChipText, { color: '#0F766E' }]}>
+                      {br.name || br.code}
+                    </Text>
+                    {canWrite && (
+                      <TouchableOpacity onPress={() => handleDeleteBranch(selectedCourseId, br.id, br.name || br.code)} hitSlop={6}>
+                        <X size={12} color="#DC2626" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        </View>
+      );
+    }
+
+    // 2. ATTENDANCE CALENDAR
+    if (curTab === 'calendar') {
+      return (
+        <View style={{ marginTop: 14 }}>
+          <View style={styles.settingsSectionHeader}>
+            <Text style={styles.settingsSectionTitle}>Holidays & Non-Working Days ({dataList.length})</Text>
+            {canWrite && (
+              <TouchableOpacity
+                style={styles.settingsAddBtn}
+                onPress={() => {
+                  setActionType('create_holiday');
+                  setFormTitle('');
+                  setFormBookingDate(new Date().toISOString().split('T')[0]);
+                  setFormContent('');
+                  setActionModalVisible(true);
+                }}
+              >
+                <Plus size={13} color="#FFFFFF" />
+                <Text style={styles.settingsAddBtnText}>Add Holiday</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {dataList.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Calendar size={28} color="#94A3B8" />
+              <Text style={styles.emptyTitle}>No Holidays Configured</Text>
+              <Text style={styles.emptyText}>Add institutional breaks or public holidays.</Text>
+            </View>
+          ) : (
+            dataList.map((h: any, idx: number) => (
+              <View key={h.id || idx} style={styles.settingsHolidayCard}>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View style={styles.settingsHolidayDate}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#1E3A8A' }}>
+                        {h.holiday_date ? h.holiday_date.split('T')[0] : 'Date'}
+                      </Text>
+                    </View>
+                    <Text style={styles.settingsHolidayTitle}>{h.holiday_name || h.name || 'Holiday'}</Text>
+                  </View>
+                  {h.description ? <Text style={styles.settingsHolidaySub}>{h.description}</Text> : null}
+                </View>
+                {canWrite && (
+                  <TouchableOpacity onPress={() => handleDeleteHoliday(h.id, h.holiday_name || h.name)} hitSlop={8}>
+                    <Trash2 size={16} color="#DC2626" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))
+          )}
+        </View>
+      );
+    }
+
+    // 3. ACADEMIC CALENDAR
+    if (curTab === 'academic-calendar') {
+      return (
+        <View style={{ marginTop: 14 }}>
+          <View style={styles.settingsSectionHeader}>
+            <Text style={styles.settingsSectionTitle}>Academic Semester Dates ({dataList.length})</Text>
+          </View>
+
+          {dataList.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Calendar size={28} color="#94A3B8" />
+              <Text style={styles.emptyTitle}>No Semester Dates Configured</Text>
+              <Text style={styles.emptyText}>Semester instructional periods will appear here.</Text>
+            </View>
+          ) : (
+            dataList.map((sem: any, idx: number) => (
+              <View key={sem.id || idx} style={styles.settingsHolidayCard}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.settingsHolidayTitle}>
+                    {sem.course_name || sem.course || 'Program'} - Sem {sem.semester_number || sem.semester || '1'}
+                  </Text>
+                  <Text style={styles.settingsHolidaySub}>
+                    Batch: {sem.batch || 'All'} • College: {sem.college_name || 'All Colleges'}
+                  </Text>
+                  <Text style={[styles.settingsHolidaySub, { color: '#059669', fontWeight: '600', marginTop: 2 }]}>
+                    Start: {sem.start_date ? sem.start_date.split('T')[0] : 'N/A'} • End: {sem.end_date ? sem.end_date.split('T')[0] : 'N/A'}
+                  </Text>
+                </View>
+                {canWrite && (
+                  <TouchableOpacity
+                    style={[styles.settingsAddBtn, { backgroundColor: '#1E3A8A' }]}
+                    onPress={() => {
+                      setActionTargetItem(sem);
+                      setActionType('set_semester_dates');
+                      setFormStartDate(sem.start_date ? sem.start_date.split('T')[0] : '');
+                      setFormEndDate(sem.end_date ? sem.end_date.split('T')[0] : '');
+                      setActionModalVisible(true);
+                    }}
+                  >
+                    <Edit2 size={13} color="#FFFFFF" />
+                    <Text style={styles.settingsAddBtnText}>Dates</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))
+          )}
+        </View>
+      );
+    }
+
+    // 4. REGISTRATION FORM
+    if (curTab === 'forms') {
+      const form = dataList[0] || {};
+      const fields = [
+        { group: 'Basic Information', items: ['Student Full Name', 'Father Name', 'Gender', 'Date of Birth', 'Aadhaar Number', 'PIN / Roll Number', 'Mother Name'] },
+        { group: 'Academic Details', items: ['College Name', 'Batch', 'Program / Course', 'Branch', 'Academic Year', 'Semester', 'Scholarship Status'] },
+        { group: 'Contact Details', items: ['Student Mobile', 'Parent Mobile 1', 'Parent Mobile 2', 'Email Address'] },
+        { group: 'Address', items: ['Permanent Address', 'City / Village', 'Mandal', 'District', 'State', 'Pincode'] },
+      ];
+
+      return (
+        <View style={{ marginTop: 14 }}>
+          <View style={styles.settingsSectionBox}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.settingsSectionTitle}>{form.form_name || 'Student Registration Form'}</Text>
+                <Text style={styles.settingsHolidaySub}>{form.form_description || 'Public student admission and registration portal'}</Text>
+              </View>
+              {canWrite && (
+                <Switch
+                  value={form.is_active !== false}
+                  onValueChange={async (val) => {
+                    if (form.form_id || form.id) {
+                      await staffService.toggleRegistrationForm(form.form_id || form.id, val);
+                      loadData();
+                    }
+                  }}
+                  trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+                  thumbColor={form.is_active !== false ? '#1E3A8A' : '#F1F5F9'}
+                />
+              )}
+            </View>
+          </View>
+
+          <Text style={[styles.settingsSectionTitle, { marginTop: 12, marginBottom: 8 }]}>Configured Fields</Text>
+          {fields.map((grp, gIdx) => (
+            <View key={gIdx} style={styles.settingsSectionBox}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E3A8A', marginBottom: 8 }}>{grp.group}</Text>
+              {grp.items.map((fieldName, fIdx) => (
+                <View key={fIdx} style={styles.settingsLayoutRow}>
+                  <Text style={styles.settingsLayoutLabel}>{fieldName}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={{ fontSize: 10, color: '#059669', fontWeight: '700' }}>ACTIVE</Text>
+                    <CheckSquare size={16} color="#059669" />
+                  </View>
+                </View>
+              ))}
+            </View>
+          ))}
+        </View>
+      );
+    }
+
+    // 5. STUDENT QUOTAS
+    if (curTab === 'quotas') {
+      return (
+        <View style={{ marginTop: 14 }}>
+          <View style={styles.settingsSectionHeader}>
+            <Text style={styles.settingsSectionTitle}>Admission Quotas ({dataList.length})</Text>
+            {canWrite && (
+              <TouchableOpacity
+                style={styles.settingsAddBtn}
+                onPress={() => {
+                  setActionType('create_quota');
+                  setFormTitle('');
+                  setFormCode('');
+                  setActionModalVisible(true);
+                }}
+              >
+                <Plus size={13} color="#FFFFFF" />
+                <Text style={styles.settingsAddBtnText}>Add Quota</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {dataList.map((q: any, idx: number) => {
+            const isAct = q.is_active !== false;
+            return (
+              <View key={q.id || idx} style={styles.settingsHolidayCard}>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={styles.settingsHolidayTitle}>{q.name}</Text>
+                    <View style={[styles.settingsBatchChip, { backgroundColor: '#EEF2FF', paddingVertical: 2 }]}>
+                      <Text style={{ fontSize: 10, fontWeight: '800', color: '#1E3A8A' }}>{q.code || 'QUOTA'}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.settingsHolidaySub}>Status: {isAct ? 'Active' : 'Inactive'}</Text>
+                </View>
+                {canWrite && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <Switch
+                      value={isAct}
+                      onValueChange={() => handleToggleQuota(q)}
+                      trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+                      thumbColor={isAct ? '#1E3A8A' : '#F1F5F9'}
+                    />
+                    <TouchableOpacity onPress={() => handleDeleteQuota(q.id, q.name)} hitSlop={8}>
+                      <Trash2 size={16} color="#DC2626" />
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      );
+    }
+
+    // 6. CASTE CATEGORIES & CASTES
+    if (curTab === 'caste-categories') {
+      const activeCat = dataList.find((c: any) => c.id === selectedCasteCategoryId) || dataList[0];
+      const castes = activeCat?.castes || activeCat?.sub_castes || [];
+
+      return (
+        <View style={{ marginTop: 14 }}>
+          <View style={styles.settingsSectionHeader}>
+            <Text style={styles.settingsSectionTitle}>Caste Categories</Text>
+            {canWrite && (
+              <TouchableOpacity
+                style={styles.settingsAddBtn}
+                onPress={() => {
+                  setActionType('create_caste_category');
+                  setFormTitle('');
+                  setActionModalVisible(true);
+                }}
+              >
+                <Plus size={13} color="#FFFFFF" />
+                <Text style={styles.settingsAddBtnText}>Add Category</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Category Chips Row */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {dataList.map((cat: any) => {
+                const isSel = (selectedCasteCategoryId || dataList[0]?.id) === cat.id;
+                return (
+                  <TouchableOpacity
+                    key={cat.id}
+                    style={[styles.settingsBatchChip, isSel && { backgroundColor: '#1E3A8A', borderColor: '#1E3A8A' }]}
+                    onPress={() => setSelectedCasteCategoryId(cat.id)}
+                  >
+                    <Text style={[styles.settingsBatchChipText, isSel && { color: '#FFFFFF' }]}>{cat.name}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </ScrollView>
+
+          {activeCat && (
+            <View style={styles.settingsSectionBox}>
+              <View style={styles.settingsSectionHeader}>
+                <Text style={styles.settingsSectionTitle}>Castes under {activeCat.name}</Text>
+                {canWrite && (
+                  <TouchableOpacity
+                    style={[styles.settingsAddBtn, { backgroundColor: '#D97706' }]}
+                    onPress={() => {
+                      setActionTargetItem(activeCat);
+                      setActionType('create_caste');
+                      setFormTitle('');
+                      setActionModalVisible(true);
+                    }}
+                  >
+                    <Plus size={13} color="#FFFFFF" />
+                    <Text style={styles.settingsAddBtnText}>Add Caste</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <View style={styles.settingsBatchChipsRow}>
+                {castes.length === 0 ? (
+                  <Text style={{ fontSize: 12, color: '#94A3B8' }}>No castes registered under {activeCat.name}.</Text>
+                ) : (
+                  castes.map((c: any) => (
+                    <View key={c.id || c.name} style={styles.settingsBatchChip}>
+                      <Text style={styles.settingsBatchChipText}>{c.name}</Text>
+                      {canWrite && (
+                        <TouchableOpacity onPress={() => handleDeleteCaste(activeCat.id, c.id, c.name)} hitSlop={6}>
+                          <X size={12} color="#DC2626" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ))
+                )}
+              </View>
+            </View>
+          )}
+        </View>
+      );
+    }
+
+    // 7. NOTIFICATIONS
+    if (curTab === 'notifications') {
+      return (
+        <View style={{ marginTop: 14 }}>
+          <View style={styles.settingsSectionHeader}>
+            <Text style={styles.settingsSectionTitle}>Notification & SMS Templates ({dataList.length})</Text>
+          </View>
+          {dataList.map((tpl: any, idx: number) => (
+            <View key={tpl.id || idx} style={styles.actionCard}>
+              <View style={styles.actionCardHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.actionTitle}>{tpl.name || tpl.title || 'SMS Template'}</Text>
+                  <Text style={styles.actionSub}>Event: {tpl.event || tpl.type || 'System Event'}</Text>
+                </View>
+                <View style={[styles.statusPill, styles.pillSuccess]}>
+                  <Text style={styles.statusPillText}>{tpl.channel || 'SMS'}</Text>
+                </View>
+              </View>
+              <Text style={styles.smsLogMsg}>{tpl.template_body || tpl.message || tpl.content || 'Template text'}</Text>
+            </View>
+          ))}
+        </View>
+      );
+    }
+
+    // 8. COLLEGE TRANSFER
+    if (curTab === 'college-transfer') {
+      return (
+        <View style={{ marginTop: 14 }}>
+          <View style={styles.settingsSectionBox}>
+            <Text style={[styles.settingsSectionTitle, { marginBottom: 10 }]}>Transfer Between Colleges</Text>
+            <View style={styles.settingsTransferPickerRow}>
+              <View style={styles.settingsTransferPickerCol}>
+                <Text style={styles.settingsTransferPickerLabel}>Source College</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {settingsColleges.map((col: any) => (
+                    <TouchableOpacity
+                      key={col.id}
+                      style={[styles.settingsBatchChip, sourceCollegeId === col.id && { backgroundColor: '#1E3A8A' }]}
+                      onPress={() => {
+                        setSourceCollegeId(col.id);
+                        staffService.getPaginatedStudents({ college: col.id, limit: 50 }).then((res) => setDataList(res.students));
+                      }}
+                    >
+                      <Text style={[styles.settingsBatchChipText, sourceCollegeId === col.id && { color: '#FFFFFF' }]}>
+                        {col.code || col.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              <View style={[styles.settingsTransferPickerCol, { marginTop: 10 }]}>
+                <Text style={styles.settingsTransferPickerLabel}>Destination College</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {settingsColleges.map((col: any) => (
+                    <TouchableOpacity
+                      key={col.id}
+                      style={[styles.settingsBatchChip, targetCollegeId === col.id && { backgroundColor: '#059669' }]}
+                      onPress={() => setTargetCollegeId(col.id)}
+                    >
+                      <Text style={[styles.settingsBatchChipText, targetCollegeId === col.id && { color: '#FFFFFF' }]}>
+                        {col.code || col.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+
+            {canWrite && selectedTransferStudentIds.length > 0 && (
+              <TouchableOpacity style={[styles.settingsSaveBtn, { backgroundColor: '#EA580C', marginTop: 14 }]} onPress={handleExecuteTransfer}>
+                <TrendingUp size={16} color="#FFFFFF" />
+                <Text style={styles.settingsSaveBtnText}>
+                  Transfer Selected ({selectedTransferStudentIds.length}) Students
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <Text style={[styles.settingsSectionTitle, { marginTop: 12, marginBottom: 8 }]}>Select Students to Transfer</Text>
+          {dataList.map((stu: any) => {
+            const isChecked = selectedTransferStudentIds.includes(stu.id || stu.student_id);
+            const stuId = stu.id || stu.student_id;
+            return (
+              <TouchableOpacity
+                key={stuId}
+                style={[styles.settingsColCard, isChecked && { borderColor: '#EA580C', backgroundColor: '#FFF7ED' }]}
+                onPress={() => {
+                  setSelectedTransferStudentIds((prev) =>
+                    prev.includes(stuId) ? prev.filter((id) => id !== stuId) : [...prev, stuId]
+                  );
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                  {isChecked ? <CheckSquare size={18} color="#EA580C" /> : <Square size={18} color="#94A3B8" />}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.settingsColTitle}>{stu.student_name || stu.name}</Text>
+                    <Text style={styles.settingsColCode}>{stu.admission_number || stu.pin_no} • {stu.course_name || 'Student'}</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      );
+    }
+
+    // 9. STUDENT PORTAL LAYOUT
+    if (curTab === 'student-layout') {
+      const items = studentLayout.length > 0 ? studentLayout : [
+        { id: 'dashboard', label: 'Dashboard Overview', enabled: true },
+        { id: 'attendance', label: 'Attendance Records', enabled: true },
+        { id: 'fees', label: 'Fee Payments & Receipts', enabled: true },
+        { id: 'announcements', label: 'Circulars & Notices', enabled: true },
+        { id: 'services', label: 'Student Services', enabled: true },
+        { id: 'seminar-halls', label: 'Seminar Hall Bookings', enabled: true },
+        { id: 'clubs', label: 'Student Campus Clubs', enabled: true },
+        { id: 'profile', label: 'Profile Update Requests', enabled: true },
+      ];
+
+      return (
+        <View style={{ marginTop: 14 }}>
+          <View style={styles.settingsSectionBox}>
+            <Text style={styles.settingsSectionTitle}>Student Portal Sidebar Layout</Text>
+            <Text style={styles.settingsHolidaySub}>Toggle navigation tabs visible to students upon login</Text>
+          </View>
+
+          {items.map((item: any) => (
+            <View key={item.id} style={styles.settingsLayoutRow}>
+              <Text style={styles.settingsLayoutLabel}>{item.label}</Text>
+              <Switch
+                value={item.enabled !== false}
+                onValueChange={() => handleToggleStudentLayoutItem(item.id)}
+                trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+                thumbColor={item.enabled !== false ? '#1E3A8A' : '#F1F5F9'}
+              />
+            </View>
+          ))}
+        </View>
+      );
+    }
+
+    // 10. QR CODE CONFIG
+    if (curTab === 'qr-config') {
+      const roles: ('attender' | 'faculty' | 'cashier' | 'principal' | 'admin')[] = [
+        'attender', 'faculty', 'cashier', 'principal', 'admin',
+      ];
+      const curFields = qrRoleConfig?.roleConfigs?.[qrRole] || ['photo', 'pin_no', 'student_name', 'college', 'course'];
+
+      return (
+        <View style={{ marginTop: 14 }}>
+          <View style={styles.settingsSectionBox}>
+            <Text style={styles.settingsSectionTitle}>QR Scanner Role Field Visibility</Text>
+            <Text style={styles.settingsHolidaySub}>Select a staff role and configure visible student card fields</Text>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                {roles.map((r) => {
+                  const isSel = qrRole === r;
+                  return (
+                    <TouchableOpacity
+                      key={r}
+                      style={[styles.settingsQrRoleChip, isSel && styles.settingsQrRoleChipActive]}
+                      onPress={() => setQrRole(r)}
+                    >
+                      <Text style={[styles.settingsQrRoleChipText, isSel && styles.settingsQrRoleChipTextActive]}>
+                        {r.toUpperCase()}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </View>
+
+          {dataList.map((f: any) => {
+            const isEnabled = curFields.includes(f.key);
+            return (
+              <View key={f.key} style={styles.settingsLayoutRow}>
+                <Text style={styles.settingsLayoutLabel}>{f.label}</Text>
+                <Switch
+                  value={isEnabled}
+                  onValueChange={() => handleToggleQrField(f.key)}
+                  trackColor={{ false: '#CBD5E1', true: '#99F6E4' }}
+                  thumbColor={isEnabled ? '#0D9488' : '#F1F5F9'}
+                />
+              </View>
+            );
+          })}
+        </View>
+      );
+    }
+
+    // 11. RTF AMOUNT SETUP
+    if (curTab === 'rtf-amount') {
+      return (
+        <View style={{ marginTop: 14 }}>
+          <View style={styles.settingsSectionBox}>
+            <Text style={styles.settingsSectionTitle}>Reimbursement of Tuition Fee (RTF) Setup</Text>
+            <Text style={styles.settingsHolidaySub}>Configure government scholarship sanctioned fees per program & batch</Text>
+          </View>
+
+          {dataList.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <GraduationCap size={28} color="#94A3B8" />
+              <Text style={styles.emptyTitle}>No RTF Rates Configured</Text>
+              <Text style={styles.emptyText}>RTF sanctioned amounts will be calculated dynamically.</Text>
+            </View>
+          ) : (
+            dataList.map((entry: any, idx: number) => (
+              <View key={idx} style={styles.settingsHolidayCard}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.settingsHolidayTitle}>{entry.course || 'Program'} - {entry.batch || 'Batch'}</Text>
+                  <Text style={styles.settingsHolidaySub}>College: {entry.college || 'All Institutions'}</Text>
+                  <Text style={[styles.settingsHolidaySub, { color: '#DB2777', fontWeight: '800', marginTop: 2 }]}>
+                    Sanctioned RTF: ₹{Number(entry.amount || entry.sanctioned || 0).toLocaleString('en-IN')}
+                  </Text>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+      );
+    }
+
+    // 12. FREEZE DATABASE
+    if (curTab === 'freeze-database') {
+      return (
+        <View style={{ marginTop: 14 }}>
+          <View style={styles.settingsSectionBox}>
+            <Text style={styles.settingsSectionTitle}>Freeze Academic Records</Text>
+            <Text style={styles.settingsHolidaySub}>Lock completed batches to prevent accidental edits to student profiles or fees</Text>
+          </View>
+
+          {dataList.map((b: any, idx: number) => {
+            const isFrozen = b.is_frozen;
+            return (
+              <View key={idx} style={styles.settingsHolidayCard}>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={styles.settingsHolidayTitle}>Batch {b.batch}</Text>
+                    <View style={[styles.statusPill, isFrozen ? styles.pillInactive : styles.pillSuccess]}>
+                      <Text style={styles.statusPillText}>{isFrozen ? 'LOCKED' : 'ACTIVE'}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.settingsHolidaySub}>
+                    {isFrozen ? 'Database modifications locked for this batch' : 'Modifications allowed'}
+                  </Text>
+                </View>
+                {canWrite && (
+                  <TouchableOpacity
+                    style={[styles.settingsAddBtn, { backgroundColor: isFrozen ? '#059669' : '#DC2626' }]}
+                    onPress={() => handleToggleFrozenBatch(b.batch, isFrozen)}
+                  >
+                    {isFrozen ? <Unlock size={14} color="#FFFFFF" /> : <Lock size={14} color="#FFFFFF" />}
+                    <Text style={styles.settingsAddBtnText}>{isFrozen ? 'Unlock' : 'Freeze'}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      );
+    }
+
+    // 13. CAMPUS CREATION
+    if (curTab === 'campus') {
+      return (
+        <View style={{ marginTop: 14 }}>
+          <View style={styles.settingsSectionHeader}>
+            <Text style={styles.settingsSectionTitle}>Campus Locations ({dataList.length})</Text>
+            {canWrite && (
+              <TouchableOpacity
+                style={[styles.settingsAddBtn, { backgroundColor: '#059669' }]}
+                onPress={() => {
+                  setActionType('create_campus');
+                  setFormTitle('');
+                  setFormHallLocation('');
+                  setFormContent('');
+                  setActionModalVisible(true);
+                }}
+              >
+                <Plus size={13} color="#FFFFFF" />
+                <Text style={styles.settingsAddBtnText}>Add Campus</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {dataList.map((c: any, idx: number) => (
+            <View key={c.id || idx} style={styles.actionCard}>
+              <View style={styles.actionCardHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.actionTitle}>{c.name || 'Campus'}</Text>
+                  <Text style={styles.actionSub}>Location: {c.location || 'Main Campus'}</Text>
+                  {c.description ? <Text style={styles.actionDetail}>{c.description}</Text> : null}
+                </View>
+                {canWrite && (
+                  <TouchableOpacity onPress={() => handleDeleteCampus(c.id, c.name)} hitSlop={8}>
+                    <Trash2 size={16} color="#DC2626" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          ))}
+        </View>
+      );
+    }
+
+    return null;
+  };
+
   const hasCreateAction =
     canWrite &&
     ((opKey === 'students' && (activeSubTab === 'database' || !activeSubTab)) ||
@@ -1200,7 +2649,14 @@ export default function OperationScreen() {
       (opKey === 'announcements' && activeSubTab === 'notices') ||
       (opKey === 'clubs' && activeSubTab === 'management') ||
       opKey === 'seminar-halls' ||
-      (opKey === 'services' && activeSubTab === 'config'));
+      (opKey === 'services' && activeSubTab === 'config') ||
+      (opKey === 'courses' &&
+        (activeSubTab === 'courses' ||
+          !activeSubTab ||
+          activeSubTab === 'calendar' ||
+          activeSubTab === 'quotas' ||
+          activeSubTab === 'caste-categories' ||
+          activeSubTab === 'campus')));
 
   return (
     <SafeAreaView style={styles.container}>
@@ -1237,6 +2693,16 @@ export default function OperationScreen() {
                   : 'Book Hall'
                 : opKey === 'services' && activeSubTab === 'config'
                 ? 'Add Service'
+                : opKey === 'courses'
+                ? activeSubTab === 'calendar'
+                  ? 'Add Holiday'
+                  : activeSubTab === 'quotas'
+                  ? 'Add Quota'
+                  : activeSubTab === 'caste-categories'
+                  ? 'Add Category'
+                  : activeSubTab === 'campus'
+                  ? 'Add Campus'
+                  : 'Add College'
                 : 'New Item'}
             </Text>
           </TouchableOpacity>
@@ -1709,6 +3175,48 @@ export default function OperationScreen() {
                   <Text style={styles.emptyText}>No SMS records found for this date. Pull down to refresh.</Text>
                 </View>
               )}
+            </View>
+          ) : opKey === 'courses' ? (
+            /* SDMS SETTINGS FULL CONSOLE (All 13 Sections) */
+            <View style={styles.settingsContainer}>
+              {/* Top 13 Navigation Cards */}
+              <View style={styles.settingsCardsGrid}>
+                {SETTINGS_CARDS.map((card) => {
+                  const isCurActive = (activeSubTab || 'courses') === card.id;
+                  return (
+                    <TouchableOpacity
+                      key={card.id}
+                      style={[
+                        styles.settingsNavCard,
+                        isCurActive && styles.settingsNavCardActive,
+                      ]}
+                      onPress={() => setActiveSubTab(card.id)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.settingsCardIconBox, { backgroundColor: card.bg }]}>
+                        {renderSettingsIcon(card.icon, card.color, 16)}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.settingsNavCardTitle,
+                            isCurActive && styles.settingsNavCardTitleActive,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {card.label}
+                        </Text>
+                        <Text style={styles.settingsNavCardSub} numberOfLines={1}>
+                          {card.sub}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* ACTIVE SETTINGS SECTION */}
+              {renderActiveSettingsSection()}
             </View>
           ) : dataList.length > 0 ? (
             dataList.map((item: any, idx: number) => {
@@ -2941,6 +4449,308 @@ export default function OperationScreen() {
                     <Text style={styles.dialogConfirmText}>
                       {actionType === 'create_service' ? 'Create Service' : 'Update Service'}
                     </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : actionType === 'create_college' ? (
+              /* 10. CREATE COLLEGE */
+              <View>
+                <Text style={styles.dialogTitle}>Add New College</Text>
+                <Text style={styles.dialogSub}>Register an institution under SDMS</Text>
+                <TextInput
+                  style={styles.dialogSingleInput}
+                  placeholder="College Name * (e.g. Pydah College of Engg)"
+                  value={formName}
+                  onChangeText={setFormName}
+                />
+                <TextInput
+                  style={styles.dialogSingleInput}
+                  placeholder="College Code (e.g. PCE)"
+                  value={formCode}
+                  onChangeText={setFormCode}
+                  autoCapitalize="characters"
+                />
+                <TextInput
+                  style={styles.dialogSingleInput}
+                  placeholder="Official Phone"
+                  value={formPhone}
+                  onChangeText={setFormPhone}
+                  keyboardType="phone-pad"
+                />
+                <TextInput
+                  style={styles.dialogSingleInput}
+                  placeholder="Official Email"
+                  value={formEmail}
+                  onChangeText={setFormEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+                <View style={styles.dialogBtnRow}>
+                  <TouchableOpacity
+                    style={styles.dialogCancelBtn}
+                    onPress={() => setActionModalVisible(false)}
+                  >
+                    <Text style={styles.dialogCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.dialogConfirmBtn} onPress={handleSaveForm}>
+                    <Text style={styles.dialogConfirmText}>Save College</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : actionType === 'create_course' ? (
+              /* 11. CREATE PROGRAM / COURSE */
+              <View>
+                <Text style={styles.dialogTitle}>Add Academic Program</Text>
+                <Text style={styles.dialogSub}>Define curriculum under selected college</Text>
+                <TextInput
+                  style={styles.dialogSingleInput}
+                  placeholder="Program Name * (e.g. B.Tech Computer Science)"
+                  value={formName}
+                  onChangeText={setFormName}
+                />
+                <TextInput
+                  style={styles.dialogSingleInput}
+                  placeholder="Program Code (e.g. BTECH-CSE)"
+                  value={formCode}
+                  onChangeText={setFormCode}
+                  autoCapitalize="characters"
+                />
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TextInput
+                    style={[styles.dialogSingleInput, { flex: 1 }]}
+                    placeholder="Total Years (4)"
+                    value={formTotalYears}
+                    onChangeText={setFormTotalYears}
+                    keyboardType="numeric"
+                  />
+                  <TextInput
+                    style={[styles.dialogSingleInput, { flex: 1 }]}
+                    placeholder="Sems/Yr (2)"
+                    value={formSemsPerYear}
+                    onChangeText={setFormSemsPerYear}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={styles.dialogBtnRow}>
+                  <TouchableOpacity
+                    style={styles.dialogCancelBtn}
+                    onPress={() => setActionModalVisible(false)}
+                  >
+                    <Text style={styles.dialogCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.dialogConfirmBtn} onPress={handleSaveForm}>
+                    <Text style={styles.dialogConfirmText}>Save Program</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : actionType === 'create_branch' ? (
+              /* 12. CREATE BRANCH */
+              <View>
+                <Text style={styles.dialogTitle}>Add Specialization / Branch</Text>
+                <Text style={styles.dialogSub}>Add branch to selected program</Text>
+                <TextInput
+                  style={styles.dialogSingleInput}
+                  placeholder="Branch Name * (e.g. CSE)"
+                  value={formName}
+                  onChangeText={setFormName}
+                />
+                <TextInput
+                  style={styles.dialogSingleInput}
+                  placeholder="Branch Code (e.g. 05)"
+                  value={formCode}
+                  onChangeText={setFormCode}
+                  autoCapitalize="characters"
+                />
+                <View style={styles.dialogBtnRow}>
+                  <TouchableOpacity
+                    style={styles.dialogCancelBtn}
+                    onPress={() => setActionModalVisible(false)}
+                  >
+                    <Text style={styles.dialogCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.dialogConfirmBtn} onPress={handleSaveForm}>
+                    <Text style={styles.dialogConfirmText}>Save Branch</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : actionType === 'create_holiday' ? (
+              /* 13. CREATE HOLIDAY */
+              <View>
+                <Text style={styles.dialogTitle}>Add Custom Holiday</Text>
+                <Text style={styles.dialogSub}>Mark non-instructional day on calendar</Text>
+                <TextInput
+                  style={styles.dialogSingleInput}
+                  placeholder="Holiday Name * (e.g. Sankranti Vacation)"
+                  value={formTitle}
+                  onChangeText={setFormTitle}
+                />
+                <TextInput
+                  style={styles.dialogSingleInput}
+                  placeholder="Date (YYYY-MM-DD) *"
+                  value={formBookingDate}
+                  onChangeText={setFormBookingDate}
+                />
+                <TextInput
+                  style={[styles.dialogInput, { height: 60 }]}
+                  placeholder="Notes / Scope..."
+                  value={formContent}
+                  onChangeText={setFormContent}
+                  multiline
+                />
+                <View style={styles.dialogBtnRow}>
+                  <TouchableOpacity
+                    style={styles.dialogCancelBtn}
+                    onPress={() => setActionModalVisible(false)}
+                  >
+                    <Text style={styles.dialogCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.dialogConfirmBtn} onPress={handleSaveForm}>
+                    <Text style={styles.dialogConfirmText}>Save Holiday</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : actionType === 'create_quota' ? (
+              /* 14. CREATE QUOTA */
+              <View>
+                <Text style={styles.dialogTitle}>Add Student Quota</Text>
+                <Text style={styles.dialogSub}>Define admission quota category</Text>
+                <TextInput
+                  style={styles.dialogSingleInput}
+                  placeholder="Quota Name * (e.g. Convener Quota)"
+                  value={formTitle}
+                  onChangeText={setFormTitle}
+                />
+                <TextInput
+                  style={styles.dialogSingleInput}
+                  placeholder="Quota Code * (e.g. CQ)"
+                  value={formCode}
+                  onChangeText={setFormCode}
+                  autoCapitalize="characters"
+                />
+                <View style={styles.dialogBtnRow}>
+                  <TouchableOpacity
+                    style={styles.dialogCancelBtn}
+                    onPress={() => setActionModalVisible(false)}
+                  >
+                    <Text style={styles.dialogCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.dialogConfirmBtn} onPress={handleSaveForm}>
+                    <Text style={styles.dialogConfirmText}>Save Quota</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : actionType === 'create_caste_category' ? (
+              /* 15. CREATE CASTE CATEGORY */
+              <View>
+                <Text style={styles.dialogTitle}>Add Caste Category</Text>
+                <Text style={styles.dialogSub}>Register reservation category (e.g. BC-A, SC, ST)</Text>
+                <TextInput
+                  style={styles.dialogSingleInput}
+                  placeholder="Category Name * (e.g. BC-E)"
+                  value={formTitle}
+                  onChangeText={setFormTitle}
+                />
+                <View style={styles.dialogBtnRow}>
+                  <TouchableOpacity
+                    style={styles.dialogCancelBtn}
+                    onPress={() => setActionModalVisible(false)}
+                  >
+                    <Text style={styles.dialogCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.dialogConfirmBtn} onPress={handleSaveForm}>
+                    <Text style={styles.dialogConfirmText}>Save Category</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : actionType === 'create_caste' ? (
+              /* 16. CREATE CASTE */
+              <View>
+                <Text style={styles.dialogTitle}>Add Sub-Caste</Text>
+                <Text style={styles.dialogSub}>
+                  Add caste under {actionTargetItem?.name || 'Category'}
+                </Text>
+                <TextInput
+                  style={styles.dialogSingleInput}
+                  placeholder="Caste Name * (e.g. Kapu, Reddy, Kamma, etc.)"
+                  value={formTitle}
+                  onChangeText={setFormTitle}
+                />
+                <View style={styles.dialogBtnRow}>
+                  <TouchableOpacity
+                    style={styles.dialogCancelBtn}
+                    onPress={() => setActionModalVisible(false)}
+                  >
+                    <Text style={styles.dialogCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.dialogConfirmBtn} onPress={handleSaveForm}>
+                    <Text style={styles.dialogConfirmText}>Save Caste</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : actionType === 'create_campus' ? (
+              /* 17. CREATE CAMPUS */
+              <View>
+                <Text style={styles.dialogTitle}>Add Campus Location</Text>
+                <Text style={styles.dialogSub}>Register a physical university campus</Text>
+                <TextInput
+                  style={styles.dialogSingleInput}
+                  placeholder="Campus Name * (e.g. Kakinada City Campus)"
+                  value={formTitle}
+                  onChangeText={setFormTitle}
+                />
+                <TextInput
+                  style={styles.dialogSingleInput}
+                  placeholder="Location (e.g. Main Road, Kakinada)"
+                  value={formHallLocation}
+                  onChangeText={setFormHallLocation}
+                />
+                <TextInput
+                  style={[styles.dialogInput, { height: 60 }]}
+                  placeholder="Description..."
+                  value={formContent}
+                  onChangeText={setFormContent}
+                  multiline
+                />
+                <View style={styles.dialogBtnRow}>
+                  <TouchableOpacity
+                    style={styles.dialogCancelBtn}
+                    onPress={() => setActionModalVisible(false)}
+                  >
+                    <Text style={styles.dialogCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.dialogConfirmBtn} onPress={handleSaveForm}>
+                    <Text style={styles.dialogConfirmText}>Save Campus</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : actionType === 'set_semester_dates' ? (
+              /* 18. SET SEMESTER DATES */
+              <View>
+                <Text style={styles.dialogTitle}>Academic Semester Schedule</Text>
+                <Text style={styles.dialogSub}>
+                  {actionTargetItem?.course_name || 'Program'} - Sem {actionTargetItem?.semester_number || '1'}
+                </Text>
+                <TextInput
+                  style={styles.dialogSingleInput}
+                  placeholder="Start Date (YYYY-MM-DD)"
+                  value={formStartDate}
+                  onChangeText={setFormStartDate}
+                />
+                <TextInput
+                  style={styles.dialogSingleInput}
+                  placeholder="End Date (YYYY-MM-DD)"
+                  value={formEndDate}
+                  onChangeText={setFormEndDate}
+                />
+                <View style={styles.dialogBtnRow}>
+                  <TouchableOpacity
+                    style={styles.dialogCancelBtn}
+                    onPress={() => setActionModalVisible(false)}
+                  >
+                    <Text style={styles.dialogCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.dialogConfirmBtn} onPress={handleSaveForm}>
+                    <Text style={styles.dialogConfirmText}>Save Dates</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -4551,5 +6361,314 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#64748B',
     fontWeight: '600',
+  },
+  // SDMS SETTINGS FULL CONSOLE STYLES
+  settingsContainer: {
+    paddingBottom: 24,
+  },
+  settingsCardsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  settingsNavCard: {
+    width: '48.5%',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  settingsNavCardActive: {
+    borderColor: '#2563EB',
+    backgroundColor: '#EFF6FF',
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  settingsCardIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  settingsNavCardTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  settingsNavCardTitleActive: {
+    color: '#1E3A8A',
+    fontWeight: '800',
+  },
+  settingsNavCardSub: {
+    fontSize: 9.5,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  settingsSummaryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 12,
+    backgroundColor: '#FFFFFF',
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  settingsSummaryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  settingsSummaryLabel: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  settingsSummaryVal: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  settingsSectionBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 12,
+    marginBottom: 12,
+  },
+  settingsSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  settingsSectionTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  settingsAddBtn: {
+    backgroundColor: '#1E3A8A',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  settingsAddBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  settingsColCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    backgroundColor: '#F8FAFC',
+    marginBottom: 6,
+  },
+  settingsColCardActive: {
+    borderColor: '#2563EB',
+    backgroundColor: '#EFF6FF',
+  },
+  colDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  settingsColTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  settingsColCode: {
+    fontSize: 10,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  settingsBatchInputRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 10,
+  },
+  settingsBatchInput: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 12,
+    color: '#0F172A',
+  },
+  settingsBatchAddBtn: {
+    backgroundColor: '#059669',
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  settingsBatchChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  settingsBatchChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  settingsBatchChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  settingsCourseCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    backgroundColor: '#F8FAFC',
+    marginBottom: 6,
+  },
+  settingsCourseCardActive: {
+    borderColor: '#7C3AED',
+    backgroundColor: '#FAF5FF',
+  },
+  settingsCourseTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  settingsCourseMeta: {
+    fontSize: 10,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  settingsBranchChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  settingsBranchChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  settingsHolidayCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+  },
+  settingsHolidayDate: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  settingsHolidayTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  settingsHolidaySub: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  settingsLayoutRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  settingsLayoutLabel: {
+    fontSize: 13,
+    color: '#334155',
+    fontWeight: '600',
+  },
+  settingsQrRoleChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#F8FAFC',
+  },
+  settingsQrRoleChipActive: {
+    borderColor: '#0D9488',
+    backgroundColor: '#0D9488',
+  },
+  settingsQrRoleChipText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  settingsQrRoleChipTextActive: {
+    color: '#FFFFFF',
+  },
+  settingsTransferPickerRow: {
+    marginBottom: 6,
+  },
+  settingsTransferPickerCol: {
+    marginBottom: 6,
+  },
+  settingsTransferPickerLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
+    marginBottom: 4,
+  },
+  settingsSaveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  settingsSaveBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
 });

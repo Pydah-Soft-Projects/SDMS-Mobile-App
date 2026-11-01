@@ -564,6 +564,257 @@ export const staffService = {
   },
 
   /**
+   * SDMS Institutional Settings APIs
+   */
+  // 1. Colleges
+  async getColleges(includeInactive = true) {
+    const res = await api.get(`/colleges?includeInactive=${includeInactive}`);
+    return res.data?.data || res.data || [];
+  },
+
+  async createCollege(data: { name: string; code?: string; address?: string; phone?: string; email?: string }) {
+    const res = await api.post('/colleges', data);
+    return res.data;
+  },
+
+  async updateCollege(id: number | string, data: any) {
+    const res = await api.put(`/colleges/${id}`, data);
+    return res.data;
+  },
+
+  async deleteCollege(id: number | string) {
+    const res = await api.delete(`/colleges/${id}?cascade=true`);
+    return res.data;
+  },
+
+  // 2. Programs / Courses
+  async getCourses(collegeId?: number | string) {
+    const params = collegeId ? { collegeId } : {};
+    const res = await api.get('/courses', { params });
+    return res.data?.data || res.data || [];
+  },
+
+  async createCourse(data: any) {
+    const res = await api.post('/courses', data);
+    return res.data;
+  },
+
+  async updateCourse(id: number | string, data: any) {
+    const res = await api.put(`/courses/${id}`, data);
+    return res.data;
+  },
+
+  async deleteCourse(id: number | string) {
+    const res = await api.delete(`/courses/${id}?cascade=true`);
+    return res.data;
+  },
+
+  // 3. Branches
+  async getBranches(courseId: number | string) {
+    const res = await api.get(`/courses/${courseId}/branches?includeInactive=true`);
+    return res.data?.data || res.data || [];
+  },
+
+  async createBranch(courseId: number | string, data: any) {
+    const res = await api.post(`/courses/${courseId}/branches`, data);
+    return res.data;
+  },
+
+  async deleteBranch(courseId: number | string, branchId: number | string) {
+    const res = await api.delete(`/courses/${courseId}/branches/${branchId}?cascade=true`);
+    return res.data;
+  },
+
+  // 4. Batches / Academic Years
+  async getBatches() {
+    const res = await api.get('/students/batches');
+    return res.data?.data || res.data || [];
+  },
+
+  async createAcademicYear(year: string) {
+    const res = await api.post('/academic-years', { year, is_active: true });
+    return res.data;
+  },
+
+  async deleteAcademicYear(id: number | string) {
+    const res = await api.delete(`/academic-years/${id}`);
+    return res.data;
+  },
+
+  // 5. Attendance Calendar Holidays
+  async getHolidays(year?: number | string) {
+    const res = await api.get('/calendar/non-working-days', {
+      params: year ? { year } : {},
+    });
+    return res.data?.data || res.data || [];
+  },
+
+  async createHoliday(data: { holiday_date: string; holiday_name: string; holiday_type?: string; description?: string }) {
+    const res = await api.post('/calendar/custom-holidays', data);
+    return res.data;
+  },
+
+  async deleteHoliday(holidayId: number | string) {
+    const res = await api.delete(`/calendar/custom-holidays/${holidayId}`);
+    return res.data;
+  },
+
+  // 6. Academic Calendar / Semesters
+  async getSemesters() {
+    const res = await api.get('/semesters');
+    return res.data?.data || res.data || [];
+  },
+
+  async saveSemester(payload: any) {
+    if (payload.id) {
+      const res = await api.put(`/semesters/${payload.id}`, payload);
+      return res.data;
+    }
+    const res = await api.post('/semesters', payload);
+    return res.data;
+  },
+
+  // 7. Registration Forms
+  async getRegistrationForms() {
+    const res = await api.get('/forms');
+    return res.data?.data || res.data || [];
+  },
+
+  async toggleRegistrationForm(formId: number | string, isActive: boolean) {
+    const res = await api.put(`/forms/${formId}`, { isActive });
+    return res.data;
+  },
+
+  // 8. Quotas
+  async getQuotas() {
+    const res = await api.get('/quotas?includeInactive=true');
+    return res.data?.data || res.data || [];
+  },
+
+  async createQuota(data: { name: string; code: string; is_active?: boolean }) {
+    const res = await api.post('/quotas', data);
+    return res.data;
+  },
+
+  async toggleQuota(id: number | string, isActive: boolean) {
+    const res = await api.put(`/quotas/${id}`, { is_active: isActive });
+    return res.data;
+  },
+
+  async deleteQuota(id: number | string) {
+    const res = await api.delete(`/quotas/${id}`);
+    return res.data;
+  },
+
+  // 9. Categories & Castes
+  async getCasteCategories() {
+    const res = await api.get('/caste-categories?includeInactive=true');
+    return res.data?.data || res.data || [];
+  },
+
+  async createCasteCategory(name: string) {
+    const res = await api.post('/caste-categories', { name, isActive: true });
+    return res.data;
+  },
+
+  async createCaste(categoryId: number | string, name: string) {
+    const res = await api.post(`/caste-categories/${categoryId}/castes`, { name, isActive: true });
+    return res.data;
+  },
+
+  async deleteCasteCategory(id: number | string) {
+    const res = await api.delete(`/caste-categories/${id}`);
+    return res.data;
+  },
+
+  async deleteCaste(categoryId: number | string, casteId: number | string) {
+    const res = await api.delete(`/caste-categories/${categoryId}/castes/${casteId}`);
+    return res.data;
+  },
+
+  // 10. Notifications Settings
+  async getNotificationSettings() {
+    const res = await api.get('/settings/notifications');
+    return res.data?.settings || res.data?.data || res.data || [];
+  },
+
+  async updateNotificationSettings(settings: any) {
+    const res = await api.put('/settings/notifications', { settings });
+    return res.data;
+  },
+
+  // 11. College Transfers
+  async transferStudents(payload: { studentIds: (number | string)[]; targetCollegeId: number | string; remarks?: string }) {
+    const res = await api.post('/students/transfers/bulk', payload);
+    return res.data;
+  },
+
+  // 12. Student Portal Layout
+  async getStudentLayout() {
+    const res = await api.get('/settings/student-layout');
+    return res.data?.layout || res.data?.data || res.data || [];
+  },
+
+  async updateStudentLayout(layout: any) {
+    const res = await api.put('/settings/student-layout', { layout });
+    return res.data;
+  },
+
+  // 13. QR Config
+  async getQrConfig() {
+    const res = await api.get('/settings/qr-config');
+    return res.data || {};
+  },
+
+  async saveQrConfig(payload: { roleConfigs: any; publicFields: any }) {
+    const res = await api.post('/settings/qr-config', payload);
+    return res.data;
+  },
+
+  // 14. RTF Amount Setup
+  async getRtfAmountConfig() {
+    const res = await api.get('/settings/rtf-amount');
+    return res.data?.config || res.data || {};
+  },
+
+  async saveRtfAmountConfig(config: any) {
+    const res = await api.put('/settings/rtf-amount', { config });
+    return res.data;
+  },
+
+  // 15. Frozen Batches
+  async getFrozenBatches() {
+    const res = await api.get('/settings/frozen-batches');
+    return res.data?.batches || res.data?.data || [];
+  },
+
+  async updateFrozenBatches(batches: string[]) {
+    const res = await api.put('/settings/frozen-batches', { batches });
+    return res.data;
+  },
+
+  // 16. Campuses
+  async getCampuses() {
+    const res = await api.get('/campuses');
+    return res.data?.data || res.data || [];
+  },
+
+  async createCampus(data: { name: string; location?: string; description?: string }) {
+    const res = await api.post('/campuses', data);
+    return res.data;
+  },
+
+  async updateCampus(id: number | string, data: any) {
+    const res = await api.put(`/campuses/${id}`, data);
+    return res.data;
+  },
+
+  async deleteCampus(id: number | string) {
+    const res = await api.delete(`/campuses/${id}`);
+    return res.data;
+  },
+
+  /**
    * Get Permitted Navigation Items for user
    */
   getPermittedNavItems(user: any): AdminNavItem[] {

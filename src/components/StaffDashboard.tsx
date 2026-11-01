@@ -46,6 +46,13 @@ import {
   UserCheck,
   CheckCircle,
   XCircle,
+  Layers,
+  Tags,
+  Bell,
+  Layout,
+  QrCode,
+  Lock,
+  MapPin,
 } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import Header from './Header';
@@ -168,6 +175,22 @@ export const StaffDashboard: React.FC = () => {
         return <UserCheck size={size} color={color} />;
       case 'Building2':
         return <Building2 size={size} color={color} />;
+      case 'Layers':
+        return <Layers size={size} color={color} />;
+      case 'Tags':
+        return <Tags size={size} color={color} />;
+      case 'Bell':
+        return <Bell size={size} color={color} />;
+      case 'Layout':
+        return <Layout size={size} color={color} />;
+      case 'QrCode':
+        return <QrCode size={size} color={color} />;
+      case 'GraduationCap':
+        return <GraduationCap size={size} color={color} />;
+      case 'Lock':
+        return <Lock size={size} color={color} />;
+      case 'MapPin':
+        return <MapPin size={size} color={color} />;
       case 'Settings':
       default:
         return <Settings size={size} color={color} />;

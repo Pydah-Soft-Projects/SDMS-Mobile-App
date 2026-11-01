@@ -11,12 +11,18 @@ import {
 import { Calendar, CheckCircle2, XCircle, Clock, AlertTriangle, CalendarDays } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import Header from '../../src/components/Header';
+import StaffAttendanceView from '../../src/components/StaffAttendanceView';
 import studentService from '../../src/services/studentService';
 import { StudentAttendanceData, AttendanceTotals } from '../../src/types';
 import logger from '../../src/utils/logger';
 
 export default function AttendanceScreen() {
-  const { user } = useAuth();
+  const { user, userType } = useAuth();
+
+  // If staff or admin user, render Staff Attendance Monitoring view
+  if (userType === 'staff' || userType === 'admin') {
+    return <StaffAttendanceView />;
+  }
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'semester' | 'monthly' | 'weekly'>('semester');

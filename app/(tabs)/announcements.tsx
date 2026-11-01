@@ -8,52 +8,28 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { Bell, AlertCircle, FileText, Calendar } from 'lucide-react-native';
+import { Bell, AlertCircle, Calendar } from 'lucide-react-native';
+import { useAuth } from '../../src/context/AuthContext';
 import Header from '../../src/components/Header';
 import announcementService from '../../src/services/announcementService';
 import { Announcement } from '../../src/types';
 
 export default function AnnouncementsScreen() {
+  const { userType } = useAuth();
+  const isStaff = userType === 'staff' || userType === 'admin';
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([
-    {
-      id: 1,
-      title: 'Mid-Term Examination Schedule Announced',
-      content:
-        'The Mid-Term theory examinations for all B.Tech branches will commence from next Monday. Please download the timetable from your portal.',
-      priority: 'high',
-      createdAt: '2026-10-28T09:30:00Z',
-      category: 'Exams',
-    },
-    {
-      id: 2,
-      title: 'Annual Campus Hackathon & Tech Fest 2026',
-      content:
-        'Registrations are now open for the campus Hackathon. Form teams of up to 4 members and register before Friday evening.',
-      priority: 'medium',
-      createdAt: '2026-10-26T14:15:00Z',
-      category: 'Events',
-    },
-    {
-      id: 3,
-      title: 'Fee Payment Deadline Extension',
-      content:
-        'The last date for semester tuition fee payment has been extended till 30th November 2026 without late fee charges.',
-      priority: 'urgent',
-      createdAt: '2026-10-24T11:00:00Z',
-      category: 'Accounts',
-    },
-  ]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
 
   const loadNotices = async () => {
     try {
-      const data = await announcementService.getStudentAnnouncements();
-      if (data && data.length > 0) {
-        setAnnouncements(data);
-      }
-    } catch (e) {
-      console.warn('Using default notices', e);
+      const data = isStaff
+        ? await announcementService.getAdminAnnouncements()
+        : await announcementService.getStudentAnnouncements();
+      setAnnouncements(data);
+    } catch {
+      setAnnouncements([]);
     } finally {
       setLoading(false);
     }
@@ -61,7 +37,7 @@ export default function AnnouncementsScreen() {
 
   useEffect(() => {
     loadNotices();
-  }, []);
+  }, [userType]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -82,53 +58,67 @@ export default function AnnouncementsScreen() {
 
   return (
     <View style={styles.container}>
-      <Header title="Circulars & Notices" subtitle="Official Campus Announcements" />
+      <Header
+        title={isStaff ? 'Campus Circulars' : 'Circulars & Notices'}
+        subtitle={isStaff ? 'SDMS Institutional Announcements' : 'Official Student Announcements'}
+      />
 
       {loading ? (
         <View style={styles.loader}>
           <ActivityIndicator size="large" color="#1E3A8A" />
+          <Text style={styles.loaderText}>Loading announcements...</Text>
         </View>
       ) : (
         <ScrollView
           contentContainerStyle={styles.content}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
-          {announcements.map((item) => {
-            const pStyle = getPriorityStyle(item.priority);
-            const formattedDate = new Date(item.createdAt).toLocaleDateString('en-IN', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-            });
+          {announcements.length > 0 ? (
+            announcements.map((item) => {
+              const pStyle = getPriorityStyle(item.priority);
+              const formattedDate = new Date(item.createdAt).toLocaleDateString('en-IN', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              });
 
-            return (
-              <View key={item.id} style={styles.card}>
-                <View style={styles.cardHeader}>
-                  <View style={[styles.priorityBadge, { backgroundColor: pStyle.bg }]}>
-                    <AlertCircle size={12} color={pStyle.text} />
-                    <Text style={[styles.priorityText, { color: pStyle.text }]}>
-                      {item.priority.toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={styles.dateRow}>
-                    <Calendar size={12} color="#94A3B8" />
-                    <Text style={styles.dateText}>{formattedDate}</Text>
-                  </View>
-                </View>
-
-                <Text style={styles.title}>{item.title}</Text>
-                <Text style={styles.body}>{item.content}</Text>
-
-                {item.category && (
-                  <View style={styles.footerRow}>
-                    <View style={styles.categoryPill}>
-                      <Text style={styles.categoryText}>#{item.category}</Text>
+              return (
+                <View key={item.id} style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <View style={[styles.priorityBadge, { backgroundColor: pStyle.bg }]}>
+                      <AlertCircle size={12} color={pStyle.text} />
+                      <Text style={[styles.priorityText, { color: pStyle.text }]}>
+                        {item.priority.toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={styles.dateRow}>
+                      <Calendar size={12} color="#94A3B8" />
+                      <Text style={styles.dateText}>{formattedDate}</Text>
                     </View>
                   </View>
-                )}
-              </View>
-            );
-          })}
+
+                  <Text style={styles.title}>{item.title}</Text>
+                  <Text style={styles.body}>{item.content}</Text>
+
+                  {item.category && (
+                    <View style={styles.footerRow}>
+                      <View style={styles.categoryPill}>
+                        <Text style={styles.categoryText}>#{item.category}</Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              );
+            })
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Bell size={32} color="#CBD5E1" />
+              <Text style={styles.emptyTitle}>No Announcements</Text>
+              <Text style={styles.emptyText}>
+                There are no active circulars posted in SDMS at this time.
+              </Text>
+            </View>
+          )}
         </ScrollView>
       )}
     </View>
@@ -144,6 +134,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+  },
+  loaderText: {
+    fontSize: 13,
+    color: '#64748B',
   },
   content: {
     padding: 16,
@@ -153,14 +148,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
     padding: 18,
-    marginBottom: 14,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -200,7 +190,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#475569',
     lineHeight: 20,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   footerRow: {
     flexDirection: 'row',
@@ -216,5 +206,21 @@ const styles = StyleSheet.create({
     color: '#64748B',
     fontWeight: '600',
   },
+  emptyContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginTop: 8,
+  },
+  emptyText: {
+    fontSize: 13,
+    color: '#94A3B8',
+    textAlign: 'center',
+  },
 });
-

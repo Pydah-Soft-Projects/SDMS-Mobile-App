@@ -13,13 +13,19 @@ import { CreditCard, CheckCircle2, Clock, ShieldCheck, Download, AlertCircle } f
 import { useAuth } from '../../src/context/AuthContext';
 import Header from '../../src/components/Header';
 import CustomButton from '../../src/components/CustomButton';
+import StaffFeesView from '../../src/components/StaffFeesView';
 import studentService from '../../src/services/studentService';
 import feeService from '../../src/services/feeService';
 import { StudentFeeDetails } from '../../src/types';
 import logger from '../../src/utils/logger';
 
 export default function FeesScreen() {
-  const { user } = useAuth();
+  const { user, userType } = useAuth();
+
+  // If staff or admin user, render Staff Accounts & Fee Ledgers view
+  if (userType === 'staff' || userType === 'admin') {
+    return <StaffFeesView />;
+  }
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [paying, setPaying] = useState(false);

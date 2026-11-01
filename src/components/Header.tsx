@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { LogOut } from 'lucide-react-native';
+import { LogOut, Terminal } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { getStaticFileUrl } from '../config/api';
+import LogViewerModal from './LogViewerModal';
 
 interface HeaderProps {
   title: string;
@@ -12,31 +13,45 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ title, subtitle, showLogout = true }) => {
   const { user, logout } = useAuth();
+  const [showLogs, setShowLogs] = useState(false);
   const avatarUrl = (user as any)?.avatarUrl ? getStaticFileUrl((user as any).avatarUrl) : null;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.titleContainer}>
-        <Text style={styles.title}>{title}</Text>
-        {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
-      </View>
-      <View style={styles.actions}>
-        {avatarUrl ? (
-          <Image source={{ uri: avatarUrl }} style={styles.avatar} />
-        ) : (
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarText}>
-              {(user?.name || (user as any)?.username || 'U')[0].toUpperCase()}
-            </Text>
-          </View>
-        )}
-        {showLogout && (
-          <TouchableOpacity onPress={logout} style={styles.logoutBtn} hitSlop={10}>
-            <LogOut size={20} color="#EF4444" />
+    <>
+      <View style={styles.container}>
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>{title}</Text>
+          {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+        </View>
+        <View style={styles.actions}>
+          <TouchableOpacity
+            onPress={() => setShowLogs(true)}
+            style={styles.terminalBtn}
+            hitSlop={8}
+          >
+            <Terminal size={18} color="#1E3A8A" />
           </TouchableOpacity>
-        )}
+
+          {avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarText}>
+                {(user?.name || (user as any)?.username || 'U')[0].toUpperCase()}
+              </Text>
+            </View>
+          )}
+
+          {showLogout && (
+            <TouchableOpacity onPress={logout} style={styles.logoutBtn} hitSlop={10}>
+              <LogOut size={18} color="#EF4444" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
-    </View>
+
+      <LogViewerModal visible={showLogs} onClose={() => setShowLogs(false)} />
+    </>
   );
 };
 
@@ -68,7 +83,12 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
+  },
+  terminalBtn: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#EEF2FF',
   },
   avatar: {
     width: 36,
@@ -91,11 +111,10 @@ const styles = StyleSheet.create({
     color: '#1E3A8A',
   },
   logoutBtn: {
-    padding: 6,
+    padding: 8,
     borderRadius: 8,
     backgroundColor: '#FEE2E2',
   },
 });
 
 export default Header;
-

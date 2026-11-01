@@ -8,13 +8,16 @@ import {
   Platform,
   TouchableOpacity,
   Image,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { User, Lock, Mail, Eye, EyeOff } from 'lucide-react-native';
+import { User, Lock, Mail, Eye, EyeOff, Terminal, Settings } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import CustomInput from '../../src/components/CustomInput';
 import CustomButton from '../../src/components/CustomButton';
+import LogViewerModal from '../../src/components/LogViewerModal';
 import { ENV } from '../../src/config/env';
+import logger from '../../src/utils/logger';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -26,38 +29,70 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
 
   const handleLogin = async () => {
     setError(null);
-    if (!identifier.trim()) {
-      setError(activeTab === 'student' ? 'Please enter your Roll Number or Email' : 'Please enter your Username or Email');
+    const cleanId = identifier.trim();
+
+    if (!cleanId) {
+      const err = activeTab === 'student' ? 'Please enter your Roll Number or Email' : 'Please enter your Username or Email';
+      setError(err);
+      logger.warn('LOGIN_UI', `Validation failed: ${err}`);
       return;
     }
     if (!password) {
       setError('Please enter your password');
+      logger.warn('LOGIN_UI', 'Validation failed: Password missing');
       return;
     }
 
     setLoading(true);
+    logger.info('LOGIN_UI', `User initiated ${activeTab.toUpperCase()} login for "${cleanId}" targeting ${ENV.apiUrl}`);
+
     try {
       if (activeTab === 'student') {
         await studentLogin({
-          rollNumber: identifier.trim(),
+          rollNumber: cleanId,
+          username: cleanId,
           password,
         });
       } else {
         await staffLogin({
-          username: identifier.trim(),
+          username: cleanId,
+          email: cleanId,
           password,
         });
       }
+      logger.info('LOGIN_UI', `Login flow completed successfully! Redirecting...`);
     } catch (err: any) {
-      const msg =
+      const status = err.response?.status;
+      const serverMsg =
         err.response?.data?.message ||
         err.response?.data?.error ||
         err.message ||
-        'Login failed. Please verify your credentials and network connection.';
-      setError(msg);
+        'Connection to backend failed.';
+
+      const formattedError = `[Status ${status || 'Network Error'}] ${serverMsg}`;
+      setError(formattedError);
+
+      logger.error('LOGIN_UI', `Login failed: ${formattedError}`, {
+        url: `${ENV.apiUrl}${activeTab === 'student' ? '/students/login' : '/auth/unified-login'}`,
+        status,
+        response: err.response?.data,
+      });
+
+      // Show alert if network connection fails completely
+      if (!err.response) {
+        Alert.alert(
+          'Network Connection Error',
+          `Could not connect to backend server at:\n${ENV.apiUrl}\n\nMake sure your backend is running and that your mobile device is on the same Wi-Fi network. Tap "View Logs / Config" at the top to change the server IP.`,
+          [
+            { text: 'View Logs', onPress: () => setShowLogs(true) },
+            { text: 'OK' },
+          ]
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -68,6 +103,22 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.container}
     >
+      {/* Top Utility Bar */}
+      <View style={styles.topUtilityBar}>
+        <TouchableOpacity
+          style={styles.logPill}
+          onPress={() => setShowLogs(true)}
+          activeOpacity={0.7}
+        >
+          <Terminal size={14} color="#1E3A8A" />
+          <Text style={styles.logPillText}>View Logs / IP</Text>
+        </TouchableOpacity>
+
+        <View style={[styles.envBadge, ENV.isProd ? styles.envProd : styles.envDev]}>
+          <Text style={styles.envText}>EAS: {ENV.appEnv.toUpperCase()}</Text>
+        </View>
+      </View>
+
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         {/* College Logo / Header */}
         <View style={styles.header}>
@@ -78,11 +129,6 @@ export default function LoginScreen() {
           />
           <Text style={styles.appName}>Pydah Educational Academy</Text>
           <Text style={styles.appSubtitle}>Student & Staff Management Portal</Text>
-          
-          {/* EAS Environment Indicator */}
-          <View style={[styles.envBadge, ENV.isProd ? styles.envProd : styles.envDev]}>
-            <Text style={styles.envText}>EAS: {ENV.appEnv.toUpperCase()}</Text>
-          </View>
         </View>
 
         {/* Segmented Switcher */}
@@ -92,6 +138,7 @@ export default function LoginScreen() {
             onPress={() => {
               setActiveTab('student');
               setError(null);
+              logger.info('LOGIN_UI', 'Switched tab to: Student');
             }}
           >
             <Text style={[styles.segmentText, activeTab === 'student' && styles.segmentTextActive]}>
@@ -103,6 +150,7 @@ export default function LoginScreen() {
             onPress={() => {
               setActiveTab('staff');
               setError(null);
+              logger.info('LOGIN_UI', 'Switched tab to: Staff');
             }}
           >
             <Text style={[styles.segmentText, activeTab === 'staff' && styles.segmentTextActive]}>
@@ -120,8 +168,8 @@ export default function LoginScreen() {
 
         {/* Inputs */}
         <CustomInput
-          label={activeTab === 'student' ? 'Roll Number / Email' : 'Username / Email'}
-          placeholder={activeTab === 'student' ? 'e.g. 21A91A0501 or email' : 'e.g. faculty_admin'}
+          label={activeTab === 'student' ? 'Roll Number / PIN / Email' : 'Username / Email'}
+          placeholder={activeTab === 'student' ? 'e.g. 21A91A0501 or PIN' : 'e.g. staff_username'}
           value={identifier}
           onChangeText={setIdentifier}
           autoCapitalize="none"
@@ -155,11 +203,17 @@ export default function LoginScreen() {
           style={styles.submitBtn}
         />
 
-        {/* Backend Host Reference */}
-        <Text style={styles.serverInfo}>
-          Connecting to backend: {ENV.apiUrl}
-        </Text>
+        {/* Backend Host & Log Trigger Footer */}
+        <TouchableOpacity onPress={() => setShowLogs(true)} style={styles.serverInfoBtn}>
+          <Text style={styles.serverInfo}>
+            Connecting to: <Text style={styles.serverInfoBold}>{ENV.apiUrl}</Text>
+          </Text>
+          <Text style={styles.serverInfoHint}>(Tap to inspect logs & change IP)</Text>
+        </TouchableOpacity>
       </ScrollView>
+
+      {/* In-App Live Log Viewer Modal */}
+      <LogViewerModal visible={showLogs} onClose={() => setShowLogs(false)} />
     </KeyboardAvoidingView>
   );
 }
@@ -169,39 +223,62 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
+  topUtilityBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'android' ? 44 : 54,
+    paddingBottom: 8,
+  },
+  logPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  logPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1E3A8A',
+  },
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 60,
+    paddingTop: 20,
     paddingBottom: 40,
     justifyContent: 'center',
   },
   header: {
     alignItems: 'center',
-    marginBottom: 28,
+    marginBottom: 24,
   },
   logo: {
-    width: 80,
-    height: 80,
-    marginBottom: 16,
+    width: 76,
+    height: 76,
+    marginBottom: 12,
   },
   appName: {
-    fontSize: 22,
+    fontSize: 21,
     fontWeight: '800',
     color: '#1E3A8A',
     textAlign: 'center',
   },
   appSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#64748B',
     marginTop: 4,
     textAlign: 'center',
   },
   envBadge: {
-    marginTop: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   envDev: {
     backgroundColor: '#FEF3C7',
@@ -219,7 +296,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
     borderRadius: 12,
     padding: 4,
-    marginBottom: 24,
+    marginBottom: 20,
   },
   segmentBtn: {
     flex: 1,
@@ -254,7 +331,8 @@ const styles = StyleSheet.create({
   errorBannerText: {
     color: '#B91C1C',
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '600',
+    lineHeight: 18,
   },
   actionsRow: {
     alignItems: 'flex-end',
@@ -268,11 +346,23 @@ const styles = StyleSheet.create({
   submitBtn: {
     marginTop: 4,
   },
+  serverInfoBtn: {
+    marginTop: 20,
+    alignItems: 'center',
+    padding: 8,
+  },
   serverInfo: {
-    marginTop: 24,
     fontSize: 11,
-    color: '#94A3B8',
+    color: '#64748B',
     textAlign: 'center',
   },
+  serverInfoBold: {
+    fontWeight: '700',
+    color: '#1E3A8A',
+  },
+  serverInfoHint: {
+    fontSize: 10,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
 });
-

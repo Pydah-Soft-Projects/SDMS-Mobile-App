@@ -1,6 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, STATIC_BASE_URL } from './env';
+import logger from '../utils/logger';
 
 export const STORAGE_KEYS = {
   TOKEN: 'pydah_auth_token',
@@ -11,7 +12,7 @@ export const STORAGE_KEYS = {
 // Create configured Axios instance
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 45000,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -25,42 +26,65 @@ export const setSessionExpiryHandler = (handler: SessionExpiryListener) => {
   onSessionExpiry = handler;
 };
 
-// Request Interceptor: Attach JWT bearer token
+// Request Interceptor: Attach JWT bearer token & log outgoing call
 api.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
+    // Keep baseURL synchronized with any runtime change
+    config.baseURL = API_BASE_URL;
+
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
       if (token && config.headers) {
         config.headers.Authorization = `Bearer ${token}`;
       }
     } catch (e) {
-      console.warn('Failed to retrieve auth token for request', e);
+      logger.warn('API', 'Failed to retrieve auth token for request', e);
     }
+
+    const fullUrl = `${config.baseURL || ''}${config.url || ''}`;
+    logger.apiReq(config.method || 'GET', fullUrl, config.data);
+
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    logger.error('API', 'Request preparation error', error.message);
+    return Promise.reject(error);
+  }
 );
 
 // Response Interceptor: Handle errors and 401 Unauthorized
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const fullUrl = `${response.config.baseURL || ''}${response.config.url || ''}`;
+    logger.apiRes(response.status, fullUrl, response.data);
+    return response;
+  },
   async (error: AxiosError) => {
     if (axios.isCancel(error)) {
+      logger.warn('API', 'Request canceled', error.message);
       return Promise.reject(error);
     }
 
     const status = error.response?.status;
-    const url = error.config?.url || '';
+    const fullUrl = `${error.config?.baseURL || ''}${error.config?.url || ''}`;
+    const errData = error.response?.data as any;
+    const errMsg = errData?.message || errData?.error || error.message || 'Network Error';
+
+    logger.apiErr(fullUrl, `HTTP ${status || 'ERR'}: ${errMsg}`, {
+      status,
+      data: errData,
+      networkError: !error.response,
+    });
 
     // Ignore 401 for explicit login attempts
     const isLoginEndpoint =
-      url.includes('/login') ||
-      url.includes('/unified-login') ||
-      url.includes('/otp/verify') ||
-      url.includes('/sso-session');
+      fullUrl.includes('/login') ||
+      fullUrl.includes('/unified-login') ||
+      fullUrl.includes('/otp/verify') ||
+      fullUrl.includes('/sso-session');
 
     if (status === 401 && !isLoginEndpoint) {
-      console.warn('Session expired or unauthorized - clearing credentials');
+      logger.warn('AUTH', 'Session expired (401) - clearing credentials');
       try {
         await AsyncStorage.multiRemove([
           STORAGE_KEYS.TOKEN,
@@ -71,7 +95,7 @@ api.interceptors.response.use(
           onSessionExpiry();
         }
       } catch (e) {
-        console.error('Error clearing session storage', e);
+        logger.error('AUTH', 'Error clearing session storage', e);
       }
     }
 
@@ -79,13 +103,12 @@ api.interceptors.response.use(
   }
 );
 
-// Helper function to resolve static file/upload URLs (avatars, receipts, certificates)
+// Helper function to resolve static file/upload URLs
 export const getStaticFileUrl = (path?: string | null): string => {
   if (!path) return '';
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
   if (path.startsWith('data:')) return path;
 
-  // Clean relative slashes
   const cleanPath = path.startsWith('/') ? path.substring(1) : path;
   if (cleanPath.startsWith('uploads/')) {
     return `${STATIC_BASE_URL}/${cleanPath}`;
@@ -94,4 +117,3 @@ export const getStaticFileUrl = (path?: string | null): string => {
 };
 
 export default api;
-

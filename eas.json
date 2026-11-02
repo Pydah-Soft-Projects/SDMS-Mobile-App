@@ -18,7 +18,8 @@
       },
       "ios": {
         "simulator": true
-      }
+      },
+      "channel": "development"
     },
     "preview": {
       "distribution": "internal",
@@ -30,7 +31,8 @@
       },
       "android": {
         "buildType": "apk"
-      }
+      },
+      "channel": "preview"
     },
     "production-apk": {
       "distribution": "internal",
@@ -42,7 +44,8 @@
         "EXPO_PUBLIC_API_URL": "https://sdms.pydah.edu.in/api",
         "EXPO_PUBLIC_CRM_BACKEND_URL": "https://crm.pydah.edu.in",
         "EXPO_PUBLIC_GATEWAY_URL": "https://sdms.pydah.edu.in/api/v1"
-      }
+      },
+      "channel": "preview"
     },
     "production": {
       "autoIncrement": true,
@@ -55,7 +58,8 @@
         "EXPO_PUBLIC_API_URL": "https://sdms.pydah.edu.in/api",
         "EXPO_PUBLIC_CRM_BACKEND_URL": "https://crm.pydah.edu.in",
         "EXPO_PUBLIC_GATEWAY_URL": "https://sdms.pydah.edu.in/api/v1"
-      }
+      },
+      "channel": "production"
     }
   },
   "submit": {

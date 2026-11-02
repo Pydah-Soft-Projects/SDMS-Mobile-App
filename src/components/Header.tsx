@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Platform, StatusBar as RNStatusBar } from 'react-native';
-import { Menu, BellRing } from 'lucide-react-native';
+import { Menu, Bell } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { StudentSidebarDrawer } from './StudentSidebarDrawer';
@@ -69,7 +69,10 @@ export const Header: React.FC<HeaderProps> = ({
               style={styles.bellBtn}
               hitSlop={8}
             >
-              <BellRing size={20} color="#1E3A8A" />
+              <Bell size={18} color="#1E3A8A" />
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>2</Text>
+              </View>
             </TouchableOpacity>
           )}
         </View>
@@ -154,6 +157,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 8,
     backgroundColor: '#F1F5F9',
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: '#EF4444',
+    borderRadius: 7,
+    minWidth: 14,
+    height: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  bellBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
   },
 });
 

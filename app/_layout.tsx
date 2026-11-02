@@ -1,59 +1,14 @@
 import React, { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, Alert, Platform, View } from 'react-native';
-import * as Updates from 'expo-updates';
+import { ActivityIndicator, View } from 'react-native';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import logger from '../src/utils/logger';
 
 function RootNavigation() {
   const { isAuthenticated, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
-
-  useEffect(() => {
-    if (isLoading || Platform.OS === 'web' || !Updates.isEnabled) return;
-
-    let active = true;
-    const checkForUpdate = async () => {
-      try {
-        const result = await Updates.checkForUpdateAsync();
-        if (!active || !result.isAvailable) return;
-
-        Alert.alert(
-          'Update available',
-          'A new version of the app is ready to download.',
-          [
-            { text: 'Later', style: 'cancel' },
-            {
-              text: 'Update',
-              onPress: async () => {
-                try {
-                  const download = await Updates.fetchUpdateAsync();
-                  if (!download.isNew) return;
-                  await Updates.reloadAsync();
-                } catch (error) {
-                  logger.error('UPDATES', 'Failed to download or apply update', error);
-                  Alert.alert(
-                    'Update failed',
-                    'The update could not be installed. Please try again later.'
-                  );
-                }
-              },
-            },
-          ]
-        );
-      } catch (error) {
-        logger.error('UPDATES', 'Failed to check for an update', error);
-      }
-    };
-
-    checkForUpdate();
-    return () => {
-      active = false;
-    };
-  }, [isLoading]);
 
   useEffect(() => {
     if (isLoading) return;
@@ -99,3 +54,4 @@ export default function RootLayout() {
     </SafeAreaProvider>
   );
 }
+

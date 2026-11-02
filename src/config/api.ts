@@ -106,15 +106,25 @@ export const getStaticFileUrl = (path?: string | null): string => {
     return path.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, STATIC_BASE_URL);
   }
 
-  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  // Force HTTPS on all hosted Pydah domains to prevent Android cleartext HTTP blocking
+  let resolved = path.trim();
+  if (resolved.startsWith('http://sdms.pydah.edu.in')) {
+    resolved = resolved.replace(/^http:\/\/sdms\.pydah\.edu\.in/i, 'https://sdms.pydah.edu.in');
+  } else if (resolved.startsWith('http://crm.pydah.edu.in')) {
+    resolved = resolved.replace(/^http:\/\/crm\.pydah\.edu\.in/i, 'https://crm.pydah.edu.in');
+  } else if (STATIC_BASE_URL.startsWith('https://') && resolved.startsWith('http://') && resolved.includes('pydah.edu.in')) {
+    resolved = resolved.replace(/^http:/i, 'https:');
+  }
+
+  if (resolved.startsWith('http://') || resolved.startsWith('https://')) return resolved;
 
   // Handle direct API paths like /api/announcements/1/image
-  if (path.startsWith('/api/') || path.startsWith('api/')) {
+  if (resolved.startsWith('/api/') || resolved.startsWith('api/')) {
     const cleanPath = path.startsWith('/') ? path : `/${path}`;
     return `${STATIC_BASE_URL}${cleanPath}`;
   }
 
-  const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+  const cleanPath = resolved.startsWith('/') ? resolved.substring(1) : resolved;
   if (cleanPath.startsWith('uploads/')) {
     return `${STATIC_BASE_URL}/${cleanPath}`;
   }

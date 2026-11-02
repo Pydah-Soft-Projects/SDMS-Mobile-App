@@ -19,6 +19,24 @@ import announcementService from '../../src/services/announcementService';
 import { Announcement } from '../../src/types';
 import { getStaticFileUrl } from '../../src/config/api';
 
+const SafeAnnouncementImage: React.FC<{ uri?: string | null; style: any }> = ({ uri, style }) => {
+  const [loadError, setLoadError] = useState(false);
+  const fallback = require('../../assets/pydah-logo.png');
+
+  if (!uri || loadError) {
+    return <Image source={fallback} style={style} resizeMode="contain" />;
+  }
+
+  return (
+    <Image
+      source={{ uri: getStaticFileUrl(uri) }}
+      style={style}
+      resizeMode="cover"
+      onError={() => setLoadError(true)}
+    />
+  );
+};
+
 
 export default function AnnouncementsScreen() {
   const insets = useSafeAreaInsets();
@@ -114,15 +132,7 @@ export default function AnnouncementsScreen() {
 
                   <Text style={styles.title}>{item.title}</Text>
                   <View style={styles.cardImageWrapper}>
-                    <Image
-                      source={
-                        item.imageUrl
-                          ? { uri: getStaticFileUrl(item.imageUrl) }
-                          : require('../../assets/pydah-logo.png')
-                      }
-                      style={styles.cardImage}
-                      resizeMode="cover"
-                    />
+                    <SafeAnnouncementImage uri={item.imageUrl} style={styles.cardImage} />
                   </View>
                   <Text style={styles.body}>{item.content}</Text>
                   {item.attachmentUrl ? (

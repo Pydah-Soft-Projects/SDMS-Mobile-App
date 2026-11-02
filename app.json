@@ -16,7 +16,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1E3A8A"
       },
-      "package": "com.pydahsoft.studentapp"
+      "package": "com.pydahsoft.studentapp",
+      "usesCleartextTraffic": true
     },
     "web": {
       "bundler": "metro",

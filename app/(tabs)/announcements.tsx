@@ -118,7 +118,7 @@ export default function AnnouncementsScreen() {
                       source={
                         item.imageUrl
                           ? { uri: getStaticFileUrl(item.imageUrl) }
-                          : require('../../assets/announcement-fallback.jpg')
+                          : require('../../assets/pydah-logo.png')
                       }
                       style={styles.cardImage}
                       resizeMode="cover"

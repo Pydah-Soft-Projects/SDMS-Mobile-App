@@ -394,7 +394,7 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
                           source={
                             item.image_url || item.banner_image
                               ? { uri: getStaticFileUrl(item.image_url || item.banner_image) }
-                              : require('../../assets/announcement-fallback.jpg')
+                              : require('../../assets/pydah-logo.png')
                           }
                           style={styles.cardBannerImg}
                           resizeMode="cover"
@@ -888,7 +888,7 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
                               ? { uri: getStaticFileUrl(item.image_url || item.image || item.club_image) }
                               : (item.has_image || item.id)
                               ? { uri: getStaticFileUrl(`/api/clubs/${item.id}/image`) }
-                              : require('../../assets/announcement-fallback.jpg')
+                              : require('../../assets/pydah-logo.png')
                           }
                           style={styles.cardBannerImg}
                           resizeMode="cover"

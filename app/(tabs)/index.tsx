@@ -60,7 +60,7 @@ import { StudentModuleDetailModal, StudentModuleItem } from '../../src/component
 import { getStaticFileUrl } from '../../src/config/api';
 const SafeEventImage: React.FC<{ uri?: string | null; style: any }> = ({ uri, style }) => {
   const [loadError, setLoadError] = useState(false);
-  const fallback = require('../../assets/announcement-fallback.jpg');
+  const fallback = require('../../assets/pydah-logo.png');
 
   if (!uri || loadError) {
     return <Image source={fallback} style={style} resizeMode="cover" />;
@@ -78,7 +78,7 @@ const SafeEventImage: React.FC<{ uri?: string | null; style: any }> = ({ uri, st
 
 const SafeClubImage: React.FC<{ club: any; style: any }> = ({ club, style }) => {
   const [loadError, setLoadError] = useState(false);
-  const fallback = require('../../assets/announcement-fallback.jpg');
+  const fallback = require('../../assets/pydah-logo.png');
   const clubImg = club.image_url || club.image || club.club_image;
   const clubUrl = clubImg
     ? getStaticFileUrl(clubImg)

@@ -32,7 +32,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#1E3A8A"
         }
-      ]
+      ],
+      "expo-widgets"
     ],
     "experiments": {
       "typedRoutes": true
@@ -46,6 +47,13 @@
       "eas": {
         "projectId": "dfd664bd-0f17-41a3-a4d3-05e1ecb72fcb"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/dfd664bd-0f17-41a3-a4d3-05e1ecb72fcb",
+      "checkAutomatically": "NEVER"
     }
   }
 }

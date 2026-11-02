@@ -7,6 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
+  Animated,
   SafeAreaView,
   Image,
 } from 'react-native';
@@ -43,6 +44,7 @@ import studentService from '../services/studentService';
 import { StudentModuleItem, StudentModuleDetailModal } from './StudentModuleDetailModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const DRAWER_WIDTH = Math.min(SCREEN_WIDTH * 0.86, 350);
 
 export interface SDMSModuleItem extends StudentModuleItem {
   layoutKey: string;
@@ -270,6 +272,39 @@ export const StudentSidebarDrawer: React.FC<StudentSidebarDrawerProps> = ({
   );
   const [selectedModule, setSelectedModule] = useState<StudentModuleItem | null>(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [modalVisible, setModalVisible] = useState(visible);
+  const drawerTranslateX = React.useRef(new Animated.Value(-DRAWER_WIDTH)).current;
+  const hasOpened = React.useRef(visible);
+
+  useEffect(() => {
+    drawerTranslateX.stopAnimation();
+
+    if (visible) {
+      hasOpened.current = true;
+      drawerTranslateX.setValue(-DRAWER_WIDTH);
+      setModalVisible(true);
+      Animated.spring(drawerTranslateX, {
+        toValue: 0,
+        useNativeDriver: true,
+        damping: 24,
+        stiffness: 220,
+      }).start();
+      return;
+    }
+
+    if (hasOpened.current) {
+      Animated.timing(drawerTranslateX, {
+        toValue: -DRAWER_WIDTH,
+        duration: 200,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished) {
+          hasOpened.current = false;
+          setModalVisible(false);
+        }
+      });
+    }
+  }, [visible, drawerTranslateX]);
 
   // Directly fetch SDMS Student Portal Layout settings if not provided
   useEffect(() => {
@@ -348,11 +383,14 @@ export const StudentSidebarDrawer: React.FC<StudentSidebarDrawerProps> = ({
 
   return (
     <>
-      <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+      <Modal visible={modalVisible} animationType="none" transparent onRequestClose={onClose}>
         <View style={styles.overlay}>
-          <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
-
-          <View style={styles.drawerContainer}>
+          <Animated.View
+            style={[
+              styles.drawerContainer,
+              { transform: [{ translateX: drawerTranslateX }] },
+            ]}
+          >
             <SafeAreaView style={styles.safeArea}>
               {/* Student Profile Header */}
               <View style={styles.profileHeader}>
@@ -451,7 +489,9 @@ export const StudentSidebarDrawer: React.FC<StudentSidebarDrawerProps> = ({
                 </TouchableOpacity>
               </ScrollView>
             </SafeAreaView>
-          </View>
+          </Animated.View>
+
+          <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
         </View>
       </Modal>
 
@@ -464,17 +504,18 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     flexDirection: 'row',
+    backgroundColor: 'transparent',
   },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
   },
   drawerContainer: {
-    width: Math.min(SCREEN_WIDTH * 0.86, 350),
+    width: DRAWER_WIDTH,
     backgroundColor: '#FFFFFF',
     height: '100%',
     shadowColor: '#000',
-    shadowOffset: { width: -3, height: 0 },
+    shadowOffset: { width: 3, height: 0 },
     shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 16,

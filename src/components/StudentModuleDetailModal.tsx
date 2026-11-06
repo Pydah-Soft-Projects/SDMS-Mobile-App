@@ -37,6 +37,11 @@ import {
   CheckCircle2,
   FolderOpen,
   Plus,
+  RefreshCw,
+  Star,
+  Eye,
+  MapPin,
+  RotateCcw,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import api, { getStaticFileUrl } from '../config/api';
@@ -108,6 +113,94 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
     room_no: '',
   });
   const [submittingComplaint, setSubmittingComplaint] = useState(false);
+  const [complaintFilter, setComplaintFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
+  const [refreshingComplaints, setRefreshingComplaints] = useState(false);
+  const [reopeningTicketId, setReopeningTicketId] = useState<number | string | null>(null);
+  const [selectedTicketForDetails, setSelectedTicketForDetails] = useState<any | null>(null);
+  const [showTicketDetailsModal, setShowTicketDetailsModal] = useState(false);
+  const [selectedTicketForFeedback, setSelectedTicketForFeedback] = useState<any | null>(null);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+
+  const handleRefreshComplaints = async () => {
+    try {
+      setRefreshingComplaints(true);
+      const [ticketsRes, catsRes] = await Promise.all([
+        api.get('/tickets/student/my-tickets').catch(() => ({ data: { data: [] } })),
+        api.get('/complaint-categories/active').catch(() => ({ data: { data: [] } })),
+      ]);
+      setData(ticketsRes.data?.data || ticketsRes.data?.tickets || []);
+      setComplaintCategories(catsRes.data?.data || []);
+    } catch (_) {
+      // silently proceed
+    } finally {
+      setRefreshingComplaints(false);
+    }
+  };
+
+  const handleReopenComplaint = (ticketItem: any) => {
+    if (!ticketItem?.id) return;
+    const ticketIdLabel = ticketItem.complaint_number || ticketItem.ticket_number || ticketItem.id;
+    Alert.alert(
+      'Re-Raise Complaint',
+      `Are you sure you want to re-raise complaint #${ticketIdLabel}? The campus maintenance team will reopen it as pending.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Yes, Re-Raise',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setReopeningTicketId(ticketItem.id);
+              await api.post(`/tickets/${ticketItem.id}/reopen`);
+              Alert.alert('Complaint Reopened', 'The complaint status has been changed back to pending.');
+              await handleRefreshComplaints();
+              if (selectedTicketForDetails?.id === ticketItem.id) {
+                setShowTicketDetailsModal(false);
+                setSelectedTicketForDetails(null);
+              }
+            } catch (err: any) {
+              Alert.alert('Reopen Error', err.response?.data?.message || 'Failed to reopen complaint.');
+            } finally {
+              setReopeningTicketId(null);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleOpenFeedback = (ticketItem: any) => {
+    setSelectedTicketForFeedback(ticketItem);
+    setFeedbackRating(5);
+    setFeedbackText('');
+    setShowFeedbackModal(true);
+  };
+
+  const handleSubmitFeedback = async () => {
+    if (!selectedTicketForFeedback?.id) return;
+    try {
+      setSubmittingFeedback(true);
+      await api.post(`/tickets/${selectedTicketForFeedback.id}/feedback`, {
+        rating: feedbackRating,
+        feedback_text: feedbackText.trim() || undefined,
+      });
+      Alert.alert('Thank You', 'Your feedback has been submitted successfully.');
+      setShowFeedbackModal(false);
+      setSelectedTicketForFeedback(null);
+      if (selectedTicketForDetails?.id === selectedTicketForFeedback.id) {
+        setShowTicketDetailsModal(false);
+        setSelectedTicketForDetails(null);
+      }
+      await handleRefreshComplaints();
+    } catch (err: any) {
+      Alert.alert('Feedback Error', err.response?.data?.message || 'Failed to submit feedback.');
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  };
 
   const handleSubmitComplaint = async () => {
     if (!complaintForm.category_id) {
@@ -1051,69 +1144,312 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
             )}
 
             {/* 11. Support & Maintenance Tickets */}
-            {module.id === 'my-tickets' && (
-              <View style={styles.section}>
-                {/* Action button to file a complaint */}
-                <TouchableOpacity
-                  style={[styles.card, { backgroundColor: '#1E3A8A', borderColor: '#1E3A8A' }]}
-                  onPress={() => setShowComplaintModal(true)}
-                  activeOpacity={0.8}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.cardTitle, { color: '#FFFFFF' }]}>+ File a Complaint</Text>
-                      <Text style={[styles.cardSub, { color: '#BFDBFE', marginTop: 2 }]}>
-                        Report campus maintenance, electrical, plumbing, or facility issues.
-                      </Text>
-                    </View>
-                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
-                      <Plus size={20} color="#FFFFFF" />
-                    </View>
-                  </View>
-                </TouchableOpacity>
+            {module.id === 'my-tickets' && (() => {
+              const complaintsList = Array.isArray(data) ? data : [];
+              const pendingCount = complaintsList.filter((t: any) => t.status === 'pending').length;
+              const inProgCount = complaintsList.filter((t: any) => t.status === 'approaching' || t.status === 'resolving').length;
+              const completedCount = complaintsList.filter((t: any) => t.status === 'completed' || t.status === 'closed').length;
 
-                {Array.isArray(data) && data.length > 0 ? (
-                  data.map((item: any, idx: number) => (
-                    <View key={item.id || idx} style={styles.card}>
-                      <View style={styles.cardHeader}>
-                        <Text style={styles.cardTitle}>{item.title || item.subject || `Ticket #${item.id}`}</Text>
-                        <View style={[styles.pillBadge, { backgroundColor: item.status === 'completed' ? '#DCFCE7' : '#EFF6FF' }]}>
-                          <Text style={[styles.pillBadgeText, { color: item.status === 'completed' ? '#166534' : '#1D4ED8' }]}>
-                            {(item.status || 'OPEN').toUpperCase()}
-                          </Text>
-                        </View>
-                      </View>
-                      {item.category_name ? (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginVertical: 4 }}>
-                          <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: '#F1F5F9' }}>
-                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#475569' }}>
-                              {item.category_name} {item.sub_category_name ? `• ${item.sub_category_name}` : ''}
+              const filteredList = complaintsList.filter((t: any) => {
+                if (complaintFilter === 'all') return true;
+                if (complaintFilter === 'pending') return t.status === 'pending';
+                if (complaintFilter === 'in_progress') return t.status === 'approaching' || t.status === 'resolving';
+                if (complaintFilter === 'completed') return t.status === 'completed' || t.status === 'closed';
+                return true;
+              });
+
+              const getStatusConfig = (st: string) => {
+                switch ((st || '').toLowerCase()) {
+                  case 'pending':
+                    return { bg: '#FEF3C7', text: '#B45309', border: '#FDE68A', label: 'Pending' };
+                  case 'approaching':
+                    return { bg: '#E0F2FE', text: '#0369A1', border: '#BAE6FD', label: 'Assigned' };
+                  case 'resolving':
+                    return { bg: '#F3E8FF', text: '#6B21A8', border: '#E9D5FF', label: 'In Progress' };
+                  case 'completed':
+                    return { bg: '#DCFCE7', text: '#15803D', border: '#BBF7D0', label: 'Resolved' };
+                  case 'closed':
+                    return { bg: '#F1F5F9', text: '#475569', border: '#E2E8F0', label: 'Closed' };
+                  default:
+                    return { bg: '#F8FAFC', text: '#64748B', border: '#E2E8F0', label: st || 'Open' };
+                }
+              };
+
+              return (
+                <View style={styles.section}>
+                  {/* Top Action Bar: Raise Complaint + Refresh */}
+                  <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+                    <TouchableOpacity
+                      style={{
+                        flex: 1,
+                        backgroundColor: '#1E3A8A',
+                        borderRadius: 14,
+                        paddingVertical: 12,
+                        paddingHorizontal: 16,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        elevation: 2,
+                        shadowColor: '#1E3A8A',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.25,
+                        shadowRadius: 4,
+                      }}
+                      onPress={() => setShowComplaintModal(true)}
+                      activeOpacity={0.85}
+                    >
+                      <Plus size={18} color="#FFFFFF" />
+                      <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>
+                        Raise Complaint
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={{
+                        width: 48,
+                        backgroundColor: '#F8FAFC',
+                        borderRadius: 14,
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      onPress={handleRefreshComplaints}
+                      disabled={refreshingComplaints}
+                      activeOpacity={0.7}
+                    >
+                      {refreshingComplaints ? (
+                        <ActivityIndicator size="small" color="#1E3A8A" />
+                      ) : (
+                        <RefreshCw size={18} color="#1E3A8A" />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Filter Pills Bar */}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                    <View style={{ flexDirection: 'row', gap: 6, paddingVertical: 2 }}>
+                      {[
+                        { id: 'all', label: 'All', count: complaintsList.length },
+                        { id: 'pending', label: 'Pending', count: pendingCount },
+                        { id: 'in_progress', label: 'In Progress', count: inProgCount },
+                        { id: 'completed', label: 'Resolved', count: completedCount },
+                      ].map((tab) => {
+                        const active = complaintFilter === tab.id;
+                        return (
+                          <TouchableOpacity
+                            key={tab.id}
+                            onPress={() => setComplaintFilter(tab.id as any)}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 6,
+                              paddingHorizontal: 12,
+                              paddingVertical: 6,
+                              borderRadius: 20,
+                              backgroundColor: active ? '#1E3A8A' : '#F1F5F9',
+                              borderWidth: 1,
+                              borderColor: active ? '#1E3A8A' : '#E2E8F0',
+                            }}
+                          >
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#FFFFFF' : '#475569' }}>
+                              {tab.label}
                             </Text>
+                            <View
+                              style={{
+                                paddingHorizontal: 6,
+                                paddingVertical: 1,
+                                borderRadius: 10,
+                                backgroundColor: active ? 'rgba(255,255,255,0.25)' : '#E2E8F0',
+                              }}
+                            >
+                              <Text style={{ fontSize: 10, fontWeight: '700', color: active ? '#FFFFFF' : '#64748B' }}>
+                                {tab.count}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </ScrollView>
+
+                  {/* Complaints Cards List */}
+                  {filteredList.length > 0 ? (
+                    filteredList.map((item: any, idx: number) => {
+                      const stCfg = getStatusConfig(item.status);
+                      const isCompletedOrClosed = item.status === 'completed' || item.status === 'closed';
+                      const isReopeningThis = reopeningTicketId === item.id;
+
+                      return (
+                        <View key={item.id || idx} style={[styles.card, { paddingBottom: 12 }]}>
+                          {/* Header: Title and Status Badge */}
+                          <View style={styles.cardHeader}>
+                            <Text style={[styles.cardTitle, { flex: 1, marginRight: 8 }]} numberOfLines={2}>
+                              {item.title || item.subject || `Complaint #${item.id}`}
+                            </Text>
+                            <View
+                              style={{
+                                paddingHorizontal: 8,
+                                paddingVertical: 3,
+                                borderRadius: 8,
+                                backgroundColor: stCfg.bg,
+                                borderWidth: 1,
+                                borderColor: stCfg.border,
+                              }}
+                            >
+                              <Text style={{ fontSize: 11, fontWeight: '800', color: stCfg.text, textTransform: 'uppercase' }}>
+                                {stCfg.label}
+                              </Text>
+                            </View>
                           </View>
-                          {item.ticket_number || item.complaint_number ? (
-                            <Text style={{ fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', color: '#64748B' }}>
-                              #{item.ticket_number || item.complaint_number}
+
+                          {/* Category and Complaint Number */}
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginVertical: 4 }}>
+                            {item.category_name ? (
+                              <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: '#F1F5F9' }}>
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: '#475569' }}>
+                                  {item.category_name} {item.sub_category_name ? `• ${item.sub_category_name}` : ''}
+                                </Text>
+                              </View>
+                            ) : null}
+                            {item.complaint_number || item.ticket_number ? (
+                              <Text style={{ fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', color: '#64748B' }}>
+                                #{item.complaint_number || item.ticket_number}
+                              </Text>
+                            ) : null}
+                          </View>
+
+                          {/* Location (Block / Room) */}
+                          {(item.block_no || item.room_no) ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginVertical: 2 }}>
+                              <MapPin size={13} color="#64748B" />
+                              <Text style={{ fontSize: 12, color: '#475569', fontWeight: '500' }}>
+                                {item.block_no ? `Block: ${item.block_no}` : ''}
+                                {(item.block_no && item.room_no) ? ' • ' : ''}
+                                {item.room_no ? `Room: ${item.room_no}` : ''}
+                              </Text>
+                            </View>
+                          ) : null}
+
+                          {/* Description snippet */}
+                          <Text style={[styles.cardSub, { marginVertical: 4 }]} numberOfLines={2}>
+                            {item.description || 'Campus maintenance complaint'}
+                          </Text>
+
+                          {/* Created date */}
+                          {item.created_at ? (
+                            <Text style={[styles.timeScheduleText, { marginTop: 2, marginBottom: 8 }]}>
+                              Raised on: {new Date(item.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
                             </Text>
                           ) : null}
+
+                          {/* Action Buttons on Complaint Card */}
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              flexWrap: 'wrap',
+                              alignItems: 'center',
+                              gap: 8,
+                              paddingTop: 8,
+                              borderTopWidth: 1,
+                              borderTopColor: '#F1F5F9',
+                            }}
+                          >
+                            {/* View Details Button */}
+                            <TouchableOpacity
+                              onPress={() => {
+                                setSelectedTicketForDetails(item);
+                                setShowTicketDetailsModal(true);
+                              }}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 4,
+                                paddingHorizontal: 10,
+                                paddingVertical: 6,
+                                borderRadius: 8,
+                                backgroundColor: '#F1F5F9',
+                                borderWidth: 1,
+                                borderColor: '#E2E8F0',
+                              }}
+                            >
+                              <Eye size={13} color="#334155" />
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: '#334155' }}>
+                                View Details
+                              </Text>
+                            </TouchableOpacity>
+
+                            {/* Raise Again Button (for completed or closed tickets) */}
+                            {isCompletedOrClosed && (
+                              <TouchableOpacity
+                                onPress={() => handleReopenComplaint(item)}
+                                disabled={isReopeningThis}
+                                style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 6,
+                                  borderRadius: 8,
+                                  backgroundColor: '#FEF3C7',
+                                  borderWidth: 1,
+                                  borderColor: '#FDE68A',
+                                }}
+                              >
+                                {isReopeningThis ? (
+                                  <ActivityIndicator size="small" color="#B45309" />
+                                ) : (
+                                  <RefreshCw size={13} color="#B45309" />
+                                )}
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: '#B45309' }}>
+                                  Raise Again
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+
+                            {/* Rate Service / Feedback Button */}
+                            {isCompletedOrClosed && !item.feedback && (
+                              <TouchableOpacity
+                                onPress={() => handleOpenFeedback(item)}
+                                style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 6,
+                                  borderRadius: 8,
+                                  backgroundColor: '#DCFCE7',
+                                  borderWidth: 1,
+                                  borderColor: '#BBF7D0',
+                                }}
+                              >
+                                <Star size={13} color="#15803D" />
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: '#15803D' }}>
+                                  Rate Service
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
                         </View>
-                      ) : null}
-                      <Text style={styles.cardSub}>{item.description || 'Campus maintenance complaint'}</Text>
-                      {item.created_at ? (
-                        <Text style={styles.timeScheduleText}>
-                          Created: {new Date(item.created_at).toLocaleDateString('en-IN')}
-                        </Text>
-                      ) : null}
+                      );
+                    })
+                  ) : (
+                    <View style={styles.emptyCard}>
+                      <Ticket size={28} color="#94A3B8" />
+                      <Text style={styles.emptyTitle}>
+                        {complaintFilter === 'all' ? 'No Complaints Logged' : `No ${complaintFilter} Complaints`}
+                      </Text>
+                      <Text style={styles.emptySub}>
+                        {complaintFilter === 'all'
+                          ? 'You have not submitted any maintenance or facility complaints yet.'
+                          : 'No complaints match the selected filter category.'}
+                      </Text>
                     </View>
-                  ))
-                ) : (
-                  <View style={styles.emptyCard}>
-                    <Ticket size={28} color="#94A3B8" />
-                    <Text style={styles.emptyTitle}>No Complaints Logged</Text>
-                    <Text style={styles.emptySub}>You have not submitted any maintenance or helpdesk complaints yet.</Text>
-                  </View>
-                )}
-              </View>
-            )}
+                  )}
+                </View>
+              );
+            })()}
 
             {/* 12. CRT Training Portal */}
             {module.id === 'crt' && (
@@ -1473,6 +1809,334 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
                       <Text style={styles.actionModalSubmitText}>Submit Complaint</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Complaint Details Modal */}
+        <Modal
+          visible={showTicketDetailsModal && !!selectedTicketForDetails}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            setShowTicketDetailsModal(false);
+            setSelectedTicketForDetails(null);
+          }}
+        >
+          <View style={styles.actionModalBackdrop}>
+            <View style={[styles.actionModalCard, { maxHeight: '88%' }]}>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {selectedTicketForDetails && (() => {
+                  const t = selectedTicketForDetails;
+                  const isCompletedOrClosed = t.status === 'completed' || t.status === 'closed';
+
+                  let historyList: any[] = [];
+                  if (t.status_history) {
+                    if (Array.isArray(t.status_history)) {
+                      historyList = t.status_history;
+                    } else if (typeof t.status_history === 'string') {
+                      try {
+                        const parsed = JSON.parse(t.status_history);
+                        if (Array.isArray(parsed)) historyList = parsed;
+                      } catch (_) {}
+                    }
+                  }
+
+                  let assignmentsList: any[] = [];
+                  if (t.assignments) {
+                    if (Array.isArray(t.assignments)) {
+                      assignmentsList = t.assignments;
+                    } else if (typeof t.assignments === 'string') {
+                      try {
+                        const parsed = JSON.parse(t.assignments);
+                        if (Array.isArray(parsed)) assignmentsList = parsed;
+                      } catch (_) {}
+                    }
+                  }
+
+                  let commentsList: any[] = [];
+                  if (t.comments) {
+                    if (Array.isArray(t.comments)) {
+                      commentsList = t.comments;
+                    } else if (typeof t.comments === 'string') {
+                      try {
+                        const parsed = JSON.parse(t.comments);
+                        if (Array.isArray(parsed)) commentsList = parsed;
+                      } catch (_) {}
+                    }
+                  }
+
+                  return (
+                    <View>
+                      {/* Header */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                        <View style={{ flex: 1, marginRight: 8 }}>
+                          <Text style={{ fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', color: '#64748B' }}>
+                            #{t.complaint_number || t.ticket_number || t.id}
+                          </Text>
+                          <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A', marginTop: 2 }}>
+                            {t.title || t.subject}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setShowTicketDetailsModal(false);
+                            setSelectedTicketForDetails(null);
+                          }}
+                          style={{ padding: 6, borderRadius: 16, backgroundColor: '#F1F5F9' }}
+                        >
+                          <X size={18} color="#64748B" />
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Status and Category Badges */}
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+                        <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: isCompletedOrClosed ? '#DCFCE7' : '#FEF3C7' }}>
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: isCompletedOrClosed ? '#15803D' : '#B45309', textTransform: 'uppercase' }}>
+                            {t.status || 'PENDING'}
+                          </Text>
+                        </View>
+                        {t.category_name ? (
+                          <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: '#F1F5F9' }}>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#475569' }}>
+                              {t.category_name} {t.sub_category_name ? `• ${t.sub_category_name}` : ''}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
+
+                      {/* Location Information */}
+                      {(t.block_no || t.room_no || t.floor_no) ? (
+                        <View style={{ backgroundColor: '#F8FAFC', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 12 }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 4 }}>
+                            Location
+                          </Text>
+                          <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155' }}>
+                            {t.block_no ? `Block: ${t.block_no}` : ''}
+                            {t.floor_no ? ` • Floor: ${t.floor_no}` : ''}
+                            {t.room_no ? ` • Room: ${t.room_no}` : ''}
+                          </Text>
+                        </View>
+                      ) : null}
+
+                      {/* Description */}
+                      <View style={{ marginBottom: 14 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 4 }}>
+                          Issue Description
+                        </Text>
+                        <Text style={{ fontSize: 13, color: '#334155', lineHeight: 20 }}>
+                          {t.description || 'No description provided.'}
+                        </Text>
+                      </View>
+
+                      {/* Photo if present */}
+                      {t.photo_url ? (
+                        <View style={{ marginBottom: 14 }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 6 }}>
+                            Attached Photo
+                          </Text>
+                          <Image
+                            source={{ uri: t.photo_url.startsWith('http') || t.photo_url.startsWith('data:') ? t.photo_url : getStaticFileUrl(t.photo_url) }}
+                            style={{ width: '100%', height: 180, borderRadius: 10, backgroundColor: '#E2E8F0' }}
+                            resizeMode="cover"
+                          />
+                        </View>
+                      ) : null}
+
+                      {/* Status History Timeline */}
+                      {historyList.length > 0 && (
+                        <View style={{ marginBottom: 14 }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 8 }}>
+                            Status Timeline
+                          </Text>
+                          <View style={{ gap: 8 }}>
+                            {historyList.map((h: any, hIdx: number) => (
+                              <View key={h.id || hIdx} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#1E3A8A', marginTop: 5 }} />
+                                <View style={{ flex: 1 }}>
+                                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>
+                                    {h.new_status ? `${h.old_status || ''} ➔ ${h.new_status}`.trim() : (h.status || 'Updated')}
+                                  </Text>
+                                  {h.notes ? (
+                                    <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                                      {h.notes}
+                                    </Text>
+                                  ) : null}
+                                  {(h.created_at || h.updated_at) ? (
+                                    <Text style={{ fontSize: 10, color: '#94A3B8', marginTop: 2 }}>
+                                      {new Date(h.created_at || h.updated_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
+                                    </Text>
+                                  ) : null}
+                                </View>
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                      )}
+
+                      {/* Bottom Action Buttons in Modal */}
+                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
+                        {isCompletedOrClosed && (
+                          <TouchableOpacity
+                            onPress={() => handleReopenComplaint(t)}
+                            disabled={reopeningTicketId === t.id}
+                            style={{
+                              flex: 1,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 6,
+                              paddingVertical: 10,
+                              borderRadius: 10,
+                              backgroundColor: '#FEF3C7',
+                              borderWidth: 1,
+                              borderColor: '#FDE68A',
+                            }}
+                          >
+                            {reopeningTicketId === t.id ? (
+                              <ActivityIndicator size="small" color="#B45309" />
+                            ) : (
+                              <RefreshCw size={14} color="#B45309" />
+                            )}
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: '#B45309' }}>
+                              Raise Again
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+
+                        {isCompletedOrClosed && !t.feedback && (
+                          <TouchableOpacity
+                            onPress={() => handleOpenFeedback(t)}
+                            style={{
+                              flex: 1,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 6,
+                              paddingVertical: 10,
+                              borderRadius: 10,
+                              backgroundColor: '#DCFCE7',
+                              borderWidth: 1,
+                              borderColor: '#BBF7D0',
+                            }}
+                          >
+                            <Star size={14} color="#15803D" />
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: '#15803D' }}>
+                              Rate Service
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+
+                        <TouchableOpacity
+                          onPress={() => {
+                            setShowTicketDetailsModal(false);
+                            setSelectedTicketForDetails(null);
+                          }}
+                          style={{
+                            paddingHorizontal: 16,
+                            paddingVertical: 10,
+                            borderRadius: 10,
+                            backgroundColor: '#F1F5F9',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569' }}>
+                            Close
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })()}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Star Rating / Feedback Modal */}
+        <Modal
+          visible={showFeedbackModal && !!selectedTicketForFeedback}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            setShowFeedbackModal(false);
+            setSelectedTicketForFeedback(null);
+          }}
+        >
+          <View style={styles.actionModalBackdrop}>
+            <View style={[styles.actionModalCard, { maxHeight: '80%' }]}>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Text style={styles.actionModalTitle}>Rate Maintenance Service</Text>
+                <Text style={styles.actionModalSubtitle}>
+                  Please share your feedback on the resolution of complaint #{selectedTicketForFeedback?.complaint_number || selectedTicketForFeedback?.ticket_number || selectedTicketForFeedback?.id}.
+                </Text>
+
+                {/* Star Rating Selector */}
+                <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 12, marginVertical: 16 }}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity
+                      key={star}
+                      onPress={() => setFeedbackRating(star)}
+                      activeOpacity={0.7}
+                      style={{ padding: 4 }}
+                    >
+                      <Star
+                        size={32}
+                        color={star <= feedbackRating ? '#EAB308' : '#CBD5E1'}
+                        fill={star <= feedbackRating ? '#EAB308' : 'none'}
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Rating Label */}
+                <Text style={{ textAlign: 'center', fontSize: 13, fontWeight: '700', color: '#64748B', marginBottom: 16 }}>
+                  {feedbackRating === 1 && '1 - Very Unsatisfied (Poor)'}
+                  {feedbackRating === 2 && '2 - Unsatisfied (Fair)'}
+                  {feedbackRating === 3 && '3 - Neutral (Good)'}
+                  {feedbackRating === 4 && '4 - Satisfied (Very Good)'}
+                  {feedbackRating === 5 && '5 - Highly Satisfied (Excellent)'}
+                </Text>
+
+                {/* Comments */}
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#334155', marginBottom: 6 }}>
+                  Feedback Comments (Optional)
+                </Text>
+                <TextInput
+                  style={[styles.actionModalInput, { minHeight: 70, maxHeight: 110 }]}
+                  placeholder="Share details regarding the service, speed, or technician..."
+                  placeholderTextColor="#94A3B8"
+                  multiline
+                  value={feedbackText}
+                  onChangeText={setFeedbackText}
+                />
+
+                <View style={styles.actionModalButtons}>
+                  <TouchableOpacity
+                    style={[styles.actionModalButton, styles.actionModalCancelButton]}
+                    onPress={() => {
+                      setShowFeedbackModal(false);
+                      setSelectedTicketForFeedback(null);
+                    }}
+                    disabled={submittingFeedback}
+                  >
+                    <Text style={styles.actionModalCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.actionModalButton, styles.actionModalSubmitButton]}
+                    onPress={handleSubmitFeedback}
+                    disabled={submittingFeedback}
+                  >
+                    {submittingFeedback ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.actionModalSubmitText}>Submit Feedback</Text>
                     )}
                   </TouchableOpacity>
                 </View>

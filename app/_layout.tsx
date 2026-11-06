@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, Alert, Platform, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, AppStateStatus, Platform, View } from 'react-native';
 import * as Updates from 'expo-updates';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -12,46 +12,84 @@ function RootNavigation() {
   const segments = useSegments();
   const router = useRouter();
 
+  // Official live updates state hook
+  const { isUpdateAvailable, isUpdatePending } = Updates.useUpdates();
+
+  // 1. Trigger popup when update has finished downloading in the background
+  useEffect(() => {
+    if (!Updates.isEnabled || Platform.OS === 'web' || !isUpdatePending) return;
+
+    Alert.alert(
+      'Update Ready',
+      'A new version of the app has been downloaded. Restart the app now to apply the latest updates?',
+      [
+        { text: 'Later', style: 'cancel' },
+        {
+          text: 'Restart Now',
+          onPress: async () => {
+            try {
+              await Updates.reloadAsync();
+            } catch (error) {
+              logger.error('UPDATES', 'Failed to reload app for update', error);
+            }
+          },
+        },
+      ]
+    );
+  }, [isUpdatePending]);
+
+  // 2. Trigger popup when a new update is detected on the server
+  useEffect(() => {
+    if (!Updates.isEnabled || Platform.OS === 'web' || !isUpdateAvailable) return;
+
+    Alert.alert(
+      'New Update Available',
+      'A new version of the app is available. Would you like to install it now?',
+      [
+        { text: 'Later', style: 'cancel' },
+        {
+          text: 'Update Now',
+          onPress: async () => {
+            try {
+              const download = await Updates.fetchUpdateAsync();
+              if (download.isNew) {
+                await Updates.reloadAsync();
+              }
+            } catch (error) {
+              logger.error('UPDATES', 'Failed to download or apply update', error);
+              Alert.alert(
+                'Update Failed',
+                'The update could not be downloaded. Please check your network and try again.'
+              );
+            }
+          },
+        },
+      ]
+    );
+  }, [isUpdateAvailable]);
+
+  // 3. Proactively check for updates on startup and whenever the app resumes to foreground
   useEffect(() => {
     if (isLoading || Platform.OS === 'web' || !Updates.isEnabled) return;
 
-    let active = true;
-    const checkForUpdate = async () => {
+    const performUpdateCheck = async () => {
       try {
-        const result = await Updates.checkForUpdateAsync();
-        if (!active || !result.isAvailable) return;
-
-        Alert.alert(
-          'Update available',
-          'A new version of the app is ready to download.',
-          [
-            { text: 'Later', style: 'cancel' },
-            {
-              text: 'Update',
-              onPress: async () => {
-                try {
-                  const download = await Updates.fetchUpdateAsync();
-                  if (!download.isNew) return;
-                  await Updates.reloadAsync();
-                } catch (error) {
-                  logger.error('UPDATES', 'Failed to download or apply update', error);
-                  Alert.alert(
-                    'Update failed',
-                    'The update could not be installed. Please try again later.'
-                  );
-                }
-              },
-            },
-          ]
-        );
+        await Updates.checkForUpdateAsync();
       } catch (error) {
-        logger.error('UPDATES', 'Failed to check for an update', error);
+        logger.error('UPDATES', 'Failed to check for update', error);
       }
     };
 
-    checkForUpdate();
+    performUpdateCheck();
+
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        performUpdateCheck();
+      }
+    });
+
     return () => {
-      active = false;
+      subscription.remove();
     };
   }, [isLoading]);
 

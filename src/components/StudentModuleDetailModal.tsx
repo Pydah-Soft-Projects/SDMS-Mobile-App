@@ -36,6 +36,7 @@ import {
   Sparkles,
   CheckCircle2,
   FolderOpen,
+  Plus,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import api, { getStaticFileUrl } from '../config/api';
@@ -96,6 +97,58 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
   const [borrowReturnDate, setBorrowReturnDate] = useState('');
   const [submittingBorrowRequest, setSubmittingBorrowRequest] = useState(false);
   const [joiningClubId, setJoiningClubId] = useState<number | string | null>(null);
+  const [complaintCategories, setComplaintCategories] = useState<any[]>([]);
+  const [showComplaintModal, setShowComplaintModal] = useState(false);
+  const [complaintForm, setComplaintForm] = useState({
+    category_id: '',
+    sub_category_id: '',
+    title: '',
+    description: '',
+    block_no: '',
+    room_no: '',
+  });
+  const [submittingComplaint, setSubmittingComplaint] = useState(false);
+
+  const handleSubmitComplaint = async () => {
+    if (!complaintForm.category_id) {
+      Alert.alert('Category Required', 'Please select a complaint category.');
+      return;
+    }
+    if (!complaintForm.title.trim()) {
+      Alert.alert('Subject Required', 'Please enter a brief complaint subject or title.');
+      return;
+    }
+
+    try {
+      setSubmittingComplaint(true);
+      await api.post('/tickets', {
+        category_id: complaintForm.category_id,
+        sub_category_id: complaintForm.sub_category_id || undefined,
+        title: complaintForm.title.trim(),
+        description: complaintForm.description.trim() || undefined,
+        block_no: complaintForm.block_no.trim() || undefined,
+        room_no: complaintForm.room_no.trim() || undefined,
+      });
+
+      Alert.alert('Complaint Submitted', 'Your maintenance complaint has been logged and assigned.');
+      setShowComplaintModal(false);
+      setComplaintForm({
+        category_id: '',
+        sub_category_id: '',
+        title: '',
+        description: '',
+        block_no: '',
+        room_no: '',
+      });
+
+      const res = await api.get('/tickets/student/my-tickets');
+      setData(res.data?.data || res.data?.tickets || []);
+    } catch (err: any) {
+      Alert.alert('Submission Error', err.response?.data?.message || 'Failed to submit complaint. Please try again.');
+    } finally {
+      setSubmittingComplaint(false);
+    }
+  };
 
   const course = student?.course || student?.course_name || '';
   const branch = student?.branch || student?.branch_name || '';
@@ -297,8 +350,12 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
           const res = await api.get('/student-feedback/publications');
           setData(res.data?.data || res.data?.publications || []);
         } else if (module.id === 'my-tickets') {
-          const res = await api.get('/tickets/student/my-tickets');
-          setData(res.data?.data || res.data?.tickets || []);
+          const [ticketsRes, catsRes] = await Promise.all([
+            api.get('/tickets/student/my-tickets').catch(() => ({ data: { data: [] } })),
+            api.get('/complaint-categories/active').catch(() => ({ data: { data: [] } })),
+          ]);
+          setData(ticketsRes.data?.data || ticketsRes.data?.tickets || []);
+          setComplaintCategories(catsRes.data?.data || []);
         } else if (module.id === 'internship') {
           const [assignRes, statusRes] = await Promise.all([
             api.get('/internship/my-assignment').catch(() => null),
@@ -996,18 +1053,51 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
             {/* 11. Support & Maintenance Tickets */}
             {module.id === 'my-tickets' && (
               <View style={styles.section}>
+                {/* Action button to file a complaint */}
+                <TouchableOpacity
+                  style={[styles.card, { backgroundColor: '#1E3A8A', borderColor: '#1E3A8A' }]}
+                  onPress={() => setShowComplaintModal(true)}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.cardTitle, { color: '#FFFFFF' }]}>+ File a Complaint</Text>
+                      <Text style={[styles.cardSub, { color: '#BFDBFE', marginTop: 2 }]}>
+                        Report campus maintenance, electrical, plumbing, or facility issues.
+                      </Text>
+                    </View>
+                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+                      <Plus size={20} color="#FFFFFF" />
+                    </View>
+                  </View>
+                </TouchableOpacity>
+
                 {Array.isArray(data) && data.length > 0 ? (
                   data.map((item: any, idx: number) => (
                     <View key={item.id || idx} style={styles.card}>
                       <View style={styles.cardHeader}>
-                        <Text style={styles.cardTitle}>{item.subject || item.title || `Ticket #${item.id}`}</Text>
-                        <View style={[styles.pillBadge, { backgroundColor: '#EFF6FF' }]}>
-                          <Text style={[styles.pillBadgeText, { color: '#1D4ED8' }]}>
+                        <Text style={styles.cardTitle}>{item.title || item.subject || `Ticket #${item.id}`}</Text>
+                        <View style={[styles.pillBadge, { backgroundColor: item.status === 'completed' ? '#DCFCE7' : '#EFF6FF' }]}>
+                          <Text style={[styles.pillBadgeText, { color: item.status === 'completed' ? '#166534' : '#1D4ED8' }]}>
                             {(item.status || 'OPEN').toUpperCase()}
                           </Text>
                         </View>
                       </View>
-                      <Text style={styles.cardSub}>{item.description || 'Campus maintenance or support ticket'}</Text>
+                      {item.category_name ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginVertical: 4 }}>
+                          <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: '#F1F5F9' }}>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#475569' }}>
+                              {item.category_name} {item.sub_category_name ? `• ${item.sub_category_name}` : ''}
+                            </Text>
+                          </View>
+                          {item.ticket_number || item.complaint_number ? (
+                            <Text style={{ fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', color: '#64748B' }}>
+                              #{item.ticket_number || item.complaint_number}
+                            </Text>
+                          ) : null}
+                        </View>
+                      ) : null}
+                      <Text style={styles.cardSub}>{item.description || 'Campus maintenance complaint'}</Text>
                       {item.created_at ? (
                         <Text style={styles.timeScheduleText}>
                           Created: {new Date(item.created_at).toLocaleDateString('en-IN')}
@@ -1018,8 +1108,8 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
                 ) : (
                   <View style={styles.emptyCard}>
                     <Ticket size={28} color="#94A3B8" />
-                    <Text style={styles.emptyTitle}>No Support Tickets</Text>
-                    <Text style={styles.emptySub}>You have not submitted any maintenance or helpdesk tickets.</Text>
+                    <Text style={styles.emptyTitle}>No Complaints Logged</Text>
+                    <Text style={styles.emptySub}>You have not submitted any maintenance or helpdesk complaints yet.</Text>
                   </View>
                 )}
               </View>
@@ -1225,6 +1315,168 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
                   )}
                 </TouchableOpacity>
               </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* File Complaint Modal */}
+        <Modal
+          visible={showComplaintModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            if (!submittingComplaint) setShowComplaintModal(false);
+          }}
+        >
+          <View style={styles.actionModalBackdrop}>
+            <View style={[styles.actionModalCard, { maxHeight: '85%' }]}>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Text style={styles.actionModalTitle}>File Maintenance Complaint</Text>
+                <Text style={styles.actionModalSubtitle}>
+                  Select category and specify issue details for campus maintenance.
+                </Text>
+
+                {/* Categories */}
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#334155', marginBottom: 6 }}>
+                  Category *
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    {complaintCategories.map((cat: any) => {
+                      const isSelected = String(complaintForm.category_id) === String(cat.id);
+                      return (
+                        <TouchableOpacity
+                          key={cat.id}
+                          onPress={() => setComplaintForm(prev => ({ ...prev, category_id: String(cat.id), sub_category_id: '' }))}
+                          style={{
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            borderRadius: 10,
+                            backgroundColor: isSelected ? '#1E3A8A' : '#F1F5F9',
+                            borderWidth: 1,
+                            borderColor: isSelected ? '#1E3A8A' : '#E2E8F0',
+                          }}
+                        >
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: isSelected ? '#FFFFFF' : '#334155' }}>
+                            {cat.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+
+                {/* Subcategories if available */}
+                {(() => {
+                  const selectedCat = complaintCategories.find(c => String(c.id) === String(complaintForm.category_id));
+                  if (!selectedCat?.sub_categories?.length) return null;
+                  return (
+                    <View style={{ marginBottom: 14 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 6 }}>
+                        Sub-Category (Optional)
+                      </Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                          {selectedCat.sub_categories.map((sub: any) => {
+                            const isSelected = String(complaintForm.sub_category_id) === String(sub.id);
+                            return (
+                              <TouchableOpacity
+                                key={sub.id}
+                                onPress={() => setComplaintForm(prev => ({
+                                  ...prev,
+                                  sub_category_id: isSelected ? '' : String(sub.id)
+                                }))}
+                                style={{
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 6,
+                                  borderRadius: 8,
+                                  backgroundColor: isSelected ? '#3B82F6' : '#F8FAFC',
+                                  borderWidth: 1,
+                                  borderColor: isSelected ? '#3B82F6' : '#E2E8F0',
+                                }}
+                              >
+                                <Text style={{ fontSize: 11, fontWeight: '600', color: isSelected ? '#FFFFFF' : '#475569' }}>
+                                  {sub.name}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      </ScrollView>
+                    </View>
+                  );
+                })()}
+
+                {/* Subject / Title */}
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#334155', marginBottom: 6 }}>
+                  Complaint Subject / Title *
+                </Text>
+                <TextInput
+                  style={[styles.actionModalInput, { minHeight: 44, maxHeight: 44 }]}
+                  placeholder="e.g. Fan not working, Water leakage"
+                  placeholderTextColor="#94A3B8"
+                  value={complaintForm.title}
+                  onChangeText={(val) => setComplaintForm(prev => ({ ...prev, title: val }))}
+                />
+
+                {/* Location row */}
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 4 }}>Block</Text>
+                    <TextInput
+                      style={[styles.actionModalInput, { minHeight: 40, maxHeight: 40 }]}
+                      placeholder="e.g. Block A"
+                      placeholderTextColor="#94A3B8"
+                      value={complaintForm.block_no}
+                      onChangeText={(val) => setComplaintForm(prev => ({ ...prev, block_no: val }))}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 4 }}>Room No</Text>
+                    <TextInput
+                      style={[styles.actionModalInput, { minHeight: 40, maxHeight: 40 }]}
+                      placeholder="e.g. 204"
+                      placeholderTextColor="#94A3B8"
+                      value={complaintForm.room_no}
+                      onChangeText={(val) => setComplaintForm(prev => ({ ...prev, room_no: val }))}
+                    />
+                  </View>
+                </View>
+
+                {/* Description */}
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#334155', marginBottom: 6 }}>
+                  Description (Optional)
+                </Text>
+                <TextInput
+                  style={[styles.actionModalInput, { minHeight: 70, maxHeight: 110 }]}
+                  placeholder="Describe the issue in detail..."
+                  placeholderTextColor="#94A3B8"
+                  multiline
+                  value={complaintForm.description}
+                  onChangeText={(val) => setComplaintForm(prev => ({ ...prev, description: val }))}
+                />
+
+                <View style={styles.actionModalButtons}>
+                  <TouchableOpacity
+                    style={[styles.actionModalButton, styles.actionModalCancelButton]}
+                    onPress={() => setShowComplaintModal(false)}
+                    disabled={submittingComplaint}
+                  >
+                    <Text style={styles.actionModalCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionModalButton, styles.actionModalSubmitButton]}
+                    onPress={handleSubmitComplaint}
+                    disabled={submittingComplaint}
+                  >
+                    {submittingComplaint ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.actionModalSubmitText}>Submit Complaint</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
             </View>
           </View>
         </Modal>

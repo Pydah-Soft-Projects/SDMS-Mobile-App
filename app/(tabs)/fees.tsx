@@ -33,6 +33,7 @@ export default function FeesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [paying, setPaying] = useState(false);
   const [feeDetails, setFeeDetails] = useState<StudentFeeDetails | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const admissionNo = (user as any)?.admission_number || (user as any)?.pin_no;
 
@@ -41,12 +42,18 @@ export default function FeesScreen() {
       setLoading(false);
       return;
     }
+    setFetchError(null);
     logger.info('FEES_SCREEN', `Fetching fee records for: ${admissionNo}`);
     try {
       const data = await studentService.getFeeDetails(admissionNo);
-      setFeeDetails(data);
+      if (data) {
+        setFeeDetails(data);
+      } else {
+        setFetchError('Fee records could not be fetched from the server. Please pull to refresh or retry.');
+      }
     } catch (e: any) {
       logger.error('FEES_SCREEN', 'Failed to load fee details', e.message);
+      setFetchError(e.message || 'Failed to load fee details');
     } finally {
       setLoading(false);
     }
@@ -111,6 +118,20 @@ export default function FeesScreen() {
           contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) + 84 }]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
+          {/* Error Banner */}
+          {fetchError && (
+            <View style={styles.errorCard}>
+              <AlertCircle size={20} color="#DC2626" style={{ marginTop: 2 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.errorTitle}>Fee Service Notice</Text>
+                <Text style={styles.errorSubtitle}>{fetchError}</Text>
+                <TouchableOpacity onPress={loadFeeData} style={styles.retryBtn}>
+                  <Text style={styles.retryBtnText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
           {/* Main Due Card */}
           <View style={styles.summaryCard}>
             <View style={styles.dueHeader}>
@@ -261,6 +282,40 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     paddingBottom: 40,
+  },
+  errorCard: {
+    flexDirection: 'row',
+    gap: 12,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+  },
+  errorTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#991B1B',
+    marginBottom: 4,
+  },
+  errorSubtitle: {
+    fontSize: 13,
+    color: '#B91C1C',
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  retryBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#DC2626',
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+  },
+  retryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
   },
   summaryCard: {
     backgroundColor: '#FFFFFF',

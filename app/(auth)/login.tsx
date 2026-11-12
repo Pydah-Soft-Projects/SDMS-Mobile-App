@@ -65,7 +65,7 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.container}
     >
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         {/* College Logo / Header */}
         <View style={styles.header}>
@@ -74,7 +74,7 @@ export default function LoginScreen() {
             style={styles.logo}
             resizeMode="contain"
           />
-          <Text style={styles.appName}>Campo Educational Academy</Text>
+          <Text style={styles.appName}></Text>
           <Text style={styles.appSubtitle}>Student Portal</Text>
         </View>
 
@@ -87,25 +87,23 @@ export default function LoginScreen() {
 
         {/* Inputs */}
         <CustomInput
-          dark
           label="Roll Number / PIN / Email"
           placeholder="e.g. 246T1A0301 or PIN"
           value={identifier}
           onChangeText={setIdentifier}
           autoCapitalize="none"
-          leftIcon={<User size={20} color="#94A3B8" />}
+          leftIcon={<User size={20} color="#64748B" />}
         />
 
         <CustomInput
-          dark
           label="Password"
           placeholder="Enter your password"
           value={password}
           onChangeText={setPassword}
           secureTextEntry={!showPassword}
-          leftIcon={<Lock size={20} color="#94A3B8" />}
+          leftIcon={<Lock size={20} color="#64748B" />}
           rightIcon={
-            showPassword ? <EyeOff size={20} color="#94A3B8" /> : <Eye size={20} color="#94A3B8" />
+            showPassword ? <EyeOff size={20} color="#64748B" /> : <Eye size={20} color="#64748B" />
           }
           onRightIconPress={() => setShowPassword(!showPassword)}
         />
@@ -132,48 +130,46 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#FFFFFF',
   },
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 40,
+    paddingTop: 20,
     paddingBottom: 40,
     justifyContent: 'center',
   },
   header: {
     alignItems: 'center',
-    marginBottom: 28,
+    marginBottom: 24,
   },
   logo: {
     width: 190,
     height: 56,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   appName: {
     fontSize: 21,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: '#1E3A8A',
     textAlign: 'center',
-    letterSpacing: 0.3,
   },
   appSubtitle: {
     fontSize: 13,
-    color: '#94A3B8',
-    marginTop: 6,
+    color: '#64748B',
+    marginTop: 4,
     textAlign: 'center',
-    fontWeight: '500',
   },
   errorBanner: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    backgroundColor: '#FEE2E2',
     borderWidth: 1,
-    borderColor: '#EF4444',
+    borderColor: '#FCA5A5',
     padding: 12,
-    borderRadius: 10,
+    borderRadius: 8,
     marginBottom: 16,
   },
   errorBannerText: {
-    color: '#FCA5A5',
+    color: '#B91C1C',
     fontSize: 13,
     fontWeight: '600',
     lineHeight: 18,
@@ -184,11 +180,11 @@ const styles = StyleSheet.create({
   },
   forgotText: {
     fontSize: 13,
-    color: '#38BDF8',
+    color: '#1E3A8A',
     fontWeight: '600',
   },
   submitBtn: {
     marginTop: 4,
-    backgroundColor: '#2563EB',
+    backgroundColor: '#1E3A8A',
   },
 });

@@ -7,6 +7,7 @@ interface CustomInputProps extends TextInputProps {
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
   onRightIconPress?: () => void;
+  dark?: boolean;
 }
 
 export const CustomInput: React.FC<CustomInputProps> = ({
@@ -15,17 +16,18 @@ export const CustomInput: React.FC<CustomInputProps> = ({
   leftIcon,
   rightIcon,
   onRightIconPress,
+  dark = false,
   style,
   ...props
 }) => {
   return (
     <View style={styles.container}>
-      {label && <Text style={styles.label}>{label}</Text>}
-      <View style={[styles.inputWrapper, !!error && styles.inputError]}>
+      {label && <Text style={[styles.label, dark && styles.labelDark]}>{label}</Text>}
+      <View style={[styles.inputWrapper, dark && styles.inputWrapperDark, !!error && styles.inputError]}>
         {leftIcon && <View style={styles.leftIcon}>{leftIcon}</View>}
         <TextInput
-          style={[styles.input, style]}
-          placeholderTextColor="#94A3B8"
+          style={[styles.input, dark && styles.inputDark, style]}
+          placeholderTextColor={dark ? '#64748B' : '#94A3B8'}
           {...props}
         />
         {rightIcon && (
@@ -49,6 +51,9 @@ const styles = StyleSheet.create({
     color: '#334155',
     marginBottom: 6,
   },
+  labelDark: {
+    color: '#E2E8F0',
+  },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -58,6 +63,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
     minHeight: 48,
+  },
+  inputWrapperDark: {
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
   },
   inputError: {
     borderColor: '#EF4444',
@@ -74,6 +83,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#0F172A',
     paddingVertical: 8,
+  },
+  inputDark: {
+    color: '#FFFFFF',
   },
   errorText: {
     fontSize: 12,

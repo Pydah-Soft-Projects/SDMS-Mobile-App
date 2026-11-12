@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Pydah Student Portal",
-    "slug": "pydah-student-app",
+    "name": "Campo Student Portal",
+    "slug": "campo-student-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

@@ -149,7 +149,7 @@ export default function ProfileScreen() {
                 <GraduationCap size={18} color="#1E3A8A" />
                 <View style={styles.infoTextCol}>
                   <Text style={styles.infoLabel}>College</Text>
-                  <Text style={styles.infoValue}>{student?.collegeName || 'Pydah College'}</Text>
+                  <Text style={styles.infoValue}>{student?.collegeName || 'Campo College'}</Text>
                 </View>
               </View>
 

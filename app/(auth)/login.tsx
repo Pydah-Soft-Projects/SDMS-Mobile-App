@@ -10,6 +10,7 @@ import {
   Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { User, Lock, Eye, EyeOff } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import CustomInput from '../../src/components/CustomInput';
@@ -64,15 +65,16 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.container}
     >
+      <StatusBar style="light" />
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         {/* College Logo / Header */}
         <View style={styles.header}>
           <Image
-            source={require('../../assets/pydah-logo.png')}
+            source={require('../../assets/campo-logo.png')}
             style={styles.logo}
             resizeMode="contain"
           />
-          <Text style={styles.appName}>Pydah Educational Academy</Text>
+          <Text style={styles.appName}>Campo Educational Academy</Text>
           <Text style={styles.appSubtitle}>Student Portal</Text>
         </View>
 
@@ -85,23 +87,25 @@ export default function LoginScreen() {
 
         {/* Inputs */}
         <CustomInput
+          dark
           label="Roll Number / PIN / Email"
           placeholder="e.g. 246T1A0301 or PIN"
           value={identifier}
           onChangeText={setIdentifier}
           autoCapitalize="none"
-          leftIcon={<User size={20} color="#64748B" />}
+          leftIcon={<User size={20} color="#94A3B8" />}
         />
 
         <CustomInput
+          dark
           label="Password"
           placeholder="Enter your password"
           value={password}
           onChangeText={setPassword}
           secureTextEntry={!showPassword}
-          leftIcon={<Lock size={20} color="#64748B" />}
+          leftIcon={<Lock size={20} color="#94A3B8" />}
           rightIcon={
-            showPassword ? <EyeOff size={20} color="#64748B" /> : <Eye size={20} color="#64748B" />
+            showPassword ? <EyeOff size={20} color="#94A3B8" /> : <Eye size={20} color="#94A3B8" />
           }
           onRightIconPress={() => setShowPassword(!showPassword)}
         />
@@ -128,47 +132,48 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0F172A',
   },
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 20,
+    paddingTop: 40,
     paddingBottom: 40,
     justifyContent: 'center',
   },
   header: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 28,
   },
   logo: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    marginBottom: 12,
+    width: 190,
+    height: 56,
+    marginBottom: 16,
   },
   appName: {
     fontSize: 21,
     fontWeight: '800',
-    color: '#1E3A8A',
+    color: '#FFFFFF',
     textAlign: 'center',
+    letterSpacing: 0.3,
   },
   appSubtitle: {
     fontSize: 13,
-    color: '#64748B',
-    marginTop: 4,
+    color: '#94A3B8',
+    marginTop: 6,
     textAlign: 'center',
+    fontWeight: '500',
   },
   errorBanner: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
     borderWidth: 1,
-    borderColor: '#FCA5A5',
+    borderColor: '#EF4444',
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     marginBottom: 16,
   },
   errorBannerText: {
-    color: '#B91C1C',
+    color: '#FCA5A5',
     fontSize: 13,
     fontWeight: '600',
     lineHeight: 18,
@@ -179,10 +184,11 @@ const styles = StyleSheet.create({
   },
   forgotText: {
     fontSize: 13,
-    color: '#1E3A8A',
+    color: '#38BDF8',
     fontWeight: '600',
   },
   submitBtn: {
     marginTop: 4,
+    backgroundColor: '#2563EB',
   },
 });

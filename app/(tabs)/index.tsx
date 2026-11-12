@@ -58,12 +58,13 @@ import {
 } from '../../src/components/StudentSidebarDrawer';
 import { StudentModuleDetailModal, StudentModuleItem } from '../../src/components/StudentModuleDetailModal';
 import { getStaticFileUrl } from '../../src/config/api';
+import DefaultEventPoster from '../../src/components/DefaultEventPoster';
+
 const SafeEventImage: React.FC<{ uri?: string | null; style: any }> = ({ uri, style }) => {
   const [loadError, setLoadError] = useState(false);
-  const fallback = require('../../assets/pydah-logo.png');
 
   if (!uri || loadError) {
-    return <Image source={fallback} style={style} resizeMode="cover" />;
+    return <DefaultEventPoster style={style} />;
   }
 
   return (

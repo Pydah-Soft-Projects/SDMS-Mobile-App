@@ -4459,7 +4459,7 @@ export default function OperationScreen() {
                 <Text style={styles.dialogSub}>Register an institution under SDMS</Text>
                 <TextInput
                   style={styles.dialogSingleInput}
-                  placeholder="College Name * (e.g. Pydah College of Engg)"
+                  placeholder="College Name * (e.g. Campo College of Engg)"
                   value={formName}
                   onChangeText={setFormName}
                 />

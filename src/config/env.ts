@@ -25,13 +25,13 @@ const getAutoDetectedHost = (): string => {
   }
 
   // Developer local LAN IP
-  return '192.168.2.25';
+  return '192.168.2.240';
 };
 
 let rawApiUrl =
   process.env.EXPO_PUBLIC_API_URL ||
   Constants.expoConfig?.extra?.API_URL ||
-  (appEnv === 'production' ? 'https://sdms.pydah.edu.in/api' : `http://${getAutoDetectedHost()}:5000/api`);
+  'https://sdms.pydah.edu.in/api';
 
 // On native mobile devices (Android/iOS), "localhost" refers to the phone itself.
 // Automatically replace localhost/127.0.0.1 with the machine's local LAN IP so mobile can reach the backend.

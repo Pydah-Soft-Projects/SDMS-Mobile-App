@@ -47,7 +47,7 @@ export const Header: React.FC<HeaderProps> = ({
             <Menu size={22} color="#1E3A8A" />
           </TouchableOpacity>
         )}
-        <Image source={require("../../assets/pydah-logo.png")} style={styles.brandLogo} resizeMode="contain" />
+        <Image source={require("../../assets/campo-icon.png")} style={styles.brandLogo} resizeMode="contain" />
         <View style={styles.titleContainer}>
           <View style={styles.titleRow}>
             <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
@@ -55,7 +55,7 @@ export const Header: React.FC<HeaderProps> = ({
             </Text>
             {shouldShowPydian && (
               <View style={styles.pydianTag}>
-                <Text style={styles.pydianTagText}>Pydian</Text>
+                <Text style={styles.pydianTagText}>Campo</Text>
               </View>
             )}
           </View>

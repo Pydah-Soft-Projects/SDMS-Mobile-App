@@ -171,7 +171,7 @@ export default function FeesScreen() {
             <View style={styles.secureTag}>
               <ShieldCheck size={14} color="#059669" />
               <Text style={styles.secureTagText}>
-                Official Pydah Payment Gateway (PPG) Integration
+                Official Campo Payment Gateway (CPG) Integration
               </Text>
             </View>
           </View>

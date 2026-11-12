@@ -70,7 +70,7 @@ function RootNavigation() {
 
   // 3. Proactively check for updates on startup and whenever the app resumes to foreground
   useEffect(() => {
-    if (isLoading || Platform.OS === 'web' || !Updates.isEnabled) return;
+    if (__DEV__ || isLoading || Platform.OS === 'web' || !Updates.isEnabled) return;
 
     const performUpdateCheck = async () => {
       try {

@@ -229,7 +229,7 @@ export const SDMS_STUDENT_SECTIONS: {
         id: 'ai-assistant',
         layoutKey: 'ai-assistant',
         title: 'AI Assistant',
-        subtitle: 'Pydah Academic Assistant',
+        subtitle: 'Campo Academic Assistant',
         category: 'support',
         iconName: 'Sparkles',
       },

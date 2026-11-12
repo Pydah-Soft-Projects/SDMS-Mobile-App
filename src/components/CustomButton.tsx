@@ -39,7 +39,7 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
         return 'transparent';
       case 'primary':
       default:
-        return '#1E3A8A'; // Pydah Navy Blue
+        return '#1E3A8A'; // Campo Navy Blue
     }
   };
 

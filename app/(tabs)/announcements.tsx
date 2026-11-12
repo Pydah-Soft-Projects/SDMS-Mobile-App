@@ -18,13 +18,13 @@ import Header from '../../src/components/Header';
 import announcementService from '../../src/services/announcementService';
 import { Announcement } from '../../src/types';
 import { getStaticFileUrl } from '../../src/config/api';
+import DefaultEventPoster from '../../src/components/DefaultEventPoster';
 
 const SafeAnnouncementImage: React.FC<{ uri?: string | null; style: any }> = ({ uri, style }) => {
   const [loadError, setLoadError] = useState(false);
-  const fallback = require('../../assets/pydah-logo.png');
 
   if (!uri || loadError) {
-    return <Image source={fallback} style={style} resizeMode="contain" />;
+    return <DefaultEventPoster style={style} />;
   }
 
   return (

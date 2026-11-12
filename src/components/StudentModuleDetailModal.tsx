@@ -47,6 +47,7 @@ import { useRouter } from 'expo-router';
 import api, { getStaticFileUrl } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import DefaultEventPoster from './DefaultEventPoster';
 import logger from '../utils/logger';
 import studentService from '../services/studentService';
 
@@ -540,15 +541,15 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
                   data.map((item: any, idx: number) => (
                     <View key={item.id || idx} style={styles.card}>
                       <View style={styles.cardBannerWrapper}>
-                        <Image
-                          source={
-                            item.image_url || item.banner_image
-                              ? { uri: getStaticFileUrl(item.image_url || item.banner_image) }
-                              : require('../../assets/pydah-logo.png')
-                          }
-                          style={styles.cardBannerImg}
-                          resizeMode="cover"
-                        />
+                        {item.image_url || item.banner_image ? (
+                          <Image
+                            source={{ uri: getStaticFileUrl(item.image_url || item.banner_image) }}
+                            style={styles.cardBannerImg}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <DefaultEventPoster style={styles.cardBannerImg} />
+                        )}
                       </View>
                       <View style={styles.cardHeader}>
                         <Text style={styles.cardHighlight}>{item.day_of_week || 'SCHEDULE'}</Text>
@@ -1523,7 +1524,7 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
               <View style={styles.section}>
                 <View style={styles.card}>
                   <View style={styles.cardHeader}>
-                    <Text style={styles.cardTitle}>Pydah AI Student Assistant</Text>
+                    <Text style={styles.cardTitle}>Campo AI Student Assistant</Text>
                     <Sparkles size={18} color="#7C3AED" />
                   </View>
                   <Text style={styles.cardSub}>

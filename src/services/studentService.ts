@@ -232,7 +232,16 @@ export const studentService = {
   async getEvents(): Promise<any[]> {
     try {
       const res = await api.get('/events/student');
-      return res.data?.data || res.data?.events || res.data || [];
+      const list = res.data?.data || res.data?.events || (Array.isArray(res.data) ? res.data : []);
+      if (Array.isArray(list)) {
+        return list.slice().sort((a: any, b: any) => {
+          const timeA = new Date(a.event_date || a.createdAt || 0).getTime();
+          const timeB = new Date(b.event_date || b.createdAt || 0).getTime();
+          if (timeB !== timeA) return timeB - timeA;
+          return Number(b.id || 0) - Number(a.id || 0);
+        });
+      }
+      return [];
     } catch (e: any) {
       logger.warn('STUDENT_SERVICE', 'Failed to fetch events', e.message);
       return [];

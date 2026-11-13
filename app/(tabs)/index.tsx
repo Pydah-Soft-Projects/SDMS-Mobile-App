@@ -11,6 +11,7 @@ import {
   Image,
   Modal,
   Alert,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -79,7 +80,7 @@ const SafeEventImage: React.FC<{ uri?: string | null; style: any }> = ({ uri, st
 
 const SafeClubImage: React.FC<{ club: any; style: any }> = ({ club, style }) => {
   const [loadError, setLoadError] = useState(false);
-  const fallback = require('../../assets/pydah-logo.png');
+  const fallback = require('../../assets/campo-logo.png');
   const clubImg = club.image_url || club.image || club.club_image;
   const clubUrl = clubImg
     ? getStaticFileUrl(clubImg)
@@ -113,12 +114,12 @@ export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const horizontalPadding = screenWidth < 360 ? 12 : 16;
-  const portalColumns = 3;
-  const portalCardWidth =
-    (screenWidth -
-      horizontalPadding * 2 -
-      10 * (portalColumns - 1)) /
-    portalColumns;
+  const portalColumns = screenWidth >= 600 ? 4 : 3;
+  const gridGap = 10;
+  const contentMaxWidth = Math.min(screenWidth, 720);
+  const availableGridWidth = contentMaxWidth - horizontalPadding * 2;
+  const portalCardWidth = Math.floor((availableGridWidth - gridGap * (portalColumns - 1)) / portalColumns);
+  const horizontalCardWidth = Math.min(Math.max(Math.floor(screenWidth * 0.62), 220), 280);
   const { user, userType } = useAuth();
 
   // If staff or admin user, render Staff Management Dashboard
@@ -175,7 +176,13 @@ export default function DashboardScreen() {
         setAnnouncements(noticesRes.value);
       }
       if (eventsRes.status === 'fulfilled' && Array.isArray(eventsRes.value)) {
-        setEvents(eventsRes.value);
+        const sortedEvents = (eventsRes.value || []).slice().sort((a: any, b: any) => {
+          const timeA = new Date(a.event_date || a.createdAt || 0).getTime();
+          const timeB = new Date(b.event_date || b.createdAt || 0).getTime();
+          if (timeB !== timeA) return timeB - timeA;
+          return Number(b.id || 0) - Number(a.id || 0);
+        });
+        setEvents(sortedEvents);
       }
       if (clubsRes.status === 'fulfilled' && Array.isArray(clubsRes.value)) {
         setClubs(clubsRes.value);
@@ -364,6 +371,13 @@ export default function DashboardScreen() {
       });
     });
 
+    // Sort so newest dates appear first
+    items.sort((a, b) => {
+      const timeA = new Date(a.date || 0).getTime();
+      const timeB = new Date(b.date || 0).getTime();
+      return timeB - timeA;
+    });
+
     return items;
   }, [announcements, events]);
 
@@ -432,6 +446,24 @@ export default function DashboardScreen() {
   const quota = student?.quota || student?.stud_type || '';
   const college = student?.college || student?.college_name || '';
 
+  // Derive student's current year of study (1st, 2nd, 3rd, 4th Year)
+  const rawYear =
+    student?.current_year ||
+    student?.year ||
+    student?.year_of_study ||
+    (semester && !isNaN(Number(semester)) ? Math.ceil(Number(semester) / 2) : '');
+
+  const formatYearLabel = (yr: string | number) => {
+    if (!yr) return '';
+    const num = Number(yr);
+    if (num === 1) return '1st Year';
+    if (num === 2) return '2nd Year';
+    if (num === 3) return '3rd Year';
+    if (num === 4) return '4th Year';
+    return `Year ${yr}`;
+  };
+  const currentYearText = formatYearLabel(rawYear);
+
   const renderPortalIcon = (iconName: string, color = '#1E3A8A', size = 20) => {
     switch (iconName) {
       case 'Home': return <Home size={size} color={color} />;
@@ -467,12 +499,30 @@ export default function DashboardScreen() {
     }
   };
 
+  const getServiceCardColors = (id: string, category: string) => {
+    if (id === 'attendance') return { bg: '#DCFCE7', fg: '#16A34A' };
+    if (id === 'fees') return { bg: '#FEE2E2', fg: '#DC2626' };
+    if (id === 'timetable') return { bg: '#EEF2FF', fg: '#4F46E5' };
+    if (category === 'academics') return { bg: '#EFF6FF', fg: '#2563EB' };
+    if (category === 'finance') return { bg: '#FEE2E2', fg: '#DC2626' };
+    if (category === 'campus') return { bg: '#FEF3C7', fg: '#D97706' };
+    if (category === 'support') return { bg: '#F3E8FF', fg: '#9333EA' };
+    return { bg: '#F1F5F9', fg: '#1E3A8A' };
+  };
+
+  const renderServiceCardIcon = (id: string, iconName: string, color: string, size = 20) => {
+    if (id === 'attendance') return <CheckCircle2 size={size} color={color} />;
+    if (id === 'fees') return <Text style={{ fontSize: 19, fontWeight: '700', color, includeFontPadding: false }}>₹</Text>;
+    if (id === 'timetable') return <Calendar size={size} color={color} />;
+    return renderPortalIcon(iconName, color, size);
+  };
+
   return (
     <View style={styles.container}>
       {/* Dynamic Header */}
       <Header
         title={greetingText}
-        subtitle={`PIN: ${student?.pin_no || student?.admission_number || 'N/A'}${semester ? ` • Sem ${semester}` : ''}`}
+        subtitle={`PIN: ${student?.pin_no || student?.admission_number || 'N/A'}${currentYearText ? ` • ${currentYearText}` : ''}${semester ? ` • Sem ${semester}` : ''}`}
         showPydianTag={true}
       />
 
@@ -485,11 +535,20 @@ export default function DashboardScreen() {
         <ScrollView
           contentContainerStyle={[
             styles.content,
-            { paddingHorizontal: horizontalPadding },
-            { paddingBottom: Math.max(insets.bottom, 16) + 84 },
+            {
+              paddingHorizontal: horizontalPadding,
+              paddingBottom: Math.max(insets.bottom, 16) + 84,
+              maxWidth: 720,
+              alignSelf: 'center',
+              width: '100%',
+            },
           ]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           showsVerticalScrollIndicator={false}
+          removeClippedSubviews={Platform.OS === 'android'}
+          scrollEventThrottle={16}
+          overScrollMode="never"
+          nestedScrollEnabled={true}
         >
           {/* 1. STUDENT ACADEMIC INFO BANNER */}
           <View style={styles.banner}>
@@ -505,10 +564,16 @@ export default function DashboardScreen() {
                 {college ? <Text style={styles.bannerCollege}>{college}</Text> : null}
                 <Text style={styles.bannerCourse}>
                   {course ? `${course} - ${branch}` : 'Student Record'}
+                  {currentYearText ? ` • ${currentYearText}` : ''}
                   {semester ? ` • Sem ${semester}` : ''}
                   {section ? ` (Sec ${section})` : ''}
                 </Text>
                 <View style={styles.bannerPillRow}>
+                  {currentYearText ? (
+                    <Text style={[styles.bannerPill, { backgroundColor: 'rgba(255, 255, 255, 0.22)', color: '#FFFFFF', fontWeight: '700' }]}>
+                      {currentYearText}
+                    </Text>
+                  ) : null}
                   {batch ? <Text style={styles.bannerPill}>Batch {batch}</Text> : null}
                   {quota ? <Text style={styles.bannerPill}>Quota: {quota}</Text> : null}
                   <Text style={[styles.bannerPill, { backgroundColor: 'rgba(52, 211, 153, 0.25)', color: '#6EE7B7' }]}>
@@ -529,18 +594,23 @@ export default function DashboardScreen() {
               ]}
             >
               <View style={styles.metricCardHeader}>
-                <Text style={[styles.metricCardTitle, { color: todayAttendance.color }]}>
+                <Text style={[styles.metricCardTitle, { color: todayAttendance.color }]} numberOfLines={1}>
                   Today's Attendance
                 </Text>
               </View>
               <View style={styles.metricCardBody}>
                 <View style={styles.metricTextCol}>
-                  <Text style={[styles.metricMainValue, { color: todayAttendance.color }]}>
+                  <Text
+                    style={[styles.metricMainValue, { color: todayAttendance.color, fontSize: screenWidth < 360 ? 15 : 18 }]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.75}
+                  >
                     {todayAttendance.status}
                   </Text>
                   <View style={styles.metricDateRow}>
                     <ChevronRight size={10} color={todayAttendance.color} />
-                    <Text style={[styles.metricDateText, { color: todayAttendance.color }]}>
+                    <Text style={[styles.metricDateText, { color: todayAttendance.color }]} numberOfLines={1}>
                       {todayAttendance.dateText}
                     </Text>
                   </View>
@@ -564,18 +634,23 @@ export default function DashboardScreen() {
               ]}
             >
               <View style={styles.metricCardHeader}>
-                <Text style={[styles.metricCardTitle, { color: '#6D28D9' }]}>
+                <Text style={[styles.metricCardTitle, { color: '#6D28D9' }]} numberOfLines={1}>
                   Overall Attendance
                 </Text>
               </View>
               <View style={styles.metricCardBody}>
                 <View style={styles.metricTextCol}>
-                  <Text style={[styles.metricMainValue, { color: progressInfo.color }]}>
+                  <Text
+                    style={[styles.metricMainValue, { color: progressInfo.color, fontSize: screenWidth < 360 ? 15 : 18 }]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.75}
+                  >
                     {progressInfo.percentage === null ? '—' : `${progressInfo.percentage}%`}
                   </Text>
                   <View style={styles.metricDateRow}>
                     <ChevronRight size={10} color="#6D28D9" />
-                    <Text style={[styles.metricDateText, { color: progressInfo.color }]}>
+                    <Text style={[styles.metricDateText, { color: progressInfo.color }]} numberOfLines={1}>
                       {progressInfo.rating} Rating
                     </Text>
                   </View>
@@ -592,31 +667,26 @@ export default function DashboardScreen() {
             </View>
           </View>
 
-          {/* 3. DYNAMIC SDMS PORTALS SECTION */}
+          {/* 3. DYNAMIC SDMS PORTALS & SERVICES (Horizontally Scrollable Carousel) */}
           <View style={styles.sectionHeaderRow}>
-            <View style={styles.scopeHeaderTitleCol}>
-              <Text style={styles.sectionTitle}>SDMS Portals & Services</Text>
-              <Text style={styles.scopeSubTitle}>Synced with SDMS Student Portal Layout settings</Text>
-            </View>
-            <TouchableOpacity onPress={() => setDrawerVisible(true)} style={styles.allPagesPill}>
-              <Menu size={13} color="#1E3A8A" />
-              <Text style={styles.allPagesText}>Sidebar ({activeModules.length})</Text>
-            </TouchableOpacity>
+            <Text style={styles.sectionTitle}>Portals & Services</Text>
           </View>
 
-          {/* 3-Column Portals Grid */}
-          <View style={styles.portalGrid}>
-            {displayPortals.map((mod) => {
-              const colors = getPortalColors(mod.category);
+          {/* Horizontally Scrollable Services Cards (Matches Image 2) */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.servicesHorizontalScroll}
+            removeClippedSubviews={Platform.OS === 'android'}
+            nestedScrollEnabled={true}
+            overScrollMode="never"
+          >
+            {activeModules.map((mod) => {
+              const colors = getServiceCardColors(mod.id, mod.category);
               return (
                 <TouchableOpacity
                   key={mod.id}
-                  style={[
-                    styles.portalCard,
-                    {
-                      width: portalCardWidth,
-                    },
-                  ]}
+                  style={styles.serviceSquareCard}
                   onPress={() => {
                     if (mod.isTab && mod.tabRoute) {
                       router.push(mod.tabRoute as any);
@@ -626,44 +696,22 @@ export default function DashboardScreen() {
                   }}
                   activeOpacity={0.7}
                 >
-                  <View style={[styles.portalIconContainer, { backgroundColor: colors.bg }]}>
-                    {renderPortalIcon(mod.iconName, colors.fg, 20)}
+                  <View style={[styles.serviceIconCircle, { backgroundColor: colors.bg }]}>
+                    {renderServiceCardIcon(mod.id, mod.iconName, colors.fg, 20)}
                   </View>
-                  <Text style={styles.portalLabel} numberOfLines={1}>
+                  <Text style={styles.serviceSquareLabel} numberOfLines={1}>
                     {mod.title}
-                  </Text>
-                  <Text style={styles.portalScopeTag} numberOfLines={1}>
-                    {mod.subtitle}
                   </Text>
                 </TouchableOpacity>
               );
             })}
+          </ScrollView>
 
-            {/* All Portals Card */}
-            <TouchableOpacity
-              style={[
-                styles.portalCard,
-                styles.allPortalsCard,
-                { width: portalCardWidth },
-              ]}
-              onPress={() => setDrawerVisible(true)}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.portalIconContainer, { backgroundColor: '#EFF6FF' }]}>
-                <Layers size={20} color="#1E3A8A" />
-              </View>
-              <Text style={[styles.portalLabel, { color: '#1E3A8A', fontWeight: '800' }]} numberOfLines={1}>
-                All ({activeModules.length})
-              </Text>
-              <Text style={[styles.portalScopeTag, { color: '#1D4ED8' }]}>View All</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* 4. CAMPUS EVENTS & NOTICES SECTION */}
+          {/* 4. CAMPUS EVENTS SECTION */}
           {combinedFeed.length > 0 && (
             <View style={styles.sectionContainer}>
               <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionTitle}>Notices & Events</Text>
+                <Text style={styles.sectionTitle}>Campus Events</Text>
                 <TouchableOpacity
                   onPress={() => router.push('/(tabs)/announcements')}
                   style={styles.viewAllRow}
@@ -677,11 +725,14 @@ export default function DashboardScreen() {
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.horizontalCardsScroll}
+                removeClippedSubviews={Platform.OS === 'android'}
+                nestedScrollEnabled={true}
+                overScrollMode="never"
               >
                 {combinedFeed.map((item) => (
                   <TouchableOpacity
                     key={item.id}
-                    style={styles.eventCard}
+                    style={[styles.eventCard, { width: horizontalCardWidth }]}
                     onPress={() => router.push(item.type === 'event' ? '/student-module/events' as any : '/(tabs)/announcements' as any)}
                     activeOpacity={0.85}
                   >
@@ -740,13 +791,16 @@ export default function DashboardScreen() {
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.horizontalCardsScroll}
+                removeClippedSubviews={Platform.OS === 'android'}
+                nestedScrollEnabled={true}
+                overScrollMode="never"
               >
                 {displayClubs.map((club) => {
                   const isJoined = joinedClubIds[club.id] || club.userStatus === 'approved';
                   return (
                     <TouchableOpacity
                       key={club.id}
-                      style={styles.clubCard}
+                      style={[styles.clubCard, { width: horizontalCardWidth }]}
                       onPress={() => router.push('/student-module/clubs' as any)}
                       activeOpacity={0.85}
                     >
@@ -971,13 +1025,62 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 20,
   },
+  servicesHorizontalScroll: {
+    paddingVertical: 4,
+    gap: 12,
+    marginBottom: 20,
+  },
+  serviceSquareCard: {
+    width: 78,
+    height: 88,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    paddingVertical: 6,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 3,
+      },
+      android: {
+        elevation: 1,
+      },
+    }),
+  },
+  allServicesCard: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#CBD5E1',
+  },
+  serviceIconCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  serviceSquareLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#1E293B',
+    textAlign: 'center',
+    width: '100%',
+  },
   portalCard: {
     flexShrink: 0,
-    minHeight: 100,
+    minHeight: 96,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
@@ -986,24 +1089,26 @@ const styles = StyleSheet.create({
     borderColor: '#CBD5E1',
   },
   portalIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
   },
   portalLabel: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#1E293B',
     textAlign: 'center',
+    width: '100%',
   },
   portalScopeTag: {
     fontSize: 9,
     color: '#64748B',
     marginTop: 2,
     textAlign: 'center',
+    width: '100%',
   },
   sectionContainer: {
     marginBottom: 20,
@@ -1107,11 +1212,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
     overflow: 'hidden',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
   },
   clubCardBanner: {
     width: '100%',

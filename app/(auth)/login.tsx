@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,11 @@ import {
   Platform,
   TouchableOpacity,
   Image,
+  Keyboard,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { User, Lock, Eye, EyeOff } from 'lucide-react-native';
+import { User, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import CustomInput from '../../src/components/CustomInput';
 import CustomButton from '../../src/components/CustomButton';
@@ -19,14 +20,42 @@ import CustomButton from '../../src/components/CustomButton';
 export default function LoginScreen() {
   const router = useRouter();
   const { studentLogin } = useAuth();
+  const scrollRef = useRef<ScrollView>(null);
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+
+  // Automatically scroll up when keyboard opens while password field is focused
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        if (isPasswordFocused) {
+          setTimeout(() => {
+            scrollRef.current?.scrollToEnd({ animated: true });
+          }, 80);
+        }
+      }
+    );
+
+    return () => {
+      showSub.remove();
+    };
+  }, [isPasswordFocused]);
+
+  const handlePasswordFocus = () => {
+    setIsPasswordFocused(true);
+    setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }, 150);
+  };
 
   const handleLogin = async () => {
+    Keyboard.dismiss();
     setError(null);
     const cleanId = identifier.trim();
 
@@ -62,66 +91,110 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
       style={styles.container}
     >
       <StatusBar style="dark" />
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        {/* College Logo / Header */}
+
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Branding & Welcome Header */}
         <View style={styles.header}>
           <Image
             source={require('../../assets/campo-logo.png')}
             style={styles.logo}
             resizeMode="contain"
           />
-          <Text style={styles.appName}></Text>
-          <Text style={styles.appSubtitle}>Student Portal</Text>
-        </View>
 
-        {/* Error Alert */}
-        {error && (
-          <View style={styles.errorBanner}>
-            <Text style={styles.errorBannerText}>{error}</Text>
+          <View style={styles.portalBadge}>
+            <Text style={styles.portalBadgeText}>STUDENT PORTAL</Text>
           </View>
-        )}
 
-        {/* Inputs */}
-        <CustomInput
-          label="Roll Number / PIN / Email"
-          placeholder="e.g. 246T1A0301 or PIN"
-          value={identifier}
-          onChangeText={setIdentifier}
-          autoCapitalize="none"
-          leftIcon={<User size={20} color="#64748B" />}
-        />
-
-        <CustomInput
-          label="Password"
-          placeholder="Enter your password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry={!showPassword}
-          leftIcon={<Lock size={20} color="#64748B" />}
-          rightIcon={
-            showPassword ? <EyeOff size={20} color="#64748B" /> : <Eye size={20} color="#64748B" />
-          }
-          onRightIconPress={() => setShowPassword(!showPassword)}
-        />
-
-        <View style={styles.actionsRow}>
-          <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>
-            <Text style={styles.forgotText}>Forgot Password?</Text>
-          </TouchableOpacity>
+          <Text style={styles.welcomeTitle}>Welcome Back</Text>
         </View>
 
-        {/* Submit Button */}
-        <CustomButton
-          title="Sign In as Student"
-          onPress={handleLogin}
-          isLoading={loading}
-          style={styles.submitBtn}
-        />
+        {/* Clean Input Form (Without background card box) */}
+        <View style={styles.formContainer}>
+          {/* Error Banner */}
+          {error && (
+            <View style={styles.errorBanner}>
+              <AlertCircle size={18} color="#B91C1C" style={styles.errorIcon} />
+              <Text style={styles.errorBannerText}>{error}</Text>
+            </View>
+          )}
 
+          {/* Roll Number / PIN / Email Field */}
+          <CustomInput
+            label="Roll Number / PIN / Email"
+            placeholder="e.g. 246T1A0301 or PIN"
+            value={identifier}
+            onChangeText={(text) => {
+              setIdentifier(text);
+              if (error) setError(null);
+            }}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="next"
+            leftIcon={<User size={19} color="#64748B" />}
+          />
+
+          {/* Password Field */}
+          <CustomInput
+            label="Password"
+            placeholder="Enter your password"
+            value={password}
+            onChangeText={(text) => {
+              setPassword(text);
+              if (error) setError(null);
+            }}
+            secureTextEntry={!showPassword}
+            autoCapitalize="none"
+            returnKeyType="done"
+            onSubmitEditing={handleLogin}
+            onFocus={handlePasswordFocus}
+            onBlur={() => setIsPasswordFocused(false)}
+            leftIcon={<Lock size={19} color="#64748B" />}
+            rightIcon={
+              showPassword ? <EyeOff size={19} color="#64748B" /> : <Eye size={19} color="#64748B" />
+            }
+            onRightIconPress={() => setShowPassword(!showPassword)}
+          />
+
+          {/* Forgot Password Link */}
+          <View style={styles.actionsRow}>
+            <TouchableOpacity
+              onPress={() => router.push('/(auth)/forgot-password')}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.forgotText}>Forgot Password?</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Submit Button */}
+          <CustomButton
+            title="Sign In as Student"
+            onPress={handleLogin}
+            isLoading={loading}
+            icon={!loading ? <ArrowRight size={18} color="#FFFFFF" /> : undefined}
+            style={styles.submitBtn}
+          />
+        </View>
+
+        {/* Footer / Support Notice */}
+        <View style={styles.footer}>
+          <View style={styles.securityRow}>
+            <ShieldCheck size={14} color="#64748B" />
+            <Text style={styles.securityText}>Secured by Campo Unified Authentication</Text>
+          </View>
+          <Text style={styles.supportText}>
+            Need assistance? Reach out to your Campus Administration
+          </Text>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -135,47 +208,76 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 40,
+    paddingTop: Platform.OS === 'ios' ? 50 : 40,
+    paddingBottom: 60,
     justifyContent: 'center',
   },
   header: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 26,
   },
   logo: {
-    width: 190,
-    height: 56,
-    marginBottom: 14,
+    width: 200,
+    height: 58,
+    marginBottom: 16,
   },
-  appName: {
-    fontSize: 21,
+  portalBadge: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+    marginBottom: 12,
+  },
+  portalBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1D4ED8',
+    letterSpacing: 0.8,
+  },
+  welcomeTitle: {
+    fontSize: 24,
     fontWeight: '800',
-    color: '#1E3A8A',
+    color: '#0F172A',
     textAlign: 'center',
+    letterSpacing: -0.3,
+    marginBottom: 6,
   },
-  appSubtitle: {
-    fontSize: 13,
+  welcomeSubtitle: {
+    fontSize: 13.5,
+    lineHeight: 20,
     color: '#64748B',
-    marginTop: 4,
     textAlign: 'center',
+    paddingHorizontal: 16,
+  },
+  formContainer: {
+    width: '100%',
   },
   errorBanner: {
-    backgroundColor: '#FEE2E2',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
     borderWidth: 1,
     borderColor: '#FCA5A5',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginBottom: 18,
+  },
+  errorIcon: {
+    marginRight: 8,
   },
   errorBannerText: {
     color: '#B91C1C',
     fontSize: 13,
     fontWeight: '600',
+    flex: 1,
     lineHeight: 18,
   },
   actionsRow: {
     alignItems: 'flex-end',
+    marginTop: -4,
     marginBottom: 20,
   },
   forgotText: {
@@ -184,7 +286,29 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   submitBtn: {
-    marginTop: 4,
     backgroundColor: '#1E3A8A',
+    borderRadius: 12,
+    height: 50,
+  },
+  footer: {
+    alignItems: 'center',
+    marginTop: 28,
+    paddingHorizontal: 16,
+    gap: 6,
+  },
+  securityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  securityText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  supportText: {
+    fontSize: 11.5,
+    color: '#94A3B8',
+    textAlign: 'center',
   },
 });

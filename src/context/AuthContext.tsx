@@ -36,6 +36,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setToken(storedToken);
           setUser(JSON.parse(storedUser));
           setUserType(storedType || 'student');
+
+          // Silently refresh token in the background to upgrade to long-lived 10-year token
+          authService.verifyToken().then((res) => {
+            if (res?.token && res.token !== storedToken) {
+              setToken(res.token);
+              AsyncStorage.setItem(STORAGE_KEYS.TOKEN, res.token);
+            }
+          }).catch(() => {
+            // Keep persistent session even if offline or network drops
+          });
         }
       } catch (e) {
         console.error('Failed to restore auth session from storage', e);
@@ -108,9 +118,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshSession = async () => {
     try {
-      await authService.verifyToken();
+      const res = await authService.verifyToken();
+      if (res?.token) {
+        setToken(res.token);
+        await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, res.token);
+      }
     } catch {
-      await logout();
+      // Do not log out on transient errors; keep persistent session intact
     }
   };
 

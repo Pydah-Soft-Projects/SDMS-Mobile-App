@@ -10,7 +10,10 @@
     "lint": "expo lint",
     "build:apk": "eas build -p android --profile production-apk",
     "build:android:apk": "eas build -p android --profile production-apk",
-    "build:apk:local": "eas build -p android --profile production-apk --local"
+    "build:apk:local": "eas build -p android --profile production-apk --local",
+    "update": "eas update --branch production",
+    "update:production": "eas update --branch production",
+    "update:preview": "eas update --branch preview"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -20,6 +23,7 @@
     "expo-font": "^14.0.10",
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.12",
+    "expo-notifications": "^0.32.17",
     "expo-router": "~6.0.24",
     "expo-splash-screen": "^31.0.13",
     "expo-status-bar": "~3.0.9",

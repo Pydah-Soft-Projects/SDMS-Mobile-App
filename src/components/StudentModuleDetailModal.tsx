@@ -48,6 +48,7 @@ import api, { getStaticFileUrl } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DefaultEventPoster from './DefaultEventPoster';
+import StudentTimetableView from './StudentTimetableView';
 import logger from '../utils/logger';
 import studentService from '../services/studentService';
 
@@ -398,7 +399,14 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
           setData(res.data?.data || res.data?.timetable || []);
         } else if (module.id === 'events') {
           const res = await api.get('/events/student');
-          setData(res.data?.data || res.data?.events || []);
+          const rawEvents = res.data?.data || res.data?.events || [];
+          const sorted = (Array.isArray(rawEvents) ? rawEvents : []).slice().sort((a: any, b: any) => {
+            const timeA = new Date(a.event_date || a.createdAt || 0).getTime();
+            const timeB = new Date(b.event_date || b.createdAt || 0).getTime();
+            if (timeB !== timeA) return timeB - timeA;
+            return Number(b.id || 0) - Number(a.id || 0);
+          });
+          setData(sorted);
         } else if (module.id === 'semester-registration') {
           const [studRes, schRes] = await Promise.all([
             api.get(`/students/${admissionNo}`).catch(() => null),
@@ -534,51 +542,9 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
           </View>
         ) : (
           <ScrollView contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 24) + 24 }]} showsVerticalScrollIndicator={false}>
-            {/* 1. Timetable View */}
+            {/* 1. Timetable View (Matches Image 1 design & live period highlighting) */}
             {module.id === 'timetable' && (
-              <View style={styles.section}>
-                {Array.isArray(data) && data.length > 0 ? (
-                  data.map((item: any, idx: number) => (
-                    <View key={item.id || idx} style={styles.card}>
-                      <View style={styles.cardBannerWrapper}>
-                        {item.image_url || item.banner_image ? (
-                          <Image
-                            source={{ uri: getStaticFileUrl(item.image_url || item.banner_image) }}
-                            style={styles.cardBannerImg}
-                            resizeMode="cover"
-                          />
-                        ) : (
-                          <DefaultEventPoster style={styles.cardBannerImg} />
-                        )}
-                      </View>
-                      <View style={styles.cardHeader}>
-                        <Text style={styles.cardHighlight}>{item.day_of_week || 'SCHEDULE'}</Text>
-                        <Text style={styles.cardTime}>Period {item.period_slot_id || item.slot_name || idx + 1}</Text>
-                      </View>
-                      <Text style={styles.cardTitle}>{item.subject_name || item.subject_code || 'Academic Session'}</Text>
-                      <View style={styles.cardFooter}>
-                        <Text style={styles.cardSub}>
-                          {item.faculty_name ? `Faculty: ${item.faculty_name}` : 'Department Faculty'}
-                        </Text>
-                        {item.room_number ? <Text style={styles.roomTag}>Room {item.room_number}</Text> : null}
-                      </View>
-                      {item.start_time && item.end_time ? (
-                        <Text style={styles.timeScheduleText}>
-                          {item.start_time} - {item.end_time}
-                        </Text>
-                      ) : null}
-                    </View>
-                  ))
-                ) : (
-                  <View style={styles.emptyCard}>
-                    <Inbox size={28} color="#94A3B8" />
-                    <Text style={styles.emptyTitle}>No Timetable Published</Text>
-                    <Text style={styles.emptySub}>
-                      No class timetable schedule has been published for {branch || 'your branch'} Semester {semester || 'term'} yet.
-                    </Text>
-                  </View>
-                )}
-              </View>
+              <StudentTimetableView data={data} student={student} />
             )}
 
             {/* 2. Events & Academic Calendar */}
@@ -1039,7 +1005,7 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
                               ? { uri: getStaticFileUrl(item.image_url || item.image || item.club_image) }
                               : (item.has_image || item.id)
                               ? { uri: getStaticFileUrl(`/api/clubs/${item.id}/image`) }
-                              : require('../../assets/pydah-logo.png')
+                              : require('../../assets/campo-logo.png')
                           }
                           style={styles.cardBannerImg}
                           resizeMode="cover"

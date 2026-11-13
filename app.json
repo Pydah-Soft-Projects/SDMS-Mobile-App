@@ -1,10 +1,15 @@
 {
   "expo": {
     "name": "Campo Student Portal",
-    "slug": "campo-student-app",
-    "version": "1.0.0",
+    "slug": "pydah-student-app",
+    "version": "1.2.1",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/campo-icon.png",
+    "splash": {
+      "image": "./assets/campo-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
     "scheme": "pydahstudent",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -13,25 +18,37 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#1E3A8A"
+        "foregroundImage": "./assets/campo-icon.png",
+        "backgroundColor": "#FFFFFF"
       },
       "package": "com.pydahsoft.studentapp",
-      "usesCleartextTraffic": true
+      "usesCleartextTraffic": true,
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "POST_NOTIFICATIONS"
+      ]
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/campo-icon.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/splash-icon.png",
+          "image": "./assets/campo-icon.png",
           "resizeMode": "contain",
-          "backgroundColor": "#1E3A8A"
+          "backgroundColor": "#FFFFFF"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/campo-icon.png",
+          "color": "#1E3A8A"
         }
       ]
     ],

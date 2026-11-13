@@ -15,6 +15,7 @@ export const api = axios.create({
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
+    'X-Client-Type': 'mobile',
   },
 });
 
@@ -33,6 +34,9 @@ api.interceptors.request.use(
     config.baseURL = API_BASE_URL;
 
     try {
+      if (config.headers) {
+        config.headers['X-Client-Type'] = 'mobile';
+      }
       const token = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
       if (token && config.headers) {
         config.headers.Authorization = `Bearer ${token}`;
@@ -76,19 +80,29 @@ api.interceptors.response.use(
       fullUrl.includes('/otp/verify') ||
       fullUrl.includes('/sso-session');
 
+    // Do not abruptly drop the session or kick out the user on incidental 401s.
+    // Persistent mobile authentication keeps the user logged in until they explicitly sign out.
+    // Only clear credentials if the core auth verification explicitly confirms the account was deactivated or revoked.
     if (status === 401 && !isLoginEndpoint) {
-      logger.warn('AUTH', 'Session expired (401) - clearing credentials');
-      try {
-        await AsyncStorage.multiRemove([
-          STORAGE_KEYS.TOKEN,
-          STORAGE_KEYS.USER,
-          STORAGE_KEYS.USER_TYPE,
-        ]);
-        if (onSessionExpiry) {
-          onSessionExpiry();
+      logger.warn('AUTH', 'Received 401 Unauthorized response', { fullUrl, errMsg });
+      const isAccountRevoked =
+        fullUrl.includes('/auth/verify') &&
+        (errData?.deactivated || errData?.revoked || errData?.message === 'Account deactivated');
+
+      if (isAccountRevoked) {
+        logger.warn('AUTH', 'Session revoked by server - clearing credentials');
+        try {
+          await AsyncStorage.multiRemove([
+            STORAGE_KEYS.TOKEN,
+            STORAGE_KEYS.USER,
+            STORAGE_KEYS.USER_TYPE,
+          ]);
+          if (onSessionExpiry) {
+            onSessionExpiry();
+          }
+        } catch (e) {
+          logger.error('AUTH', 'Error clearing session storage', e);
         }
-      } catch (e) {
-        logger.error('AUTH', 'Error clearing session storage', e);
       }
     }
 

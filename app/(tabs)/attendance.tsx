@@ -8,6 +8,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
 import { Calendar, CheckCircle2, XCircle, Clock, AlertTriangle, CalendarDays } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
@@ -131,6 +132,10 @@ export default function AttendanceScreen() {
         <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) + 84 }]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          showsVerticalScrollIndicator={false}
+          removeClippedSubviews={Platform.OS === 'android'}
+          scrollEventThrottle={16}
+          overScrollMode="never"
         >
           {/* Main Attendance Score Card */}
           <View style={styles.overviewCard}>
@@ -268,6 +273,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
     gap: 8,
+    maxWidth: 720,
+    alignSelf: 'center',
+    width: '100%',
   },
   tabBtn: {
     flex: 1,
@@ -300,6 +308,9 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     paddingBottom: 40,
+    maxWidth: 720,
+    alignSelf: 'center',
+    width: '100%',
   },
   overviewCard: {
     backgroundColor: '#FFFFFF',

@@ -11,6 +11,7 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { User, Mail, Phone, BookOpen, GraduationCap, ShieldAlert, LogOut, KeyRound } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
@@ -117,7 +118,13 @@ export default function ProfileScreen() {
     <View style={styles.container}>
       <Header title="My Profile" subtitle="Account & Academic Records" showLogout={false} />
 
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) + 84 }]}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) + 84 }]}
+        showsVerticalScrollIndicator={false}
+        removeClippedSubviews={Platform.OS === 'android'}
+        scrollEventThrottle={16}
+        overScrollMode="never"
+      >
         {/* Profile Card */}
         <View style={styles.profileCard}>
           {avatarUrl ? (
@@ -399,6 +406,9 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     paddingBottom: 40,
+    maxWidth: 720,
+    alignSelf: 'center',
+    width: '100%',
   },
   profileCard: {
     backgroundColor: '#FFFFFF',

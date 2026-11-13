@@ -47,6 +47,7 @@ export const authService = {
         username: identifier,
         password: payload.password,
         expectedRole: 'student',
+        isMobile: true,
       });
     } catch (err: any) {
       logger.warn('AUTH', 'Unified login endpoint failed, falling back to /students/login', err.message);
@@ -55,6 +56,7 @@ export const authService = {
         username: identifier,
         rollNumber: identifier,
         password: payload.password,
+        isMobile: true,
       });
     }
 
@@ -131,6 +133,7 @@ export const authService = {
       username: identifier,
       password: payload.password,
       expectedRole: 'staff',
+      isMobile: true,
     });
 
     const data = response.data;

@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
   Linking,
+  Platform,
 } from 'react-native';
 import { CreditCard, CheckCircle2, Clock, ShieldCheck, Download, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
@@ -117,6 +118,10 @@ export default function FeesScreen() {
         <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) + 84 }]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          showsVerticalScrollIndicator={false}
+          removeClippedSubviews={Platform.OS === 'android'}
+          scrollEventThrottle={16}
+          overScrollMode="never"
         >
           {/* Error Banner */}
           {fetchError && (
@@ -282,6 +287,9 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     paddingBottom: 40,
+    maxWidth: 720,
+    alignSelf: 'center',
+    width: '100%',
   },
   errorCard: {
     flexDirection: 'row',

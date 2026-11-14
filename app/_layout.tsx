@@ -36,7 +36,7 @@ function RootNavigation() {
   // Notification Permission Request Modal State
   const [showPermissionModal, setShowPermissionModal] = useState(false);
 
-  // 1. Trigger modal when update has finished downloading in the background
+  // 1. Trigger modal when update has finished downloading in the background via official hook
   useEffect(() => {
     if (!Updates.isEnabled || Platform.OS === 'web' || !isUpdatePending || userDismissedRef.current) return;
 
@@ -44,7 +44,7 @@ function RootNavigation() {
     setShowUpdateModal(true);
   }, [isUpdatePending]);
 
-  // 2. Trigger modal when a new update is detected on the server (and not yet finished downloading)
+  // 2. Trigger modal when a new update is detected on the server via official hook
   useEffect(() => {
     if (!Updates.isEnabled || Platform.OS === 'web' || !isUpdateAvailable || isUpdatePending || userDismissedRef.current) return;
 
@@ -52,29 +52,49 @@ function RootNavigation() {
     setShowUpdateModal(true);
   }, [isUpdateAvailable, isUpdatePending]);
 
-  // 3. Proactively check for updates on startup and whenever the app resumes to foreground
+  // 3. Proactively check for updates on startup, every 45s while active, and whenever app resumes
   useEffect(() => {
-    if (__DEV__ || isLoading || Platform.OS === 'web' || !Updates.isEnabled) return;
+    if (__DEV__ || Platform.OS === 'web' || !Updates.isEnabled) return;
+
+    let isChecking = false;
 
     const performUpdateCheck = async () => {
+      if (isChecking || userDismissedRef.current) return;
+      isChecking = true;
       try {
-        if (__DEV__ || !Updates.isEnabled) return;
         const result = await Updates.checkForUpdateAsync();
         if (result.isAvailable) {
+          logger.info('UPDATES', 'New update detected on server!');
+          // Immediately show update modal on whichever page the student is currently viewing
+          setShowUpdateModal(true);
+          setModalIsPending(false);
+
+          // Fetch update in background
           try {
-            await Updates.fetchUpdateAsync();
+            const fetchResult = await Updates.fetchUpdateAsync();
+            if (fetchResult.isNew) {
+              setModalIsPending(true);
+            }
           } catch (fetchErr) {
             logger.warn('UPDATES', 'Background update prefetch failed', fetchErr);
           }
         }
       } catch (error: any) {
         if (error?.code !== 'ERR_NOT_SUPPORTED') {
-          logger.error('UPDATES', 'Failed to check for update', error);
+          logger.warn('UPDATES', 'Update check notice', error?.message);
         }
+      } finally {
+        isChecking = false;
       }
     };
 
+    // Run immediately on boot
     performUpdateCheck();
+
+    // Continuously check every 45 seconds so update appears on any page without reloading
+    const updateInterval = setInterval(() => {
+      performUpdateCheck();
+    }, 45000);
 
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
@@ -83,9 +103,10 @@ function RootNavigation() {
     });
 
     return () => {
+      clearInterval(updateInterval);
       subscription.remove();
     };
-  }, [isLoading]);
+  }, []);
 
   // Handle action when user confirms update in modal
   const handleConfirmUpdate = async () => {
@@ -137,14 +158,14 @@ function RootNavigation() {
     notificationService.registerForPushNotifications();
     notificationService.checkForNewAlerts();
 
-    // Check if notification permission modal should be prompted to user (only if native notifications exist)
-    if (Notifications) {
+    // Check if notification permission modal should be prompted to user
+    const timer = setTimeout(() => {
       notificationService.shouldShowPermissionModal().then((shouldShow) => {
         if (shouldShow) {
           setShowPermissionModal(true);
         }
       });
-    }
+    }, 600);
 
     // Check for new circulars and events every 45 seconds while active
     const pollInterval = setInterval(() => {
@@ -154,20 +175,35 @@ function RootNavigation() {
     const appStateSub = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         notificationService.checkForNewAlerts();
+        notificationService.shouldShowPermissionModal().then((shouldShow) => {
+          if (shouldShow) {
+            setShowPermissionModal(true);
+          }
+        });
       }
     });
 
-    let subscription: any = null;
+    let responseSubscription: any = null;
+    let receivedSubscription: any = null;
+
+    try {
+      if (Notifications?.addNotificationReceivedListener) {
+        receivedSubscription = Notifications.addNotificationReceivedListener(() => {
+          notificationService.getUnreadCount();
+        });
+      }
+    } catch {}
+
     try {
       if (Notifications?.addNotificationResponseReceivedListener) {
-        subscription = Notifications.addNotificationResponseReceivedListener((response: any) => {
+        responseSubscription = Notifications.addNotificationResponseReceivedListener((response: any) => {
           try {
             const data = response?.notification?.request?.content?.data;
-            if (data?.url) {
-              router.push(data.url as any);
-            } else {
-              router.push('/(tabs)/announcements' as any);
+            let targetUrl = data?.url || '/(tabs)/announcements';
+            if (targetUrl.includes('announcement') || targetUrl.includes('event')) {
+              targetUrl = '/(tabs)/announcements';
             }
+            router.push(targetUrl as any);
           } catch {
             router.push('/(tabs)/announcements' as any);
           }
@@ -178,9 +214,11 @@ function RootNavigation() {
     }
 
     return () => {
+      clearTimeout(timer);
       clearInterval(pollInterval);
       appStateSub.remove();
-      subscription?.remove?.();
+      receivedSubscription?.remove?.();
+      responseSubscription?.remove?.();
     };
   }, [isAuthenticated]);
 

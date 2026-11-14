@@ -48,6 +48,7 @@ import api, { getStaticFileUrl } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DefaultEventPoster from './DefaultEventPoster';
+import { isExamRelated } from '../utils/filterUtils';
 import StudentTimetableView from './StudentTimetableView';
 import logger from '../utils/logger';
 import studentService from '../services/studentService';
@@ -400,12 +401,15 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
         } else if (module.id === 'events') {
           const res = await api.get('/events/student');
           const rawEvents = res.data?.data || res.data?.events || [];
-          const sorted = (Array.isArray(rawEvents) ? rawEvents : []).slice().sort((a: any, b: any) => {
-            const timeA = new Date(a.event_date || a.createdAt || 0).getTime();
-            const timeB = new Date(b.event_date || b.createdAt || 0).getTime();
-            if (timeB !== timeA) return timeB - timeA;
-            return Number(b.id || 0) - Number(a.id || 0);
-          });
+          const sorted = (Array.isArray(rawEvents) ? rawEvents : [])
+            .filter((item: any) => !isExamRelated(item))
+            .slice()
+            .sort((a: any, b: any) => {
+              const timeA = new Date(a.event_date || a.createdAt || 0).getTime();
+              const timeB = new Date(b.event_date || b.createdAt || 0).getTime();
+              if (timeB !== timeA) return timeB - timeA;
+              return Number(b.id || 0) - Number(a.id || 0);
+            });
           setData(sorted);
         } else if (module.id === 'semester-registration') {
           const [studRes, schRes] = await Promise.all([

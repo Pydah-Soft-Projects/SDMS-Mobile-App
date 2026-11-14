@@ -30,6 +30,7 @@ import Header from '../../src/components/Header';
 import announcementService from '../../src/services/announcementService';
 import studentService from '../../src/services/studentService';
 import notificationService from '../../src/services/notificationService';
+import { isExamRelated } from '../../src/utils/filterUtils';
 import { Announcement } from '../../src/types';
 import api, { getStaticFileUrl } from '../../src/config/api';
 import DefaultEventPoster from '../../src/components/DefaultEventPoster';
@@ -85,8 +86,11 @@ export default function AnnouncementsScreen() {
         notificationService.checkHasPermission(),
       ]);
 
-      setAnnouncements(announcesData || []);
-      setEvents(sortEventsNewestFirst(eventsData || []));
+      const filteredAnnouncements = (announcesData || []).filter((item: any) => !isExamRelated(item));
+      const filteredEvents = sortEventsNewestFirst((eventsData || []).filter((item: any) => !isExamRelated(item)));
+
+      setAnnouncements(filteredAnnouncements);
+      setEvents(filteredEvents);
       setHasPermission(permissionStatus);
 
       // Mark all notices as seen when the screen loads
@@ -136,7 +140,7 @@ export default function AnnouncementsScreen() {
       }
       // Refresh event list
       const updatedEvents = await studentService.getEvents();
-      setEvents(sortEventsNewestFirst(updatedEvents || []));
+      setEvents(sortEventsNewestFirst((updatedEvents || []).filter((item: any) => !isExamRelated(item))));
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Action failed. Please try again.';
       Alert.alert('Event Action', msg);
@@ -222,7 +226,13 @@ export default function AnnouncementsScreen() {
                 style={styles.permissionCardBtn}
                 onPress={async () => {
                   const granted = await notificationService.requestPermissionWithPrompt();
-                  if (granted) setHasPermission(true);
+                  if (granted) {
+                    setHasPermission(true);
+                    Alert.alert(
+                      'Notifications Enabled',
+                      'You are now set up to receive instant alerts for important college circulars and events.'
+                    );
+                  }
                 }}
                 activeOpacity={0.8}
               >

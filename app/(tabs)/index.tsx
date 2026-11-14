@@ -60,6 +60,7 @@ import {
 import { StudentModuleDetailModal, StudentModuleItem } from '../../src/components/StudentModuleDetailModal';
 import { getStaticFileUrl } from '../../src/config/api';
 import DefaultEventPoster from '../../src/components/DefaultEventPoster';
+import { isExamRelated } from '../../src/utils/filterUtils';
 
 const SafeEventImage: React.FC<{ uri?: string | null; style: any }> = ({ uri, style }) => {
   const [loadError, setLoadError] = useState(false);
@@ -340,6 +341,7 @@ export default function DashboardScreen() {
   const combinedFeed = useMemo(() => {
     const items: any[] = [];
     announcements.forEach((a) => {
+      if (isExamRelated(a)) return;
       items.push({
         type: 'announcement',
         id: `ann-${a.id}`,
@@ -356,6 +358,7 @@ export default function DashboardScreen() {
     });
 
     events.forEach((e) => {
+      if (isExamRelated(e)) return;
       items.push({
         type: 'event',
         id: `evt-${e.id}`,

@@ -1,5 +1,6 @@
 import api, { getStaticFileUrl } from '../config/api';
 import logger from '../utils/logger';
+import { isExamRelated } from '../utils/filterUtils';
 import {
   StudentUser,
   StudentAttendanceData,
@@ -146,23 +147,25 @@ export const studentService = {
 
       if (!Array.isArray(list)) return [];
 
-      return list.map((item: any) => {
-        const rawImg =
-          item.image_url ||
-          item.imageUrl ||
-          (item.has_image ? `/api/announcements/${item.id}/image` : null) ||
-          item.attachment_url;
-        return {
-          id: item.id,
-          title: item.title,
-          content: item.content || item.description || '',
-          priority: item.priority || 'medium',
-          createdAt: item.created_at || item.createdAt || new Date().toISOString(),
-          category: item.category || 'General',
-          imageUrl: rawImg ? getStaticFileUrl(rawImg) : undefined,
-          attachmentUrl: item.attachment_url ? getStaticFileUrl(item.attachment_url) : undefined,
-        };
-      });
+      return list
+        .filter((item: any) => !isExamRelated(item))
+        .map((item: any) => {
+          const rawImg =
+            item.image_url ||
+            item.imageUrl ||
+            (item.has_image ? `/api/announcements/${item.id}/image` : null) ||
+            item.attachment_url;
+          return {
+            id: item.id,
+            title: item.title,
+            content: item.content || item.description || '',
+            priority: item.priority || 'medium',
+            createdAt: item.created_at || item.createdAt || new Date().toISOString(),
+            category: item.category || 'General',
+            imageUrl: rawImg ? getStaticFileUrl(rawImg) : undefined,
+            attachmentUrl: item.attachment_url ? getStaticFileUrl(item.attachment_url) : undefined,
+          };
+        });
     } catch (e: any) {
       logger.warn('STUDENT_SERVICE', 'Failed to fetch announcements', e.message);
       return [];
@@ -234,12 +237,15 @@ export const studentService = {
       const res = await api.get('/events/student');
       const list = res.data?.data || res.data?.events || (Array.isArray(res.data) ? res.data : []);
       if (Array.isArray(list)) {
-        return list.slice().sort((a: any, b: any) => {
-          const timeA = new Date(a.event_date || a.createdAt || 0).getTime();
-          const timeB = new Date(b.event_date || b.createdAt || 0).getTime();
-          if (timeB !== timeA) return timeB - timeA;
-          return Number(b.id || 0) - Number(a.id || 0);
-        });
+        return list
+          .filter((item: any) => !isExamRelated(item))
+          .slice()
+          .sort((a: any, b: any) => {
+            const timeA = new Date(a.event_date || a.createdAt || 0).getTime();
+            const timeB = new Date(b.event_date || b.createdAt || 0).getTime();
+            if (timeB !== timeA) return timeB - timeA;
+            return Number(b.id || 0) - Number(a.id || 0);
+          });
       }
       return [];
     } catch (e: any) {

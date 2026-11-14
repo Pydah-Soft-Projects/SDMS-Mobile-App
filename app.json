@@ -2,7 +2,7 @@
   "expo": {
     "name": "Campo Student Portal",
     "slug": "pydah-student-app",
-    "version": "1.2.1",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/campo-icon.png",
     "splash": {
@@ -18,7 +18,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/campo-icon.png",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
       "package": "com.pydahsoft.studentapp",
@@ -26,7 +26,8 @@
       "permissions": [
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "WAKE_LOCK"
       ]
     },
     "web": {
@@ -48,7 +49,8 @@
         "expo-notifications",
         {
           "icon": "./assets/campo-icon.png",
-          "color": "#1E3A8A"
+          "color": "#1E3A8A",
+          "sounds": ["default"]
         }
       ]
     ],

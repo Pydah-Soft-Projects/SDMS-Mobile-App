@@ -22,6 +22,7 @@ import {
   Award,
 } from 'lucide-react-native';
 import notificationService, { InAppAlert } from '../services/notificationService';
+import { isExamRelated } from '../utils/filterUtils';
 
 export const NotificationBanner: React.FC = () => {
   const router = useRouter();
@@ -33,6 +34,7 @@ export const NotificationBanner: React.FC = () => {
   const topOffset = Math.max(insets.top, Platform.OS === 'android' ? 24 : 12);
 
   const showBanner = (newAlert: InAppAlert) => {
+    if (!newAlert || isExamRelated(newAlert)) return;
     setAlert(newAlert);
     if (dismissTimer.current) clearTimeout(dismissTimer.current);
 
@@ -69,7 +71,7 @@ export const NotificationBanner: React.FC = () => {
     };
   }, []);
 
-  if (!alert) return null;
+  if (!alert || isExamRelated(alert)) return null;
 
   const isEvent = alert.type === 'event';
   const categoryStr = (alert.category || '').toLowerCase();
@@ -114,8 +116,8 @@ export const NotificationBanner: React.FC = () => {
     }
   } else {
     // Announcements
-    if (categoryStr.includes('exam') || categoryStr.includes('academic')) {
-      badgeText = '🎓 EXAM / ACADEMIC';
+    if (categoryStr.includes('academic') || categoryStr.includes('syllabus')) {
+      badgeText = '📚 ACADEMIC NOTICE';
       badgeColor = '#2563EB';
       badgeBg = '#EFF6FF';
       IconComponent = GraduationCap;

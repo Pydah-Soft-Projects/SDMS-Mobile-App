@@ -5,10 +5,11 @@ try {
 } catch {
   Notifications = null;
 }
-import { Platform, Linking, Alert } from 'react-native';
+import { Platform, Linking, Alert, PermissionsAndroid } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../config/api';
 import logger from '../utils/logger';
+import { isExamRelated } from '../utils/filterUtils';
 
 const PUSH_TOKEN_STORAGE_KEY = '@campo_expo_push_token';
 const LAST_VIEWED_NOTICES_KEY = '@campo_last_notices_viewed_at';
@@ -16,8 +17,11 @@ const LAST_ALERTED_ID_KEY = '@campo_last_alerted_id';
 const SEEN_ALERT_IDS_KEY = '@campo_seen_alert_ids';
 const ALERTS_BASELINE_INITIALIZED_KEY = '@campo_alerts_baseline_initialized';
 const LAST_CHECKED_TIMESTAMP_KEY = '@campo_last_alert_checked_timestamp';
-const PERMISSION_PROMPTED_KEY = '@campo_notification_prompted';
+const PERMISSION_PROMPTED_KEY = '@campo_notification_prompted_v2';
+const NOTIFICATIONS_ENABLED_KEY = '@campo_notifications_enabled';
 const EAS_PROJECT_ID = 'dfd664bd-0f17-41a3-a4d3-05e1ecb72fcb';
+
+let sessionDismissed = false;
 
 export interface InAppAlert {
   id: string | number;
@@ -28,7 +32,30 @@ export interface InAppAlert {
   url?: string;
 }
 
-// Configure default notification handler for foreground notifications if native module exists
+// Helper to ensure Android notification channel exists with MAX priority for background / lockscreen alerts
+export const ensureAndroidNotificationChannel = async () => {
+  if (Platform.OS === 'android' && Notifications?.setNotificationChannelAsync) {
+    try {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'Campo Campus Updates',
+        description: 'Announcements, events, and important college notices',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#1E3A8A',
+        sound: 'default',
+        enableVibrate: true,
+        showBadge: true,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility?.PUBLIC ?? 1,
+        bypassDnd: false,
+      });
+      logger.info('NOTIFICATIONS', 'Default Android notification channel verified');
+    } catch (e: any) {
+      logger.warn('NOTIFICATIONS', 'Android notification channel init failed', e?.message);
+    }
+  }
+};
+
+// Configure default notification handler for notifications if native module exists
 try {
   if (Notifications?.setNotificationHandler) {
     Notifications.setNotificationHandler({
@@ -41,6 +68,7 @@ try {
       }),
     });
   }
+  ensureAndroidNotificationChannel();
 } catch (e) {
   logger.warn('NOTIFICATIONS', 'Notification handler init skipped', e);
 }
@@ -57,86 +85,139 @@ export const notificationService = {
    * Check if notification permission is currently granted
    */
   async checkHasPermission(): Promise<boolean> {
-    if (Platform.OS === 'web' || !Notifications?.getPermissionsAsync) return false;
+    if (Platform.OS === 'web') return false;
+
+    // 0. Check if user already enabled notifications in-app
     try {
-      const { status } = await Notifications.getPermissionsAsync();
-      return status === 'granted';
-    } catch {
-      return false;
+      const userPref = await AsyncStorage.getItem(NOTIFICATIONS_ENABLED_KEY);
+      if (userPref === 'true') return true;
+    } catch {}
+
+    // 1. Check via expo-notifications if available
+    try {
+      if (Notifications?.getPermissionsAsync) {
+        const { status } = await Notifications.getPermissionsAsync();
+        if (status === 'granted') {
+          await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, 'true');
+          return true;
+        }
+      }
+    } catch {}
+
+    // 2. Check via Android native PermissionsAndroid
+    if (Platform.OS === 'android') {
+      try {
+        if (Number(Platform.Version) >= 33) {
+          const isGranted = await PermissionsAndroid.check(
+            PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+          );
+          if (isGranted) {
+            await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, 'true');
+            return true;
+          }
+        } else {
+          return true;
+        }
+      } catch {
+        return false;
+      }
     }
+
+    return false;
   },
 
   /**
    * Request notification permission with Settings fallback prompt
    */
   async requestPermissionWithPrompt(): Promise<boolean> {
-    if (Platform.OS === 'web' || !Notifications?.getPermissionsAsync) return false;
+    if (Platform.OS === 'web') return false;
 
-    try {
-      const { status: existingStatus, canAskAgain } = await Notifications.getPermissionsAsync();
+    // 1. Try expo-notifications if available
+    if (Notifications?.requestPermissionsAsync) {
+      try {
+        const { status: existingStatus, canAskAgain } = await Notifications.getPermissionsAsync();
 
-      if (existingStatus === 'granted') {
-        await this.registerForPushNotifications();
-        return true;
-      }
-
-      if (canAskAgain || existingStatus === 'undetermined') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        if (status === 'granted') {
+        if (existingStatus === 'granted') {
+          await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, 'true');
           await this.registerForPushNotifications();
           return true;
         }
+
+        if (canAskAgain || existingStatus === 'undetermined') {
+          const { status } = await Notifications.requestPermissionsAsync();
+          if (status === 'granted') {
+            await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, 'true');
+            await this.registerForPushNotifications();
+            return true;
+          }
+        }
+      } catch (e: any) {
+        logger.warn('NOTIFICATIONS', 'Expo requestPermissionsAsync failed', e?.message);
       }
-
-      // If user denied or can't ask again directly, guide them to device Settings
-      Alert.alert(
-        'Enable Notifications in Settings',
-        'Notification permission is currently disabled. Open your device Settings to turn on alerts for campus circulars and events.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Open Settings',
-            onPress: () => {
-              if (Platform.OS === 'ios') {
-                Linking.openURL('app-settings:');
-              } else {
-                Linking.openSettings();
-              }
-            },
-          },
-        ]
-      );
-
-      return false;
-    } catch (e: any) {
-      logger.warn('NOTIFICATIONS', 'Failed to request permission', e?.message);
-      return false;
     }
+
+    // 2. Try Android native system permission dialog
+    if (Platform.OS === 'android') {
+      try {
+        if (Number(Platform.Version) >= 33) {
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+            {
+              title: 'Campo Student Portal Notifications',
+              message: 'Allow notifications for campus circulars, urgent announcements, and events.',
+              buttonPositive: 'Allow',
+              buttonNegative: 'Don\'t Allow',
+            }
+          );
+          if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+            await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, 'true');
+            await this.registerForPushNotifications();
+            return true;
+          }
+        } else {
+          await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, 'true');
+          await this.registerForPushNotifications();
+          return true;
+        }
+      } catch (err: any) {
+        logger.warn('NOTIFICATIONS', 'Android PermissionsAndroid request failed', err?.message);
+      }
+    }
+
+    // Activate in-app notifications and store preference
+    try {
+      await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, 'true');
+    } catch {}
+    await this.registerForPushNotifications();
+    return true;
   },
 
   /**
-   * Check if the user should be shown the permission setup modal on login
+   * Check if the user should be shown the permission setup modal on app open.
+   * Continues to show until the user actually enables notification access.
    */
   async shouldShowPermissionModal(): Promise<boolean> {
-    if (Platform.OS === 'web' || !Notifications?.getPermissionsAsync) return false;
+    if (Platform.OS === 'web') return false;
     try {
       const hasPermission = await this.checkHasPermission();
+      // Once granted/enabled, never show again
       if (hasPermission) return false;
 
-      const alreadyPrompted = await AsyncStorage.getItem(PERMISSION_PROMPTED_KEY);
-      return !alreadyPrompted;
+      // In the same running session, if dismissed with 'Maybe Later', respect until next app launch
+      if (sessionDismissed) return false;
+
+      return true;
     } catch {
-      return false;
+      return true;
     }
   },
 
   /**
-   * Mark permission modal as dismissed
+   * Mark permission modal as dismissed for the current session only.
+   * Resets on next app open so popup appears until enabled.
    */
   async markPermissionModalDismissed(): Promise<void> {
-    try {
-      await AsyncStorage.setItem(PERMISSION_PROMPTED_KEY, 'true');
-    } catch {}
+    sessionDismissed = true;
   },
 
   /**
@@ -147,16 +228,7 @@ export const notificationService = {
 
     try {
       // 1. Android specific notification channel setup
-      if (Platform.OS === 'android' && Notifications?.setNotificationChannelAsync) {
-        await Notifications.setNotificationChannelAsync('default', {
-          name: 'Campo Campus Updates',
-          description: 'Announcements, events, and important college notices',
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#1E3A8A',
-          sound: 'default',
-        });
-      }
+      await ensureAndroidNotificationChannel();
 
       // 2. Check and request notification permissions
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
@@ -173,17 +245,32 @@ export const notificationService = {
       }
 
       // 3. Obtain Expo Push Token
-      const tokenResult = await Notifications.getExpoPushTokenAsync({
-        projectId: EAS_PROJECT_ID,
-      });
-      const pushToken = tokenResult.data;
+      let pushToken: string | null = null;
+      try {
+        const tokenResult = await Notifications.getExpoPushTokenAsync({
+          projectId: EAS_PROJECT_ID,
+        });
+        pushToken = tokenResult?.data || null;
+      } catch (tokenErr: any) {
+        logger.warn(
+          'NOTIFICATIONS',
+          `Expo push token retrieval error: ${tokenErr?.message}. For standalone Android background push, ensure google-services.json & FCM V1 are configured on Expo.`
+        );
+      }
+
+      // If token retrieval failed, fallback to cached token if available
+      if (!pushToken) {
+        try {
+          pushToken = await AsyncStorage.getItem(PUSH_TOKEN_STORAGE_KEY);
+        } catch {}
+      }
 
       if (!pushToken) {
-        logger.warn('NOTIFICATIONS', 'Failed to retrieve Expo push token');
+        logger.warn('NOTIFICATIONS', 'No Expo push token available');
         return null;
       }
 
-      logger.info('NOTIFICATIONS', `Obtained push token: ${pushToken.substring(0, 30)}...`);
+      logger.info('NOTIFICATIONS', `Push token active: ${pushToken.substring(0, 30)}...`);
 
       // 4. Save locally and register with backend server for the authenticated user
       try {
@@ -259,10 +346,16 @@ export const notificationService = {
       const twoHoursAgo = currentTime - 2 * 60 * 60 * 1000;
       const pendingAlerts: InAppAlert[] = [];
 
-      // Check announcements
+      // Check announcements (filter out exam notifications)
       annList.slice(0, 10).forEach((item: any) => {
         const uniqueId = `ann_${item.id}`;
         const itemTime = item.created_at ? new Date(item.created_at).getTime() : 0;
+
+        // Skip exam-related announcements completely from notification popups
+        if (isExamRelated(item)) {
+          if (!seenIds.includes(uniqueId)) seenIds.push(uniqueId);
+          return;
+        }
 
         if (!seenIds.includes(uniqueId)) {
           seenIds.push(uniqueId);
@@ -273,9 +366,7 @@ export const notificationService = {
           if (isNewlyPublished) {
             const titleLower = String(item.title || '').toLowerCase();
             let category = 'Circular';
-            if (titleLower.includes('exam') || titleLower.includes('hall ticket') || titleLower.includes('timetable') || titleLower.includes('result')) {
-              category = 'Exam / Academic';
-            } else if (titleLower.includes('urgent') || titleLower.includes('important') || titleLower.includes('alert')) {
+            if (titleLower.includes('urgent') || titleLower.includes('important') || titleLower.includes('alert')) {
               category = 'Urgent Notice';
             } else if (titleLower.includes('holiday') || titleLower.includes('vacation')) {
               category = 'Holiday';
@@ -295,10 +386,16 @@ export const notificationService = {
         }
       });
 
-      // Check events
+      // Check events (filter out exam-related events)
       eventList.slice(0, 10).forEach((item: any) => {
         const uniqueId = `event_${item.id}`;
         const itemTime = item.created_at ? new Date(item.created_at).getTime() : 0;
+
+        // Skip exam-related events completely from notification popups
+        if (isExamRelated(item)) {
+          if (!seenIds.includes(uniqueId)) seenIds.push(uniqueId);
+          return;
+        }
 
         if (!seenIds.includes(uniqueId)) {
           seenIds.push(uniqueId);
@@ -349,6 +446,8 @@ export const notificationService = {
                   body: alertItem.body || 'Tap to view details in announcements',
                   data: { url: alertItem.url || '/(tabs)/announcements' },
                   sound: 'default',
+                  priority: Notifications.AndroidNotificationPriority?.MAX ?? 'max',
+                  channelId: 'default',
                 },
                 trigger: null,
               });
@@ -375,21 +474,23 @@ export const notificationService = {
 
       let unread = 0;
 
-      // 1. Check announcements
+      // 1. Check announcements (excluding exam notifications)
       try {
         const res = await api.get('/announcements/student');
         const list = res.data?.data || (Array.isArray(res.data) ? res.data : []);
         list.forEach((item: any) => {
+          if (isExamRelated(item)) return;
           const itemTime = new Date(item.created_at || item.createdAt || 0).getTime();
           if (itemTime > lastViewedTime) unread++;
         });
       } catch {}
 
-      // 2. Check events
+      // 2. Check events (excluding exam events)
       try {
         const res = await api.get('/events/student');
         const list = res.data?.data || (Array.isArray(res.data) ? res.data : []);
         list.forEach((item: any) => {
+          if (isExamRelated(item)) return;
           const itemTime = new Date(item.created_at || item.createdAt || item.event_date || 0).getTime();
           if (itemTime > lastViewedTime) unread++;
         });

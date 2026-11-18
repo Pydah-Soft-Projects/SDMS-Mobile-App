@@ -108,14 +108,14 @@ const SafeClubImage: React.FC<{ club: any; style: any }> = ({ club, style }) => 
 
 // Custom 3D Dashboard Card Images
 const SERVICE_IMAGES: Record<string, any> = {
-  attendance: require('../../assets/dashboard/attendance.png'),
-  academic: require('../../assets/dashboard/academic.png'),
-  fees: require('../../assets/dashboard/fees.png'),
-  timetable: require('../../assets/dashboard/timetable.png'),
-  'internal-marks': require('../../assets/dashboard/results.png'),
-  results: require('../../assets/dashboard/results.png'),
-  library: require('../../assets/dashboard/resources.png'),
-  resources: require('../../assets/dashboard/resources.png'),
+  attendance: require('../../assets/dashboard/attendance.webp'),
+  academic: require('../../assets/dashboard/academic.webp'),
+  fees: require('../../assets/dashboard/fees.webp'),
+  timetable: require('../../assets/dashboard/timetable.webp'),
+  'internal-marks': require('../../assets/dashboard/results.webp'),
+  results: require('../../assets/dashboard/results.webp'),
+  library: require('../../assets/dashboard/resources.webp'),
+  resources: require('../../assets/dashboard/resources.webp'),
 };
 
 export default function DashboardScreen() {
@@ -417,8 +417,8 @@ export default function DashboardScreen() {
     }
     const isFemale = genderVal === 'f' || genderVal === 'female' || genderVal === 'girl' || genderVal === 'woman';
     return isFemale
-      ? require('../../assets/girl-animated.png')
-      : require('../../assets/boy-animated.png');
+      ? require('../../assets/girl-animated.webp')
+      : require('../../assets/boy-animated.webp');
   }, [student, user]);
 
   // Registration status check matching web version
@@ -966,7 +966,7 @@ export default function DashboardScreen() {
               </Text>
             </View>
             <Image
-              source={require('../../assets/learn-build.png')}
+              source={require('../../assets/learn-build.webp')}
               style={styles.exploreBannerImg}
               resizeMode="contain"
             />

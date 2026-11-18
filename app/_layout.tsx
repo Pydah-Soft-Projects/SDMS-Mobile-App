@@ -45,7 +45,6 @@ function RootNavigation() {
     'Inter-Bold': require('../assets/fonts/Inter-Bold.ttf'),
     'DancingScript': require('../assets/fonts/DancingScript-Bold.ttf'),
     'DancingScript-Bold': require('../assets/fonts/DancingScript-Bold.ttf'),
-    'DancingScript-SemiBold': require('../assets/fonts/DancingScript-SemiBold.ttf'),
   });
 
   // Official live updates state hook

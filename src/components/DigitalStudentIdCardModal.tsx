@@ -175,7 +175,7 @@ export default function DigitalStudentIdCardModal({
       <View style={styles.frontHeader}>
         <View style={styles.headerLogoRow}>
           <Image
-            source={require('../../assets/pydah-logo.png')}
+            source={require('../../assets/pydah-logo.webp')}
             style={styles.collegeLogo}
             resizeMode="contain"
           />

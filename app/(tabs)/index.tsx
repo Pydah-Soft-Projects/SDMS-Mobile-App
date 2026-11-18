@@ -965,11 +965,13 @@ export default function DashboardScreen() {
                 Join Clubs, Workshops{'\n'}and Maker Space
               </Text>
             </View>
-            <Image
-              source={require('../../assets/learn-build.webp')}
-              style={styles.exploreBannerImg}
-              resizeMode="contain"
-            />
+            <View style={styles.exploreBannerImgWrapper} pointerEvents="none">
+              <Image
+                source={require('../../assets/learn-build.webp')}
+                style={styles.exploreBannerImg}
+                resizeMode="contain"
+              />
+            </View>
           </TouchableOpacity>
 
           {/* 6. CLUBS TO JOIN SECTION (Dynamic - Matches Web Dashboard) */}
@@ -1211,40 +1213,52 @@ const styles = StyleSheet.create({
     color: '#1D4ED8',
   },
   exploreBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    position: 'relative',
     backgroundColor: '#1E3A8A',
     borderRadius: 20,
-    padding: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    minHeight: 135,
     marginBottom: 16,
     overflow: 'hidden',
+    justifyContent: 'center',
     shadowColor: '#1E3A8A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    elevation: 4,
   },
   exploreBannerLeft: {
-    flex: 1,
+    maxWidth: '48%',
     zIndex: 2,
+    justifyContent: 'center',
   },
   exploreBannerTitle: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '900',
-    lineHeight: 22,
+    lineHeight: 24,
     letterSpacing: -0.3,
   },
   exploreBannerSubtitle: {
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'rgba(255, 255, 255, 0.85)',
     fontSize: 11.5,
     marginTop: 6,
     lineHeight: 16,
+    fontWeight: '500',
+  },
+  exploreBannerImgWrapper: {
+    position: 'absolute',
+    right: -6,
+    top: 4,
+    bottom: 4,
+    width: '58%',
+    justifyContent: 'center',
+    alignItems: 'flex-end',
   },
   exploreBannerImg: {
-    width: 105,
-    height: 75,
+    width: '100%',
+    height: '100%',
   },
   metricsRow: {
     flexDirection: 'row',

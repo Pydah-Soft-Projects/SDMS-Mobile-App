@@ -34,11 +34,13 @@ import {
   X,
   Eye,
   EyeOff,
+  CreditCard,
 } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import Header from '../../src/components/Header';
 import api, { getStaticFileUrl } from '../../src/config/api';
 import authService from '../../src/services/authService';
+import DigitalStudentIdCardModal from '../../src/components/DigitalStudentIdCardModal';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -67,6 +69,9 @@ export default function ProfileScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+
+  // Digital ID Card State
+  const [showIdCardModal, setShowIdCardModal] = useState(false);
 
   // Edit Profile Modal State
   const [profileModalVisible, setProfileModalVisible] = useState(false);
@@ -461,7 +466,7 @@ export default function ProfileScreen() {
               </View>
             </View>
 
-            {/* Action Buttons: Edit Profile & Change Password side-by-side */}
+            {/* Action Buttons: Edit Profile, Change Password & ID Card */}
             <View style={styles.actionButtonsRow}>
               <TouchableOpacity
                 style={[
@@ -472,12 +477,12 @@ export default function ProfileScreen() {
                 activeOpacity={0.8}
               >
                 {pendingRequest ? (
-                  <Clock size={14} color="#FFFFFF" />
+                  <Clock size={13} color="#FFFFFF" />
                 ) : (
-                  <Edit3 size={14} color="#FFFFFF" />
+                  <Edit3 size={13} color="#FFFFFF" />
                 )}
-                <Text style={styles.actionBtnText}>
-                  {pendingRequest ? 'Pending Request' : 'Edit Profile'}
+                <Text style={styles.actionBtnText} numberOfLines={1}>
+                  {pendingRequest ? 'Pending' : 'Edit Profile'}
                 </Text>
               </TouchableOpacity>
 
@@ -486,9 +491,24 @@ export default function ProfileScreen() {
                 onPress={() => setPasswordModalVisible(true)}
                 activeOpacity={0.8}
               >
-                <Lock size={14} color="#FFFFFF" />
-                <Text style={styles.actionBtnText}>Change Password</Text>
+                <Lock size={13} color="#FFFFFF" />
+                <Text style={styles.actionBtnText} numberOfLines={1}>
+                  Password
+                </Text>
               </TouchableOpacity>
+
+              {isStudent && (
+                <TouchableOpacity
+                  style={[styles.actionBtn, styles.actionBtnEmerald]}
+                  onPress={() => setShowIdCardModal(true)}
+                  activeOpacity={0.8}
+                >
+                  <CreditCard size={13} color="#FFFFFF" />
+                  <Text style={styles.actionBtnText} numberOfLines={1}>
+                    ID Card
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
@@ -960,6 +980,16 @@ export default function ProfileScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Digital Student ID Card Modal */}
+      {isStudent && (
+        <DigitalStudentIdCardModal
+          visible={showIdCardModal}
+          onClose={() => setShowIdCardModal(false)}
+          student={displayData}
+          getStudentData={getStudentData}
+        />
+      )}
     </View>
   );
 }
@@ -1136,11 +1166,11 @@ const styles = StyleSheet.create({
     color: '#334155',
     flex: 1,
   },
-  // Action Buttons Row (Edit Profile & Change Password side-by-side)
+  // Action Buttons Row (Edit Profile, Change Password & ID Card)
   actionButtonsRow: {
     width: '100%',
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
     marginTop: 14,
     paddingTop: 12,
     borderTopWidth: 1,
@@ -1151,8 +1181,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
+    gap: 5,
+    paddingVertical: 9,
+    paddingHorizontal: 4,
     borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -1169,11 +1200,14 @@ const styles = StyleSheet.create({
   actionBtnDark: {
     backgroundColor: '#1E293B',
   },
+  actionBtnEmerald: {
+    backgroundColor: '#059669', // matching web emerald-600
+  },
   actionBtnText: {
     color: '#FFFFFF',
-    fontSize: 11.5,
+    fontSize: 10.5,
     fontWeight: '800',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
     textTransform: 'uppercase',
   },
   // Pending Request Banner

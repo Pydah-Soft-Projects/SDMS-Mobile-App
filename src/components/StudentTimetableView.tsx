@@ -118,7 +118,7 @@ export const StudentTimetableView: React.FC<StudentTimetableViewProps> = ({ data
   const standardDayTemplate: TimetableEntry[] = useMemo(() => {
     return [
       {
-        slot_order: 'P1',
+        slot_order: 1,
         start_time: '09:15:00',
         end_time: '10:05:00',
         subject_name: 'BLOCKCHAIN TECHNOLOGY',
@@ -127,7 +127,7 @@ export const StudentTimetableView: React.FC<StudentTimetableViewProps> = ({ data
         type: 'THEORY',
       },
       {
-        slot_order: 'P2',
+        slot_order: 2,
         start_time: '10:05:00',
         end_time: '10:55:00',
         subject_name: 'CONCEPTS OF SMART GRID TECHNOLOGIES',
@@ -143,7 +143,7 @@ export const StudentTimetableView: React.FC<StudentTimetableViewProps> = ({ data
         type: 'break',
       },
       {
-        slot_order: 'P4',
+        slot_order: 3,
         start_time: '11:05:00',
         end_time: '11:55:00',
         subject_name: 'EMBEDDED SYSTEMS',
@@ -152,7 +152,7 @@ export const StudentTimetableView: React.FC<StudentTimetableViewProps> = ({ data
         type: 'THEORY',
       },
       {
-        slot_order: 'P5',
+        slot_order: 4,
         start_time: '11:55:00',
         end_time: '12:45:00',
         subject_name: 'HUMAN RESOURCES & PROJECT MANAGEMENT',
@@ -168,7 +168,7 @@ export const StudentTimetableView: React.FC<StudentTimetableViewProps> = ({ data
         type: 'break',
       },
       {
-        slot_order: 'P7',
+        slot_order: 5,
         start_time: '13:45:00',
         end_time: '14:35:00',
         subject_name: 'CRT',
@@ -177,7 +177,7 @@ export const StudentTimetableView: React.FC<StudentTimetableViewProps> = ({ data
         type: 'OTHER',
       },
       {
-        slot_order: 'P8',
+        slot_order: 6,
         start_time: '14:35:00',
         end_time: '15:25:00',
         subject_name: 'CRT',
@@ -186,7 +186,7 @@ export const StudentTimetableView: React.FC<StudentTimetableViewProps> = ({ data
         type: 'OTHER',
       },
       {
-        slot_order: 'P9',
+        slot_order: 7,
         start_time: '15:25:00',
         end_time: '16:15:00',
         subject_name: 'CRT',
@@ -290,117 +290,121 @@ export const StudentTimetableView: React.FC<StudentTimetableViewProps> = ({ data
 
           {/* SCHEDULE CARDS FOR SELECTED DAY */}
           <View style={styles.scheduleList}>
-            {daySchedule.map((item, idx) => {
-              const isBreak =
-                item.type?.toLowerCase() === 'break' ||
-                item.subject_name?.toLowerCase().includes('break');
-              const isLunch = item.subject_name?.toLowerCase().includes('lunch');
-              const activeNow = isPeriodNow(item.start_time, item.end_time);
-              const timeRange = formatTimeRange(item.start_time, item.end_time);
+            {(() => {
+              let periodSequence = 0;
+              return daySchedule.map((item, idx) => {
+                const isBreak =
+                  item.type?.toLowerCase() === 'break' ||
+                  item.subject_name?.toLowerCase().includes('break');
+                const isLunch = item.subject_name?.toLowerCase().includes('lunch');
+                const activeNow = isPeriodNow(item.start_time, item.end_time);
+                const timeRange = formatTimeRange(item.start_time, item.end_time);
 
-              // Render Break Card (Short Break or Lunch Break)
-              if (isBreak) {
+                // Render Break Card (Short Break or Lunch Break)
+                if (isBreak) {
+                  return (
+                    <View
+                      key={item.id || idx}
+                      style={[
+                        styles.breakCard,
+                        activeNow && styles.activeBreakCard,
+                      ]}
+                    >
+                      <View style={styles.breakLeftRow}>
+                        {isLunch ? (
+                          <Utensils size={15} color="#B45309" />
+                        ) : (
+                          <Coffee size={15} color="#B45309" />
+                        )}
+                        <Text style={styles.breakTitle}>
+                          {isLunch ? 'LUNCH BREAK' : 'SHORT BREAK'}
+                        </Text>
+                        {activeNow && (
+                          <View style={styles.nowPill}>
+                            <Text style={styles.nowPillText}>● NOW</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.breakTime}>{timeRange}</Text>
+                    </View>
+                  );
+                }
+
+                // Sequence number for academic / teaching periods (1, 2, 3, 4, 5, 6, 7...)
+                periodSequence += 1;
+                const sequenceNumber = periodSequence;
+                const typeText = (item.type || item.entry_type || 'THEORY').toUpperCase();
+                const faculty = item.faculty_name || item.teacher_name || item.staff_name || 'Department Faculty';
+
                 return (
                   <View
                     key={item.id || idx}
                     style={[
-                      styles.breakCard,
-                      activeNow && styles.activeBreakCard,
+                      styles.periodCard,
+                      activeNow && styles.activePeriodCard,
                     ]}
                   >
-                    <View style={styles.breakLeftRow}>
-                      {isLunch ? (
-                        <Utensils size={15} color="#B45309" />
-                      ) : (
-                        <Coffee size={15} color="#B45309" />
-                      )}
-                      <Text style={styles.breakTitle}>
-                        {isLunch ? 'LUNCH BREAK' : 'SHORT BREAK'}
-                      </Text>
-                      {activeNow && (
-                        <View style={styles.nowPill}>
-                          <Text style={styles.nowPillText}>● NOW</Text>
+                    {/* Top Row: [1] Time Range ... [THEORY] Code */}
+                    <View style={styles.cardHeaderRow}>
+                      <View style={styles.cardHeaderLeft}>
+                        <View style={styles.periodPill}>
+                          <Text style={styles.periodPillText}>{sequenceNumber}</Text>
                         </View>
-                      )}
-                    </View>
-                    <Text style={styles.breakTime}>{timeRange}</Text>
-                  </View>
-                );
-              }
-
-              // Render Period Card (Theory / Lab / CRT / Other)
-              const slotLabel = item.slot_order || item.slot_label || `P${idx + 1}`;
-              const typeText = (item.type || item.entry_type || 'THEORY').toUpperCase();
-              const faculty = item.faculty_name || item.teacher_name || item.staff_name || 'Department Faculty';
-
-              return (
-                <View
-                  key={item.id || idx}
-                  style={[
-                    styles.periodCard,
-                    activeNow && styles.activePeriodCard,
-                  ]}
-                >
-                  {/* Top Row: [P1] Time Range ... [THEORY] Code */}
-                  <View style={styles.cardHeaderRow}>
-                    <View style={styles.cardHeaderLeft}>
-                      <View style={styles.periodPill}>
-                        <Text style={styles.periodPillText}>{slotLabel}</Text>
+                        <Text style={styles.timeRangeText}>{timeRange}</Text>
+                        {activeNow && (
+                          <View style={styles.nowPill}>
+                            <Text style={styles.nowPillText}>● NOW</Text>
+                          </View>
+                        )}
                       </View>
-                      <Text style={styles.timeRangeText}>{timeRange}</Text>
-                      {activeNow && (
-                        <View style={styles.nowPill}>
-                          <Text style={styles.nowPillText}>● NOW</Text>
-                        </View>
-                      )}
-                    </View>
 
-                    <View style={styles.cardHeaderRight}>
-                      <View
-                        style={[
-                          styles.typeBadge,
-                          typeText === 'THEORY' ? styles.typeTheory : styles.typeOther,
-                        ]}
-                      >
-                        <Text
+                      <View style={styles.cardHeaderRight}>
+                        <View
                           style={[
-                            styles.typeBadgeText,
-                            typeText === 'THEORY' ? styles.typeTheoryText : styles.typeOtherText,
+                            styles.typeBadge,
+                            typeText === 'THEORY' ? styles.typeTheory : styles.typeOther,
                           ]}
                         >
-                          {typeText}
-                        </Text>
+                          <Text
+                            style={[
+                              styles.typeBadgeText,
+                              typeText === 'THEORY' ? styles.typeTheoryText : styles.typeOtherText,
+                            ]}
+                          >
+                            {typeText}
+                          </Text>
+                        </View>
+                        {item.subject_code ? (
+                          <Text style={styles.subjectCode}>{item.subject_code}</Text>
+                        ) : null}
                       </View>
-                      {item.subject_code ? (
-                        <Text style={styles.subjectCode}>{item.subject_code}</Text>
+                    </View>
+
+                    {/* Middle Row: Subject Title */}
+                    <Text style={styles.subjectTitle} numberOfLines={2}>
+                      {item.subject_name || 'Academic Class'}
+                    </Text>
+
+                    {/* Thin Divider */}
+                    <View style={styles.cardDivider} />
+
+                    {/* Bottom Row: Faculty & Room Info */}
+                    <View style={styles.facultyRow}>
+                      <User size={13} color="#64748B" />
+                      <Text style={styles.facultyName} numberOfLines={1}>
+                        {faculty.toUpperCase()}
+                      </Text>
+                      {item.room_number ? (
+                        <View style={styles.roomTag}>
+                          <MapPin size={11} color="#64748B" />
+                          <Text style={styles.roomText}>Room {item.room_number}</Text>
+                        </View>
                       ) : null}
                     </View>
                   </View>
-
-                  {/* Middle Row: Subject Title */}
-                  <Text style={styles.subjectTitle} numberOfLines={2}>
-                    {item.subject_name || 'Academic Class'}
-                  </Text>
-
-                  {/* Thin Divider */}
-                  <View style={styles.cardDivider} />
-
-                  {/* Bottom Row: Faculty & Room Info */}
-                  <View style={styles.facultyRow}>
-                    <User size={13} color="#64748B" />
-                    <Text style={styles.facultyName} numberOfLines={1}>
-                      {faculty.toUpperCase()}
-                    </Text>
-                    {item.room_number ? (
-                      <View style={styles.roomTag}>
-                        <MapPin size={11} color="#64748B" />
-                        <Text style={styles.roomText}>Room {item.room_number}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                </View>
-              );
-            })}
+                );
+              });
+            })()}
           </View>
         </>
       )}
@@ -586,6 +590,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2.5,
     borderRadius: 6,
+    minWidth: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   periodPillText: {
     fontSize: 12,

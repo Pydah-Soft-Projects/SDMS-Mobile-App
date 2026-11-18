@@ -117,6 +117,8 @@ export const SDMS_STUDENT_SECTIONS: {
         subtitle: 'College Events & Schedule',
         category: 'academics',
         iconName: 'Calendar',
+        isTab: true,
+        tabRoute: '/(tabs)/announcements',
       },
       {
         id: 'semester-registration',

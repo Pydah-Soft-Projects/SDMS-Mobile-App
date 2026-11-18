@@ -891,7 +891,7 @@ export default function DashboardScreen() {
               <View style={styles.sectionHeaderRow}>
                 <Text style={styles.sectionTitle}>Campus Events</Text>
                 <TouchableOpacity
-                  onPress={() => router.push('/(tabs)/announcements')}
+                  onPress={() => router.push({ pathname: '/(tabs)/announcements', params: { tab: 'events' } } as any)}
                   style={styles.viewAllRow}
                 >
                   <Text style={styles.viewAllText}>View All</Text>
@@ -911,7 +911,7 @@ export default function DashboardScreen() {
                   <TouchableOpacity
                     key={item.id}
                     style={[styles.eventCard, { width: horizontalCardWidth }]}
-                    onPress={() => router.push(item.type === 'event' ? '/student-module/events' as any : '/(tabs)/announcements' as any)}
+                    onPress={() => router.push({ pathname: '/(tabs)/announcements', params: { tab: item.type === 'event' ? 'events' : 'announcements' } } as any)}
                     activeOpacity={0.85}
                   >
                     <View style={styles.eventCardBanner}>

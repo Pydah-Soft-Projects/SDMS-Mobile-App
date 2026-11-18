@@ -630,7 +630,11 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
                         {item.event_date ? new Date(item.event_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Scheduled'}
                         {item.start_time ? ` • ${item.start_time}` : ''}
                       </Text>
-                      {item.description ? <Text style={styles.descText}>{item.description}</Text> : null}
+                      {item.description ? (
+                        <Text style={styles.descText} numberOfLines={3} ellipsizeMode="tail">
+                          {item.description}
+                        </Text>
+                      ) : null}
                     </View>
                   ))
                 ) : (

@@ -52,6 +52,7 @@ import { isExamRelated } from '../utils/filterUtils';
 import StudentTimetableView from './StudentTimetableView';
 import StudentLibraryView from './StudentLibraryView';
 import StudentFeesView from './StudentFeesView';
+import StudentFeedbackView from './StudentFeedbackView';
 import logger from '../utils/logger';
 import studentService from '../services/studentService';
 import Header from './Header';
@@ -1327,31 +1328,9 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
               </View>
             )}
 
-            {/* 10. Feedback Surveys */}
+            {/* 10. Feedback Surveys (Faculty Evaluation Portal - Matches Web Version) */}
             {module.id === 'feedback' && (
-              <View style={styles.section}>
-                {Array.isArray(data) && data.length > 0 ? (
-                  data.map((item: any, idx: number) => (
-                    <View key={item.id || idx} style={styles.card}>
-                      <View style={styles.cardHeader}>
-                        <Text style={styles.cardTitle}>{item.title || item.form_title || 'Faculty Feedback'}</Text>
-                        <View style={[styles.pillBadge, { backgroundColor: '#FEF3C7' }]}>
-                          <Text style={[styles.pillBadgeText, { color: '#B45309' }]}>
-                            {item.isSubmitted ? 'COMPLETED' : 'PENDING'}
-                          </Text>
-                        </View>
-                      </View>
-                      <Text style={styles.cardSub}>Academic Year: {item.academic_year || 'Current Term'}</Text>
-                    </View>
-                  ))
-                ) : (
-                  <View style={styles.emptyCard}>
-                    <MessageSquare size={28} color="#94A3B8" />
-                    <Text style={styles.emptyTitle}>No Active Feedback Surveys</Text>
-                    <Text style={styles.emptySub}>No faculty evaluation surveys assigned to your section currently.</Text>
-                  </View>
-                )}
-              </View>
+              <StudentFeedbackView data={data} student={student} />
             )}
 
             {/* 11. Support & Maintenance Tickets */}

@@ -61,8 +61,7 @@
         "expo-notifications",
         {
           "icon": "./assets/campo-icon.png",
-          "color": "#1E3A8A",
-          "sounds": ["default"]
+          "color": "#1E3A8A"
         }
       ]
     ],

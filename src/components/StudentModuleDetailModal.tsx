@@ -50,8 +50,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DefaultEventPoster from './DefaultEventPoster';
 import { isExamRelated } from '../utils/filterUtils';
 import StudentTimetableView from './StudentTimetableView';
+import StudentLibraryView from './StudentLibraryView';
+import StudentFeesView from './StudentFeesView';
 import logger from '../utils/logger';
 import studentService from '../services/studentService';
+import Header from './Header';
 
 export interface StudentModuleItem {
   id: string;
@@ -64,6 +67,7 @@ export interface StudentModuleItem {
 
 export interface StudentModuleViewProps {
   module: StudentModuleItem;
+  initialClubId?: string;
   onBack?: () => void;
 }
 
@@ -75,6 +79,7 @@ interface StudentModuleDetailModalProps {
 
 export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
   module,
+  initialClubId,
   onBack,
 }) => {
   const router = useRouter();
@@ -84,7 +89,30 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
     Platform.OS === 'android' ? RNStatusBar.currentHeight || 24 : 0,
     16
   );
+  const [selectedClubDetail, setSelectedClubDetail] = useState<any | null>(null);
+  const [clubDetailTab, setClubDetailTab] = useState<'about' | 'activities'>('about');
+
+  const handleSelectClub = async (item: any) => {
+    setSelectedClubDetail(item);
+    setClubDetailTab('about');
+    if (!item?.id) return;
+    try {
+      const res = await api.get(`/clubs/${item.id}`);
+      if (res.data?.success && res.data?.data) {
+        setSelectedClubDetail((prev: any) => ({ ...prev, ...res.data.data }));
+      } else if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
+        setSelectedClubDetail((prev: any) => ({ ...prev, ...(res.data.club || res.data) }));
+      }
+    } catch {
+      // keep fallback item
+    }
+  };
+
   const handleBack = () => {
+    if (selectedClubDetail) {
+      setSelectedClubDetail(null);
+      return;
+    }
     if (onBack) {
       onBack();
     } else {
@@ -94,6 +122,12 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
   const { user } = useAuth();
   const student = user as any;
   const admissionNo = student?.admission_number || student?.pin_no || '';
+  const initialLetter =
+    (student?.name || student?.student_name || 'S')?.charAt(0)?.toUpperCase() || 'S';
+  const studentPhotoUri =
+    student?.avatarUrl || student?.student_photo
+      ? getStaticFileUrl(student.avatarUrl || student.student_photo)
+      : null;
 
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<any>(null);
@@ -442,8 +476,46 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
             history: historyRes.data?.data || [],
           });
         } else if (module.id === 'library') {
-          const res = await api.get('/library/books').catch(() => ({ data: { data: [] } }));
-          setData(res.data?.data || res.data?.books || []);
+          const [booksRes, catRes] = await Promise.all([
+            api.get('/library/books', { params: { limit: 100 } }).catch((err) => {
+              logger.warn('MODULE_DETAIL', `Failed to fetch library books: ${err.message}`);
+              return { data: { success: false, data: { books: [] } } };
+            }),
+            api.get('/library/categories').catch(() => ({ data: { success: false, data: [] } })),
+          ]);
+
+          const rawData = booksRes.data?.data;
+          let booksList: any[] = [];
+          if (Array.isArray(rawData?.books)) {
+            booksList = rawData.books;
+          } else if (Array.isArray(rawData)) {
+            booksList = rawData;
+          } else if (Array.isArray(booksRes.data?.books)) {
+            booksList = booksRes.data.books;
+          }
+
+          const categoriesList = Array.isArray(catRes.data?.data)
+            ? catRes.data.data
+            : [];
+
+          setData({
+            books: booksList,
+            stats: rawData?.stats || {
+              totalTitles: booksList.length,
+              availableCopies: booksList.reduce(
+                (acc: number, b: any) => acc + (b.available ?? b.available_copies ?? 0),
+                0
+              ),
+              totalCopies: booksList.reduce(
+                (acc: number, b: any) =>
+                  acc + (b.total ?? b.available ?? b.available_copies ?? 0),
+                0
+              ),
+              categoriesCount: new Set(booksList.map((b: any) => b.category).filter(Boolean)).size,
+            },
+            categories: categoriesList,
+            isConnected: booksRes.data?.isConnected !== false,
+          });
         } else if (module.id === 'transport') {
           const res = await api
             .get(`/transport/my-details?admission_number=${encodeURIComponent(admissionNo)}`)
@@ -451,7 +523,8 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
           setData(res.data || null);
         } else if (module.id === 'clubs') {
           const res = await api.get('/clubs');
-          setData(res.data?.data || res.data?.clubs || []);
+          const list = res.data?.data || res.data?.clubs || (Array.isArray(res.data) ? res.data : []);
+          setData(list);
         } else if (module.id === 'feedback') {
           const res = await api.get('/student-feedback/publications');
           setData(res.data?.data || res.data?.publications || []);
@@ -472,11 +545,20 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
             status: statusRes?.data?.status || null,
             attendanceWindows: assignRes?.data?.attendanceWindows || statusRes?.data?.attendanceWindows || null,
           });
-        } else if (module.id === 'crt') {
+        } else if (module.id === 'crt' || module.id === 'crt-portal') {
           const ssoRes = await api.get('/auth/crt-sso').catch(() => null);
           setData({
-            ssoUrl: ssoRes?.data?.url || 'https://crt.pydahsoft.in',
+            ssoUrl: ssoRes?.data?.url || 'https://crt.pydah.edu.in',
           });
+        } else if (module.id === 'academic' || module.id === 'academic-content') {
+          const res = await api.get('/academic-content').catch(() => null);
+          setData(res?.data?.data || res?.data || []);
+        } else if (module.id === 'internal-marks') {
+          const res = await api.get('/internal-marks/student/me').catch(() => null);
+          setData(res?.data?.data || res?.data || []);
+        } else if (module.id === 'hostel') {
+          const res = await api.get('/hostel/my-details').catch(() => null);
+          setData(res?.data || null);
         } else if (module.id === 'fees') {
           const feeRes = await studentService.getFeeDetails(admissionNo);
           setData(feeRes);
@@ -500,44 +582,25 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
     fetchModuleData();
   }, [module?.id, admissionNo]);
 
+  useEffect(() => {
+    if (module?.id === 'clubs' && initialClubId && Array.isArray(data) && data.length > 0) {
+      const target = data.find((c: any) => String(c.id) === String(initialClubId));
+      if (target) {
+        handleSelectClub(target);
+      }
+    }
+  }, [module?.id, initialClubId, data]);
+
   if (!module) return null;
 
   return (
-    <View style={[styles.container, { paddingTop: topInset + 6, paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack} style={styles.backBtn} hitSlop={10}>
-            <ArrowLeft size={22} color="#1E293B" />
-          </TouchableOpacity>
-          <View style={styles.headerTitleRow}>
-            <View style={styles.iconCircle}>
-              <BookOpen size={20} color="#1E3A8A" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.title}>{module.title}</Text>
-              <Text style={styles.subtitle}>{module.subtitle}</Text>
-            </View>
-          </View>
-          <TouchableOpacity onPress={handleBack} style={styles.closeBtn} hitSlop={10}>
-            <X size={20} color="#64748B" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Student Context Ribbon */}
-        <View style={styles.enrolledScopeCard}>
-          <Text style={styles.enrolledScopeDetail}>
-            {course ? `${course} - ${branch}` : 'Student Record'}
-            {semester ? ` • Sem ${semester}` : ''}
-            {section ? ` (Sec ${section})` : ''}
-          </Text>
-          <View style={styles.enrolledPillRow}>
-            {batch ? <Text style={styles.scopeMiniPill}>Batch {batch}</Text> : null}
-            {quota ? <Text style={styles.scopeMiniPill}>Quota: {quota}</Text> : null}
-            <Text style={[styles.scopeMiniPill, { backgroundColor: '#EFF6FF', color: '#1D4ED8' }]}>
-              PIN: {student?.pin_no || admissionNo || 'N/A'}
-            </Text>
-          </View>
-        </View>
+    <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
+        <Header
+          title={module.title}
+          subtitle={module.subtitle}
+          showBack
+          onBack={handleBack}
+        />
 
         {loading ? (
           <View style={styles.loaderContainer}>
@@ -925,29 +988,7 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
 
             {/* 7. Campus Library */}
             {module.id === 'library' && (
-              <View style={styles.section}>
-                {Array.isArray(data) && data.length > 0 ? (
-                  data.slice(0, 15).map((b: any, idx: number) => (
-                    <View key={b.id || idx} style={styles.card}>
-                      <Text style={styles.cardTitle}>{b.title || b.book_name || 'Library Volume'}</Text>
-                      <Text style={styles.cardSub}>
-                        {b.author ? `Author: ${b.author}` : ''} {b.category ? `• Category: ${b.category}` : ''}
-                      </Text>
-                      {b.available_copies !== undefined ? (
-                        <Text style={[styles.timeScheduleText, { color: '#15803D' }]}>
-                          Available Copies: {b.available_copies}
-                        </Text>
-                      ) : null}
-                    </View>
-                  ))
-                ) : (
-                  <View style={styles.emptyCard}>
-                    <BookOpen size={28} color="#94A3B8" />
-                    <Text style={styles.emptyTitle}>No Library Books Found</Text>
-                    <Text style={styles.emptySub}>No books or volumes currently issued to your PIN.</Text>
-                  </View>
-                )}
-              </View>
+              <StudentLibraryView data={data} />
             )}
 
             {/* 8. Transport Details */}
@@ -999,90 +1040,285 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
             {/* 9. Student Clubs */}
             {module.id === 'clubs' && (
               <View style={styles.section}>
-                {Array.isArray(data) && data.length > 0 ? (
-                  data.map((item: any, idx: number) => (
-                    <View key={item.id || idx} style={styles.card}>
-                      <View style={styles.cardBannerWrapper}>
-                        <Image
-                          source={
-                            item.image_url || item.image || item.club_image
-                              ? { uri: getStaticFileUrl(item.image_url || item.image || item.club_image) }
-                              : (item.has_image || item.id)
-                              ? { uri: getStaticFileUrl(`/api/clubs/${item.id}/image`) }
-                              : require('../../assets/campo-logo.png')
-                          }
-                          style={styles.cardBannerImg}
-                          resizeMode="cover"
-                        />
-                      </View>
-                      <View style={styles.cardHeader}>
-                        <Text style={styles.cardTitle}>{item.name || item.club_name || 'Student Club'}</Text>
-                        <View
-                          style={[
-                            styles.pillBadge,
-                            {
-                              backgroundColor:
-                                item.userStatus === 'approved'
-                                  ? '#DCFCE7'
-                                  : item.userStatus === 'pending'
-                                  ? '#FEF3C7'
-                                  : '#EFF6FF',
-                            },
-                          ]}
-                        >
-                          <Text
+                {selectedClubDetail ? (
+                  /* CLUB DETAIL VIEW (Matches Web StudentClubs.jsx) */
+                  <View style={styles.clubDetailContainer}>
+                    {/* Back button link */}
+                    <TouchableOpacity
+                      style={styles.clubBackBar}
+                      onPress={() => setSelectedClubDetail(null)}
+                      activeOpacity={0.7}
+                    >
+                      <ArrowLeft size={15} color="#1D4ED8" />
+                      <Text style={styles.clubBackBarText}>Back to all clubs</Text>
+                    </TouchableOpacity>
+
+                    {/* Hero Header Card */}
+                    <View style={styles.clubHeroCard}>
+                      <Image
+                        source={
+                          selectedClubDetail.image_url || selectedClubDetail.image || selectedClubDetail.club_image
+                            ? { uri: getStaticFileUrl(selectedClubDetail.image_url || selectedClubDetail.image || selectedClubDetail.club_image) }
+                            : (selectedClubDetail.has_image || selectedClubDetail.id)
+                            ? { uri: getStaticFileUrl(`/api/clubs/${selectedClubDetail.id}/image`) }
+                            : require('../../assets/campo-logo.png')
+                        }
+                        style={styles.clubHeroBanner}
+                        resizeMode="cover"
+                      />
+                      <View style={styles.clubHeroOverlay} />
+                      <View style={styles.clubHeroContent}>
+                        <View style={styles.clubHeroHeader}>
+                          <View style={styles.clubAvatarCircle}>
+                            <Text style={styles.clubAvatarText}>
+                              {(selectedClubDetail.name || 'C').charAt(0).toUpperCase()}
+                            </Text>
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.clubHeroTitle}>{selectedClubDetail.name}</Text>
+                            <Text style={styles.clubHeroCategory}>{selectedClubDetail.category || 'Campus Student Association'}</Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.clubHeroBadgeRow}>
+                          <View
                             style={[
-                              styles.pillBadgeText,
+                              styles.clubHeroBadge,
+                              selectedClubDetail.userStatus === 'approved'
+                                ? { backgroundColor: '#DCFCE7' }
+                                : selectedClubDetail.userStatus === 'pending'
+                                ? { backgroundColor: '#FEF3C7' }
+                                : { backgroundColor: '#EFF6FF' },
+                            ]}
+                          >
+                            {selectedClubDetail.userStatus === 'approved' ? (
+                              <CheckCircle2 size={12} color="#15803D" />
+                            ) : selectedClubDetail.userStatus === 'pending' ? (
+                              <Clock size={12} color="#B45309" />
+                            ) : (
+                              <Sparkles size={12} color="#1D4ED8" />
+                            )}
+                            <Text
+                              style={[
+                                styles.clubHeroBadgeText,
+                                selectedClubDetail.userStatus === 'approved'
+                                  ? { color: '#15803D' }
+                                  : selectedClubDetail.userStatus === 'pending'
+                                  ? { color: '#B45309' }
+                                  : { color: '#1D4ED8' },
+                              ]}
+                            >
+                              {selectedClubDetail.userStatus === 'approved'
+                                ? 'ACTIVE MEMBER'
+                                : selectedClubDetail.userStatus === 'pending'
+                                ? 'MEMBERSHIP PENDING'
+                                : 'OPEN TO JOIN'}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Segment Tabs: Overview | Activities */}
+                    <View style={styles.clubTabsRow}>
+                      <TouchableOpacity
+                        style={[styles.clubTabItem, clubDetailTab === 'about' && styles.clubTabItemActive]}
+                        onPress={() => setClubDetailTab('about')}
+                        activeOpacity={0.8}
+                      >
+                        <Users size={14} color={clubDetailTab === 'about' ? '#1E3A8A' : '#64748B'} />
+                        <Text style={[styles.clubTabItemText, clubDetailTab === 'about' && styles.clubTabItemTextActive]}>
+                          Overview
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.clubTabItem, clubDetailTab === 'activities' && styles.clubTabItemActive]}
+                        onPress={() => setClubDetailTab('activities')}
+                        activeOpacity={0.8}
+                      >
+                        <Calendar size={14} color={clubDetailTab === 'activities' ? '#1E3A8A' : '#64748B'} />
+                        <Text style={[styles.clubTabItemText, clubDetailTab === 'activities' && styles.clubTabItemTextActive]}>
+                          Activities
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Tab 1: Overview */}
+                    {clubDetailTab === 'about' ? (
+                      <View style={styles.clubTabContent}>
+                        {/* About description */}
+                        <View style={styles.clubInfoBox}>
+                          <Text style={styles.clubSectionTitle}>About This Club</Text>
+                          <Text style={styles.clubSectionDesc}>
+                            {selectedClubDetail.description || 'Welcome to this campus student group! Participate in projects, events, and workshops.'}
+                          </Text>
+                        </View>
+
+                        {/* Membership Fee & Community Stats */}
+                        <View style={styles.clubStatsRow}>
+                          <View style={styles.clubStatCard}>
+                            <Text style={styles.clubStatNumber}>
+                              {selectedClubDetail.memberCount || selectedClubDetail.member_count || 0}
+                            </Text>
+                            <Text style={styles.clubStatLabel}>Active Members</Text>
+                          </View>
+                          <View style={styles.clubStatCard}>
+                            <Text style={styles.clubStatNumber}>
+                              {Number(selectedClubDetail.membership_fee) > 0 ? `₹${selectedClubDetail.membership_fee}` : 'Free'}
+                            </Text>
+                            <Text style={styles.clubStatLabel}>Membership Fee</Text>
+                          </View>
+                        </View>
+
+                        {/* Join / Status Action Button */}
+                        {selectedClubDetail.userStatus !== 'approved' && selectedClubDetail.userStatus !== 'pending' ? (
+                          <TouchableOpacity
+                            style={styles.clubJoinActionBtn}
+                            onPress={async () => {
+                              await joinClub(selectedClubDetail);
+                              setSelectedClubDetail((prev: any) => prev ? { ...prev, userStatus: 'pending' } : null);
+                            }}
+                            disabled={joiningClubId === selectedClubDetail.id}
+                            activeOpacity={0.85}
+                          >
+                            {joiningClubId === selectedClubDetail.id ? (
+                              <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                              <>
+                                <Text style={styles.clubJoinActionBtnText}>Request Club Membership</Text>
+                                <ChevronRight size={16} color="#FFFFFF" />
+                              </>
+                            )}
+                          </TouchableOpacity>
+                        ) : selectedClubDetail.userStatus === 'pending' ? (
+                          <View style={styles.clubJoinedBannerPending}>
+                            <Clock size={16} color="#B45309" />
+                            <Text style={styles.clubJoinedBannerPendingText}>
+                              Your membership request is currently awaiting coordinator approval.
+                            </Text>
+                          </View>
+                        ) : (
+                          <View style={styles.clubJoinedBannerSuccess}>
+                            <CheckCircle2 size={16} color="#15803D" />
+                            <Text style={styles.clubJoinedBannerSuccessText}>
+                              You are an active member of this club!
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    ) : (
+                      /* Tab 2: Activities */
+                      <View style={styles.clubTabContent}>
+                        {Array.isArray(selectedClubDetail.activities) && selectedClubDetail.activities.length > 0 ? (
+                          selectedClubDetail.activities.map((act: any, aIdx: number) => (
+                            <View key={act.id || aIdx} style={styles.clubActivityCard}>
+                              <View style={styles.clubActivityIconBox}>
+                                <Calendar size={18} color="#1E3A8A" />
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text style={styles.clubActivityTitle}>{act.title || act.name}</Text>
+                                <Text style={styles.clubActivityMeta}>
+                                  {[act.date, act.time, act.location].filter(Boolean).join(' • ')}
+                                </Text>
+                                {act.description ? (
+                                  <Text style={styles.clubActivityDesc}>{act.description}</Text>
+                                ) : null}
+                              </View>
+                            </View>
+                          ))
+                        ) : (
+                          <View style={styles.emptyCard}>
+                            <Calendar size={28} color="#94A3B8" />
+                            <Text style={styles.emptyTitle}>No Activities Yet</Text>
+                            <Text style={styles.emptySub}>Upcoming workshops, sessions, and events will appear here.</Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                ) : (
+                  /* LIST OF CLUBS VIEW */
+                  Array.isArray(data) && data.length > 0 ? (
+                    data.map((item: any, idx: number) => (
+                      <TouchableOpacity
+                        key={item.id || idx}
+                        style={styles.card}
+                        onPress={() => handleSelectClub(item)}
+                        activeOpacity={0.88}
+                      >
+                        <View style={styles.cardBannerWrapper}>
+                          <Image
+                            source={
+                              item.image_url || item.image || item.club_image
+                                ? { uri: getStaticFileUrl(item.image_url || item.image || item.club_image) }
+                                : (item.has_image || item.id)
+                                ? { uri: getStaticFileUrl(`/api/clubs/${item.id}/image`) }
+                                : require('../../assets/campo-logo.png')
+                            }
+                            style={styles.cardBannerImg}
+                            resizeMode="cover"
+                          />
+                        </View>
+                        <View style={styles.cardHeader}>
+                          <Text style={styles.cardTitle}>{item.name || item.club_name || 'Student Club'}</Text>
+                          <View
+                            style={[
+                              styles.pillBadge,
                               {
-                                color:
+                                backgroundColor:
                                   item.userStatus === 'approved'
-                                    ? '#15803D'
+                                    ? '#DCFCE7'
                                     : item.userStatus === 'pending'
-                                    ? '#B45309'
-                                    : '#1D4ED8',
+                                    ? '#FEF3C7'
+                                    : '#EFF6FF',
                               },
                             ]}
                           >
-                            {item.userStatus === 'approved'
-                              ? 'ACTIVE MEMBER'
-                              : item.userStatus === 'pending'
-                              ? 'PENDING APPROVAL'
-                              : 'EXPLORE CLUB'}
+                            <Text
+                              style={[
+                                styles.pillBadgeText,
+                                {
+                                  color:
+                                    item.userStatus === 'approved'
+                                      ? '#15803D'
+                                      : item.userStatus === 'pending'
+                                      ? '#B45309'
+                                      : '#1D4ED8',
+                                },
+                              ]}
+                            >
+                              {item.userStatus === 'approved'
+                                ? 'ACTIVE MEMBER'
+                                : item.userStatus === 'pending'
+                                ? 'PENDING APPROVAL'
+                                : 'OPEN TO JOIN'}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={styles.cardSub}>{item.description || 'Active campus student association.'}</Text>
+                        <View style={styles.cardFooter}>
+                          <Text style={styles.cardSub}>Members: {item.memberCount || item.member_count || 0}</Text>
+                          <Text style={styles.roomTag}>
+                            {Number(item.membership_fee) > 0 ? `₹${item.membership_fee}` : 'Free'}
                           </Text>
                         </View>
-                      </View>
-                      <Text style={styles.cardSub}>{item.description || 'Active campus student association.'}</Text>
-                      <View style={styles.cardFooter}>
-                        <Text style={styles.cardSub}>Members: {item.memberCount || 0}</Text>
-                        <Text style={styles.roomTag}>
-                          {Number(item.membership_fee) > 0 ? `₹${item.membership_fee}` : 'Free'}
-                        </Text>
-                      </View>
-                      {item.userStatus !== 'approved' && item.userStatus !== 'pending' ? (
-                        <TouchableOpacity
-                          style={styles.moduleActionButton}
-                          onPress={() => joinClub(item)}
-                          disabled={joiningClubId === item.id}
-                          activeOpacity={0.8}
-                        >
-                          {joiningClubId === item.id ? (
-                            <ActivityIndicator size="small" color="#FFFFFF" />
-                          ) : (
-                            <>
-                              <Text style={styles.moduleActionButtonText}>Request Membership</Text>
-                              <ChevronRight size={16} color="#FFFFFF" />
-                            </>
-                          )}
-                        </TouchableOpacity>
-                      ) : null}
+
+                        {/* View Club Details button */}
+                        <View style={styles.clubCardActionRow}>
+                          <Text style={styles.clubCardActionText}>
+                            {item.userStatus === 'approved' ? 'View Club & Portal' : 'View Club Details'}
+                          </Text>
+                          <ChevronRight size={15} color="#1D4ED8" />
+                        </View>
+                      </TouchableOpacity>
+                    ))
+                  ) : (
+                    <View style={styles.emptyCard}>
+                      <Users size={28} color="#94A3B8" />
+                      <Text style={styles.emptyTitle}>No Clubs Found</Text>
+                      <Text style={styles.emptySub}>No registered campus clubs available at this time.</Text>
                     </View>
-                  ))
-                ) : (
-                  <View style={styles.emptyCard}>
-                    <Users size={28} color="#94A3B8" />
-                    <Text style={styles.emptyTitle}>No Clubs Found</Text>
-                    <Text style={styles.emptySub}>No registered campus clubs available at this time.</Text>
-                  </View>
+                  )
                 )}
               </View>
             )}
@@ -1437,7 +1673,7 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
                   </View>
                   <TouchableOpacity
                     style={[styles.actionBtn, { backgroundColor: '#4338CA', marginTop: 14 }]}
-                    onPress={() => Linking.openURL(data?.ssoUrl || 'https://crt.pydahsoft.in')}
+                    onPress={() => Linking.openURL(data?.ssoUrl || 'https://crt.pydah.edu.in')}
                   >
                     <ExternalLink size={14} color="#FFFFFF" />
                     <Text style={styles.actionBtnText}>Launch CRT Training Portal</Text>
@@ -1511,52 +1747,183 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
 
             {/* 15. Fee Management Details */}
             {module.id === 'fees' && (
+              <StudentFeesView admissionNo={admissionNo} user={user} nested />
+            )}
+
+            {/* 16. Academic Content (Lecture Notes, Assignments, Class Tests) */}
+            {(module.id === 'academic' || module.id === 'academic-content') && (
               <View style={styles.section}>
-                {data ? (
+                {Array.isArray(data) && data.length > 0 ? (
                   <>
                     <View style={styles.grid3}>
                       <View style={styles.metricCard}>
-                        <Text style={styles.metricLabel}>Total Fee</Text>
-                        <Text style={styles.metricVal}>₹{Number(data.totalAmount || 0).toLocaleString('en-IN')}</Text>
-                      </View>
-                      <View style={styles.metricCard}>
-                        <Text style={styles.metricLabel}>Paid Fee</Text>
-                        <Text style={[styles.metricVal, { color: '#059669' }]}>
-                          ₹{Number(data.paidAmount || 0).toLocaleString('en-IN')}
+                        <Text style={styles.metricLabel}>Notes</Text>
+                        <Text style={styles.metricVal}>
+                          {data.filter((i: any) => i.type === 'note' || i.content_type === 'note').length}
                         </Text>
                       </View>
                       <View style={styles.metricCard}>
-                        <Text style={styles.metricLabel}>Due Fee</Text>
-                        <Text style={[styles.metricVal, { color: data.dueAmount > 0 ? '#DC2626' : '#059669' }]}>
-                          ₹{Number(data.dueAmount || 0).toLocaleString('en-IN')}
+                        <Text style={styles.metricLabel}>Assignments</Text>
+                        <Text style={[styles.metricVal, { color: '#D97706' }]}>
+                          {data.filter((i: any) => i.type === 'assignment' || i.content_type === 'assignment').length}
+                        </Text>
+                      </View>
+                      <View style={styles.metricCard}>
+                        <Text style={styles.metricLabel}>Class Tests</Text>
+                        <Text style={[styles.metricVal, { color: '#7C3AED' }]}>
+                          {data.filter((i: any) => i.type === 'test' || i.content_type === 'test').length}
                         </Text>
                       </View>
                     </View>
 
-                    {Array.isArray(data.transactions) && data.transactions.length > 0 ? (
-                      <View style={{ marginTop: 12 }}>
-                        <Text style={styles.subSectionLabel}>Payment Transactions</Text>
-                        {data.transactions.map((tx: any, idx: number) => (
-                          <View key={tx.id || idx} style={styles.card}>
+                    <View style={{ marginTop: 14 }}>
+                      <Text style={styles.subSectionLabel}>Course Materials & Tasks</Text>
+                      {data.map((item: any, idx: number) => {
+                        const itemType = (item.type || item.content_type || 'note').toLowerCase();
+                        const isNote = itemType === 'note';
+                        const isAssignment = itemType === 'assignment';
+                        const badgeColor = isNote ? '#2563EB' : isAssignment ? '#D97706' : '#7C3AED';
+                        const badgeBg = isNote ? '#EFF6FF' : isAssignment ? '#FEF3C7' : '#FAF5FF';
+
+                        return (
+                          <View key={item.id || idx} style={styles.card}>
                             <View style={styles.cardHeader}>
-                              <Text style={styles.cardTitle}>{tx.receiptNumber || 'Receipt'}</Text>
-                              <Text style={[styles.cardHighlight, { color: '#059669' }]}>
-                                ₹{Number(tx.amount || 0).toLocaleString('en-IN')}
-                              </Text>
+                              <Text style={[styles.cardTitle, { flex: 1 }]}>{item.title || item.topic || 'Academic Resource'}</Text>
+                              <View style={[styles.statusBadge, { backgroundColor: badgeBg }]}>
+                                <Text style={[styles.statusBadgeText, { color: badgeColor }]}>
+                                  {itemType.toUpperCase()}
+                                </Text>
+                              </View>
                             </View>
                             <Text style={styles.cardSub}>
-                              Date: {tx.date ? new Date(tx.date).toLocaleDateString('en-IN') : 'N/A'} • Mode: {tx.paymentMode}
+                              Subject: {item.subject_name || item.subject || 'General'}
+                              {item.topic ? ` • Topic: ${item.topic}` : ''}
                             </Text>
+                            {item.description ? (
+                              <Text style={[styles.cardSub, { marginTop: 4, color: '#475569' }]} numberOfLines={3}>
+                                {item.description}
+                              </Text>
+                            ) : null}
+                            {item.file_url ? (
+                              <TouchableOpacity
+                                style={[styles.actionBtn, { marginTop: 10, alignSelf: 'flex-start' }]}
+                                onPress={() => Linking.openURL(item.file_url)}
+                              >
+                                <Download size={14} color="#FFFFFF" />
+                                <Text style={styles.actionBtnText}>Download Resource</Text>
+                              </TouchableOpacity>
+                            ) : null}
                           </View>
-                        ))}
-                      </View>
-                    ) : null}
+                        );
+                      })}
+                    </View>
                   </>
                 ) : (
                   <View style={styles.emptyCard}>
-                    <CreditCard size={28} color="#94A3B8" />
-                    <Text style={styles.emptyTitle}>Fee Record Synchronized</Text>
-                    <Text style={styles.emptySub}>No outstanding balance records found.</Text>
+                    <BookOpen size={28} color="#94A3B8" />
+                    <Text style={styles.emptyTitle}>No Academic Materials</Text>
+                    <Text style={styles.emptySub}>No lecture notes or assignments have been uploaded for your section yet.</Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* 17. Internal Marks & Examination Results */}
+            {module.id === 'internal-marks' && (
+              <View style={styles.section}>
+                {Array.isArray(data) && data.length > 0 ? (
+                  <>
+                    <View style={styles.grid2}>
+                      <View style={styles.metricCard}>
+                        <Text style={styles.metricLabel}>Exams Recorded</Text>
+                        <Text style={styles.metricVal}>{data.length}</Text>
+                      </View>
+                      <View style={styles.metricCard}>
+                        <Text style={styles.metricLabel}>Assessment Mode</Text>
+                        <Text style={[styles.metricVal, { color: '#0284C7', fontSize: 16 }]}>CIE & Internal</Text>
+                      </View>
+                    </View>
+
+                    <View style={{ marginTop: 14 }}>
+                      <Text style={styles.subSectionLabel}>Assessment Marks List</Text>
+                      {data.map((mark: any, idx: number) => {
+                        const obtained = Number(mark.marks_obtained ?? mark.marks ?? 0);
+                        const max = Number(mark.max_marks ?? mark.total_marks ?? 100);
+                        const pct = max > 0 ? Math.round((obtained / max) * 100) : 0;
+                        const isPass = pct >= 40;
+
+                        return (
+                          <View key={mark.id || idx} style={styles.card}>
+                            <View style={styles.cardHeader}>
+                              <Text style={[styles.cardTitle, { flex: 1 }]}>
+                                {mark.subject_name || mark.subject || 'Subject Assessment'}
+                              </Text>
+                              <Text style={[styles.cardHighlight, { color: isPass ? '#16A34A' : '#DC2626' }]}>
+                                {obtained} / {max}
+                              </Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                              <Text style={styles.cardSub}>
+                                {mark.exam_type || mark.exam_name || 'CIE Assessment'}
+                                {mark.semester ? ` • Sem ${mark.semester}` : ''}
+                              </Text>
+                              <View style={[styles.statusBadge, { backgroundColor: isPass ? '#DCFCE7' : '#FEE2E2' }]}>
+                                <Text style={[styles.statusBadgeText, { color: isPass ? '#15803D' : '#DC2626' }]}>
+                                  {pct}% Score
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </>
+                ) : (
+                  <View style={styles.emptyCard}>
+                    <FileText size={28} color="#94A3B8" />
+                    <Text style={styles.emptyTitle}>No Internal Marks Found</Text>
+                    <Text style={styles.emptySub}>Examination marks have not been published for this semester yet.</Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* 18. Hostel Accommodation */}
+            {module.id === 'hostel' && (
+              <View style={styles.section}>
+                {data && (data.hasHostelAccount || data.room_no || data.block_name || data.hostel_name) ? (
+                  <>
+                    <View style={styles.card}>
+                      <View style={styles.cardHeader}>
+                        <Text style={styles.cardTitle}>{data.hostel_name || 'Campus Hostel'}</Text>
+                        <View style={[styles.statusBadge, { backgroundColor: '#DCFCE7' }]}>
+                          <Text style={[styles.statusBadgeText, { color: '#15803D' }]}>Active Resident</Text>
+                        </View>
+                      </View>
+                      <View style={[styles.grid2, { marginTop: 10 }]}>
+                        <View style={styles.metricCard}>
+                          <Text style={styles.metricLabel}>Room Number</Text>
+                          <Text style={styles.metricVal}>{data.room_no || data.room || 'N/A'}</Text>
+                        </View>
+                        <View style={styles.metricCard}>
+                          <Text style={styles.metricLabel}>Block / Floor</Text>
+                          <Text style={[styles.metricVal, { color: '#4F46E5' }]}>
+                            {data.block_name || data.block || 'Main Block'}
+                          </Text>
+                        </View>
+                      </View>
+                      {data.warden_name ? (
+                        <Text style={[styles.cardSub, { marginTop: 8 }]}>
+                          Warden: {data.warden_name} {data.warden_phone ? `(${data.warden_phone})` : ''}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </>
+                ) : (
+                  <View style={styles.emptyCard}>
+                    <ShieldCheck size={28} color="#94A3B8" />
+                    <Text style={styles.emptyTitle}>Hostel Services Synchronized</Text>
+                    <Text style={styles.emptySub}>No active hostel room assignment found for this student account.</Text>
                   </View>
                 )}
               </View>
@@ -2182,6 +2549,34 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: '#F1F5F9',
   },
+  headerProfileBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#1E3A8A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: '#DBEAFE',
+  },
+  headerProfileImg: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 18,
+  },
+  headerProfileFallback: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1E3A8A',
+  },
+  headerProfileInitialText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+  },
   enrolledScopeCard: {
     backgroundColor: '#EFF6FF',
     paddingHorizontal: 16,
@@ -2386,6 +2781,20 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 6,
   },
+  grid2: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 6,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
   metricCard: {
     flex: 1,
     backgroundColor: '#FFFFFF',
@@ -2535,5 +2944,282 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
     maxWidth: 280,
+  },
+  clubDetailContainer: {
+    gap: 12,
+  },
+  clubBackBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 2,
+    marginBottom: 4,
+  },
+  clubBackBarText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1D4ED8',
+  },
+  clubHeroCard: {
+    backgroundColor: '#1E3A8A',
+    borderRadius: 16,
+    overflow: 'hidden',
+    position: 'relative',
+    minHeight: 140,
+    justifyContent: 'flex-end',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  clubHeroBanner: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    opacity: 0.45,
+  },
+  clubHeroOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+  },
+  clubHeroContent: {
+    padding: 14,
+    gap: 10,
+    zIndex: 2,
+  },
+  clubHeroHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  clubAvatarCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
+  },
+  clubAvatarText: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1E3A8A',
+  },
+  clubHeroTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.2,
+  },
+  clubHeroCategory: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.85)',
+    marginTop: 2,
+  },
+  clubHeroBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  clubHeroBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  clubHeroBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  clubTabsRow: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 6,
+  },
+  clubTabItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 8,
+  },
+  clubTabItemActive: {
+    backgroundColor: '#EFF6FF',
+  },
+  clubTabItemText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  clubTabItemTextActive: {
+    color: '#1E3A8A',
+    fontWeight: '800',
+  },
+  clubTabContent: {
+    gap: 12,
+  },
+  clubInfoBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 6,
+  },
+  clubSectionTitle: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  clubSectionDesc: {
+    fontSize: 12.5,
+    color: '#475569',
+    lineHeight: 19,
+  },
+  clubStatsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  clubStatCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  clubStatNumber: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#1E3A8A',
+  },
+  clubStatLabel: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  clubJoinActionBtn: {
+    backgroundColor: '#1E3A8A',
+    borderRadius: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  clubJoinActionBtnText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  clubJoinedBannerSuccess: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#DCFCE7',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  clubJoinedBannerSuccessText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#15803D',
+    flex: 1,
+  },
+  clubJoinedBannerPending: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  clubJoinedBannerPendingText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#B45309',
+    flex: 1,
+  },
+  clubActivityCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  clubActivityIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+  },
+  clubActivityTitle: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  clubActivityMeta: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: '#2563EB',
+    marginTop: 2,
+  },
+  clubActivityDesc: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 4,
+    lineHeight: 17,
+  },
+  clubCardActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 4,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    marginTop: 8,
+  },
+  clubCardActionText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1D4ED8',
   },
 });

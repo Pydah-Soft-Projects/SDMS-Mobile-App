@@ -87,12 +87,28 @@ export const SDMS_STUDENT_SECTIONS: {
         tabRoute: '/(tabs)/attendance',
       },
       {
+        id: 'academic',
+        layoutKey: 'academic',
+        title: 'Academic',
+        subtitle: 'Notes, Assignments & Tests',
+        category: 'academics',
+        iconName: 'BookOpen',
+      },
+      {
         id: 'timetable',
         layoutKey: 'timetable',
         title: 'Time Table',
         subtitle: 'Weekly Academic Schedule',
         category: 'academics',
         iconName: 'Clock',
+      },
+      {
+        id: 'internal-marks',
+        layoutKey: 'internal-marks',
+        title: 'Results',
+        subtitle: 'Internal Marks & Assessments',
+        category: 'academics',
+        iconName: 'FileText',
       },
       {
         id: 'events',
@@ -188,6 +204,14 @@ export const SDMS_STUDENT_SECTIONS: {
         category: 'campus',
         iconName: 'BookOpen',
       },
+      {
+        id: 'hostel',
+        layoutKey: 'hostel',
+        title: 'Hostel',
+        subtitle: 'Hostel Accommodation & Services',
+        category: 'campus',
+        iconName: 'Home',
+      },
     ],
   },
   {
@@ -204,7 +228,7 @@ export const SDMS_STUDENT_SECTIONS: {
       {
         id: 'crt',
         layoutKey: 'crt',
-        title: 'CRT Training Portal',
+        title: 'CRT Portal',
         subtitle: 'Campus Recruitment Training (SSO)',
         category: 'support',
         iconName: 'Briefcase',
@@ -239,7 +263,15 @@ export const SDMS_STUDENT_SECTIONS: {
 
 export const getStudentModuleById = (id: string): SDMSModuleItem => {
   for (const section of SDMS_STUDENT_SECTIONS) {
-    const item = section.items.find((i) => i.id === id || i.layoutKey === id);
+    const item = section.items.find(
+      (i) =>
+        i.id === id ||
+        i.layoutKey === id ||
+        (id === 'crt-portal' && i.id === 'crt') ||
+        (id === 'academic' && (i.id === 'academic' || i.id === 'academic-content')) ||
+        (id === 'academic-content' && (i.id === 'academic' || i.id === 'academic-content')) ||
+        (id === 'internal-marks' && i.id === 'internal-marks')
+    );
     if (item) return item;
   }
   return {

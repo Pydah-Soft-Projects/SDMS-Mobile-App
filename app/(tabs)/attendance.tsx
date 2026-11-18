@@ -93,7 +93,7 @@ export default function AttendanceScreen() {
 
   return (
     <View style={styles.container}>
-      <Header title="Attendance Tracker" subtitle="SDMS Live Academic Attendance" />
+      <Header title="Attendance Tracker" subtitle="SDMS Live Academic Attendance" showBack />
 
       {/* Range Filter Selector */}
       <View style={styles.tabBar}>

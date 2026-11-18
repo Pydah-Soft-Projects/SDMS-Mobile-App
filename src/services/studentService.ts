@@ -85,7 +85,7 @@ export const studentService = {
    * Fetch student fee dues and payment history from SDMS
    * Endpoint: GET /api/fees/students/:admissionNumber/details
    */
-  async getFeeDetails(admissionNumber: string): Promise<StudentFeeDetails | null> {
+  async getFeeDetails(admissionNumber: string): Promise<any> {
     logger.info('STUDENT_SERVICE', `Fetching fee details for: ${admissionNumber}`);
     try {
       const response = await api.get(`/fees/students/${admissionNumber}/details`);
@@ -93,41 +93,55 @@ export const studentService = {
 
       if (!data) return null;
 
-      const feeHeaders = (data.feeHeaders || data.headers || []).map((h: any) => ({
-        id: h.id,
-        name: h.name || h.fee_head || 'Tuition Fee',
-        amount: Number(h.amount || 0),
-        paidAmount: Number(h.paid_amount || h.paid || 0),
-        dueAmount: Number(h.due_amount || (h.amount - (h.paid_amount || 0)) || 0),
-        year: h.year || h.current_year,
-      }));
-
-      const transactions = (data.transactions || []).map((t: any) => ({
-        id: t.id || t.payment_id,
-        receiptNumber: t.receipt_number || t.receiptNo || `REC-${t.id}`,
-        amount: Number(t.amount || 0),
-        date: t.created_at || t.payment_date || new Date().toISOString(),
-        paymentMode: t.payment_mode || t.method || 'ONLINE',
-        status:
-          t.status === 'success' || t.status === 'captured' ? 'SUCCESS' : t.status || 'SUCCESS',
-        semester: t.semester,
-      }));
-
-      const totalAmount = Number(data.totalAmount || data.total_fee || data.totalFee || 0);
-      const paidAmount = Number(data.paidAmount || data.paid_fee || data.paidFee || 0);
+      const summary = data.summary || {};
+      const totalAmount = Number(
+        summary.totalFee ?? data.totalAmount ?? data.total_fee ?? data.totalFee ?? 0
+      );
+      const paidAmount = Number(
+        summary.totalPaid ?? data.paidAmount ?? data.paid_fee ?? data.paidFee ?? 0
+      );
       const dueAmount = Number(
-        data.dueAmount !== undefined
+        summary.dueAmount !== undefined
+          ? summary.dueAmount
+          : data.dueAmount !== undefined
           ? data.dueAmount
           : Math.max(0, totalAmount - paidAmount)
       );
 
+      const feeHeaders = (data.feeHeaders || data.headers || data.fees || []).map((h: any) => ({
+        id: h.id || h._id,
+        name: h.name || h.feeHead?.name || h.fee_head || 'Tuition Fee',
+        amount: Number(h.amount || 0),
+        paidAmount: Number(h.paid_amount || h.paid || 0),
+        dueAmount: Number(h.due_amount || (h.amount - (h.paid_amount || 0)) || 0),
+        year: h.year || h.studentYear || h.current_year,
+      }));
+
+      const transactions = (data.transactions || []).map((t: any) => ({
+        ...t,
+        id: t.id || t._id || t.payment_id,
+        receiptNumber: t.receiptNumber || t.receipt_number || t.receiptNo || `REC-${t.id || t._id}`,
+        amount: Number(t.amount || 0),
+        date: t.paymentDate || t.created_at || t.payment_date || new Date().toISOString(),
+        paymentMode: t.paymentMode || t.payment_mode || t.method || 'ONLINE',
+        status:
+          t.status === 'success' || t.status === 'captured' || t.status === 'active'
+            ? 'SUCCESS'
+            : t.status || 'SUCCESS',
+        semester: t.semester,
+      }));
+
       return {
+        ...data,
         totalAmount,
         paidAmount,
         dueAmount,
         dueDate: data.dueDate,
         feeHeaders,
         transactions,
+        fees: data.fees || [],
+        studentDetails: data.studentDetails || null,
+        summary: data.summary || { totalFee: totalAmount, totalPaid: paidAmount, dueAmount },
       };
     } catch (e: any) {
       logger.error('STUDENT_SERVICE', 'Failed to fetch fee details', e.message);
@@ -295,6 +309,24 @@ export const studentService = {
       const response = await api.get('/internship/my-assignment');
       if (response.data?.success && response.data?.assignment) {
         return response.data.assignment;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Fetch student\'s hostel registration status
+   * Endpoint: GET /api/hostel/my-details
+   */
+  async getHostelDetails(): Promise<{ hasHostelAccount: boolean } | null> {
+    try {
+      const response = await api.get('/hostel/my-details');
+      if (response.data) {
+        return {
+          hasHostelAccount: Boolean(response.data.success && response.data.hasHostelAccount),
+        };
       }
       return null;
     } catch {

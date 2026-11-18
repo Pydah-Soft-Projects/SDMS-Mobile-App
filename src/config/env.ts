@@ -66,6 +66,13 @@ export const PPG_GATEWAY_URL =
   Constants.expoConfig?.extra?.GATEWAY_URL ||
   `${STATIC_BASE_URL}/api/v1`;
 
+// CRT Training Portal base URL (same as web VITE_CRT_APP_URL)
+// Direct database connections (FEE_MONGO_URI, CRT_MONGO_URI) reside on the backend.
+export const CRT_APP_URL =
+  process.env.EXPO_PUBLIC_CRT_APP_URL ||
+  Constants.expoConfig?.extra?.CRT_APP_URL ||
+  'https://crt.pydah.edu.in';
+
 export const ENV = {
   get appEnv() {
     return appEnv;
@@ -78,6 +85,7 @@ export const ENV = {
   },
   crmUrl: CRM_BACKEND_URL,
   ppgUrl: PPG_GATEWAY_URL,
+  crtUrl: CRT_APP_URL,
   isDev: appEnv === 'development',
   isPreview: appEnv === 'preview',
   isProd: appEnv === 'production',

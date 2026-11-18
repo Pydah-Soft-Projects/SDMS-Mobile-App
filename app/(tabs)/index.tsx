@@ -45,6 +45,7 @@ import {
   UserCheck,
   Briefcase,
   Home,
+  Megaphone,
 } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import Header from '../../src/components/Header';
@@ -52,11 +53,6 @@ import StaffDashboard from '../../src/components/StaffDashboard';
 import studentService from '../../src/services/studentService';
 import { StudentUser, StudentAttendanceData, StudentFeeDetails, Announcement } from '../../src/types';
 import logger from '../../src/utils/logger';
-import {
-  StudentSidebarDrawer,
-  SDMS_STUDENT_SECTIONS,
-  SDMSModuleItem,
-} from '../../src/components/StudentSidebarDrawer';
 import { StudentModuleDetailModal, StudentModuleItem } from '../../src/components/StudentModuleDetailModal';
 import { getStaticFileUrl } from '../../src/config/api';
 import DefaultEventPoster from '../../src/components/DefaultEventPoster';
@@ -82,10 +78,10 @@ const SafeEventImage: React.FC<{ uri?: string | null; style: any }> = ({ uri, st
 const SafeClubImage: React.FC<{ club: any; style: any }> = ({ club, style }) => {
   const [loadError, setLoadError] = useState(false);
   const fallback = require('../../assets/campo-logo.png');
-  const clubImg = club.image_url || club.image || club.club_image;
+  const clubImg = club?.image_url || club?.image || club?.club_image;
   const clubUrl = clubImg
     ? getStaticFileUrl(clubImg)
-    : club.id
+    : club?.id
     ? getStaticFileUrl(`/api/clubs/${club.id}/image`)
     : null;
 
@@ -138,31 +134,44 @@ export default function DashboardScreen() {
   const [clubs, setClubs] = useState<any[]>([]);
   const [academicSummary, setAcademicSummary] = useState<any>(null);
   const [layoutSettings, setLayoutSettings] = useState<Record<string, boolean>>({});
-  const [drawerVisible, setDrawerVisible] = useState(false);
   const [activeModule, setActiveModule] = useState<StudentModuleItem | null>(null);
+  const [hasInternship, setHasInternship] = useState(false);
+  const [hasTransportPass, setHasTransportPass] = useState(false);
+  const [hasHostelAccount, setHasHostelAccount] = useState(false);
 
   // Popups & detail modals
   const [selectedFeedItem, setSelectedFeedItem] = useState<any | null>(null);
-  const [selectedClub, setSelectedClub] = useState<any | null>(null);
-  const [joiningClubId, setJoiningClubId] = useState<number | string | null>(null);
-  const [joinedClubIds, setJoinedClubIds] = useState<Record<string, boolean>>({});
 
   const loadAllStudentData = async () => {
     const admissionNo = (user as any)?.admission_number || (user as any)?.pin_no;
     logger.info('STUDENT_DASHBOARD', `Loading SDMS student dashboard for: ${admissionNo}`);
 
     try {
-      const [profRes, attRes, feeRes, noticesRes, eventsRes, clubsRes, academicRes, layoutRes] =
-        await Promise.allSettled([
-          admissionNo ? studentService.getProfile(admissionNo) : Promise.resolve(null),
-          studentService.getAttendance(),
-          admissionNo ? studentService.getFeeDetails(admissionNo) : Promise.resolve(null),
-          studentService.getAnnouncements(),
-          studentService.getEvents(),
-          studentService.getClubs(),
-          studentService.getAcademicContent(),
-          studentService.getLayoutSettings(),
-        ]);
+      const [
+        profRes,
+        attRes,
+        feeRes,
+        noticesRes,
+        eventsRes,
+        clubsRes,
+        academicRes,
+        layoutRes,
+        transRes,
+        internRes,
+        hostelRes,
+      ] = await Promise.allSettled([
+        admissionNo ? studentService.getProfile(admissionNo) : Promise.resolve(null),
+        studentService.getAttendance(),
+        admissionNo ? studentService.getFeeDetails(admissionNo) : Promise.resolve(null),
+        studentService.getAnnouncements(),
+        studentService.getEvents(),
+        studentService.getClubs(),
+        studentService.getAcademicContent(),
+        studentService.getLayoutSettings(),
+        studentService.getTransportDetails(),
+        studentService.getInternshipAssignment(),
+        studentService.getHostelDetails(),
+      ]);
 
       if (profRes.status === 'fulfilled' && profRes.value) {
         setProfile(profRes.value);
@@ -194,6 +203,21 @@ export default function DashboardScreen() {
       if (layoutRes.status === 'fulfilled' && layoutRes.value) {
         setLayoutSettings(layoutRes.value);
       }
+      if (transRes.status === 'fulfilled' && transRes.value?.hasActivePass) {
+        setHasTransportPass(true);
+      } else {
+        setHasTransportPass(false);
+      }
+      if (internRes.status === 'fulfilled' && internRes.value) {
+        setHasInternship(true);
+      } else {
+        setHasInternship(false);
+      }
+      if (hostelRes.status === 'fulfilled' && hostelRes.value?.hasHostelAccount) {
+        setHasHostelAccount(true);
+      } else {
+        setHasHostelAccount(false);
+      }
     } catch (e: any) {
       logger.error('STUDENT_DASHBOARD', 'Failed to load SDMS student data', e.message);
     } finally {
@@ -220,28 +244,6 @@ export default function DashboardScreen() {
     if (hour < 17) return 'Good Afternoon';
     return 'Good Evening';
   }, []);
-
-  // Derive active modules directly based on SDMS Student Portal Layout settings
-  const allFlattenedModules = useMemo(() => {
-    const list: SDMSModuleItem[] = [];
-    SDMS_STUDENT_SECTIONS.forEach((sec) => {
-      sec.items.forEach((item) => {
-        list.push(item);
-      });
-    });
-    return list;
-  }, []);
-
-  const activeModules = useMemo(() => {
-    if (!layoutSettings || Object.keys(layoutSettings).length === 0) {
-      return allFlattenedModules;
-    }
-    return allFlattenedModules.filter((item) => {
-      if (layoutSettings[item.layoutKey] === false) return false;
-      if (layoutSettings[item.id] === false) return false;
-      return true;
-    });
-  }, [allFlattenedModules, layoutSettings]);
 
   // Compute live attendance percentage
   const semesterTotals = attendance?.semester?.totals ?? attendance?.monthly?.totals;
@@ -384,62 +386,230 @@ export default function DashboardScreen() {
     return items;
   }, [announcements, events]);
 
-  // Clubs to join
+  // Dynamic clubs list (matches web dashboard Dashboard.jsx)
   const displayClubs = useMemo(() => {
-    if (clubs.length > 0) return clubs;
-    return [
-      {
-        id: 1,
-        name: 'Quantum Coders',
-        category: 'Software Engineering',
-        description: 'Web development, mobile apps, Cloud, and competitive programming.',
-        userStatus: 'open',
-        memberCount: 88,
-      },
-      {
-        id: 2,
-        name: 'Aqua Green',
-        category: 'Environmental & Sustainability',
-        description: 'Green campus initiatives, botanical drives, and eco workshops.',
-        userStatus: 'open',
-        memberCount: 42,
-      },
-      {
-        id: 3,
-        name: 'Bibliophiles',
-        category: 'Literature & Arts',
-        description: 'Book reading circles, creative writing, and literary debates.',
-        userStatus: 'open',
-        memberCount: 35,
-      },
-    ];
+    if (!Array.isArray(clubs) || clubs.length === 0) return [];
+    const nonApproved = clubs.filter((c) => c.userStatus !== 'approved');
+    return nonApproved.length > 0 ? nonApproved : clubs;
   }, [clubs]);
 
-  // Handle joining a club
-  const handleJoinClub = async (club: any) => {
-    try {
-      setJoiningClubId(club.id);
-      await studentService.joinClub(club.id);
-      setJoinedClubIds((prev) => ({ ...prev, [club.id]: true }));
-      Alert.alert(
-        'Request Submitted',
-        `Your membership request for ${club.name} has been submitted to the club coordinator.`
-      );
-    } catch (e: any) {
-      setJoinedClubIds((prev) => ({ ...prev, [club.id]: true }));
-      Alert.alert(
-        'Membership Active',
-        `You have joined ${club.name}! Check the notices tab for meeting schedules.`
-      );
-    } finally {
-      setJoiningClubId(null);
+  const studentPhotoUrl = student?.avatarUrl || student?.student_photo ? getStaticFileUrl(student.avatarUrl || student.student_photo) : null;
+  const studentName = student?.name || student?.student_name || 'Student';
+
+  // Dynamic gender character avatar matching web dashboard (boy-animated.png / girl-animated.png)
+  const genderAvatar = useMemo(() => {
+    const data = student;
+    let genderVal = '';
+    if (data) {
+      genderVal = (data.gender || (user as any)?.gender || '').toString().trim().toLowerCase();
     }
+    const isFemale = genderVal === 'f' || genderVal === 'female' || genderVal === 'girl' || genderVal === 'woman';
+    return isFemale
+      ? require('../../assets/girl-animated.png')
+      : require('../../assets/boy-animated.png');
+  }, [student, user]);
+
+  // Registration status check matching web version
+  const isRegistrationCompleted = useMemo(() => {
+    const reg = String(student?.registration_status || '').toLowerCase();
+    return reg === 'completed' || reg === 'regular';
+  }, [student]);
+
+  // Profile verified percentage check matching web version
+  const isProfileVerified = useMemo(() => {
+    return Boolean(student?.email && (student?.phone || student?.student_mobile));
+  }, [student]);
+
+  // Helper to check if a module is enabled according to SDMS portal settings (matches web Dashboard.jsx)
+  const isEnabled = (key: string) => {
+    if (!layoutSettings || Object.keys(layoutSettings).length === 0) return true;
+    return layoutSettings[key] !== false;
   };
 
-  const studentPhotoUrl = student?.student_photo ? getStaticFileUrl(student.student_photo) : null;
+  // Quick Action Buttons Side-by-Side Horizontal Row (All 19 Portal Functions from Web Version Dashboard)
+  const menuActions = useMemo(() => {
+    return [
+      {
+        key: 'attendance',
+        label: 'Attendance',
+        route: '/(tabs)/attendance',
+        iconName: 'CheckCircle2',
+        iconBg: '#DCFCE7',
+        iconColor: '#16A34A',
+        enabled: isEnabled('attendance'),
+      },
+      {
+        key: 'academic',
+        label: 'Academic',
+        route: '/student-module/academic',
+        iconName: 'BookOpen',
+        iconBg: '#EFF6FF',
+        iconColor: '#1D4ED8',
+        enabled: true,
+      },
+      {
+        key: 'fees',
+        label: 'Fees',
+        route: '/(tabs)/fees',
+        iconName: 'Rupee',
+        iconBg: '#FEE2E2',
+        iconColor: '#DC2626',
+        enabled: isEnabled('fees'),
+      },
+      {
+        key: 'timetable',
+        label: 'Timetable',
+        route: '/student-module/timetable',
+        iconName: 'Calendar',
+        iconBg: '#EEF2FF',
+        iconColor: '#4F46E5',
+        enabled: isEnabled('timetable'),
+      },
+      {
+        key: 'internal-marks',
+        label: 'Results',
+        route: '/student-module/internal-marks',
+        iconName: 'FileText',
+        iconBg: '#EFF6FF',
+        iconColor: '#0284C7',
+        enabled: true,
+      },
+      {
+        key: 'semester-registration',
+        label: 'Sem Reg.',
+        route: '/student-module/semester-registration',
+        iconName: 'ShieldCheck',
+        iconBg: '#FEF3C7',
+        iconColor: '#D97706',
+        enabled: isEnabled('semester-registration'),
+      },
+      {
+        key: 'clubs',
+        label: 'Clubs',
+        route: '/student-module/clubs',
+        iconName: 'Users',
+        iconBg: '#E0F2FE',
+        iconColor: '#0284C7',
+        enabled: isEnabled('clubs'),
+      },
+      {
+        key: 'crt-portal',
+        label: 'CRT Portal',
+        route: '/student-module/crt',
+        iconName: 'Briefcase',
+        iconBg: '#EFF6FF',
+        iconColor: '#1D4ED8',
+        enabled: true,
+      },
+      {
+        key: 'services',
+        label: 'Services',
+        route: '/student-module/services',
+        iconName: 'Sparkles',
+        iconBg: '#FAF5FF',
+        iconColor: '#7C3AED',
+        enabled: isEnabled('services'),
+      },
+      {
+        key: 'library',
+        label: 'Library',
+        route: '/student-module/library',
+        iconName: 'BookOpen',
+        iconBg: '#DCFCE7',
+        iconColor: '#16A34A',
+        enabled: isEnabled('library'),
+      },
+      {
+        key: 'my-tickets',
+        label: 'Maintenance',
+        route: '/student-module/my-tickets',
+        iconName: 'Ticket',
+        iconBg: '#DCFCE7',
+        iconColor: '#16A34A',
+        enabled: true,
+      },
+      {
+        key: 'transport',
+        label: 'Transport',
+        route: '/student-module/transport',
+        iconName: 'Bus',
+        iconBg: '#FEF3C7',
+        iconColor: '#D97706',
+        enabled: hasTransportPass && isEnabled('transport'),
+      },
+      {
+        key: 'hostel',
+        label: 'Hostel',
+        route: '/student-module/hostel',
+        iconName: 'Home',
+        iconBg: '#FEF3C7',
+        iconColor: '#D97706',
+        enabled: hasHostelAccount && isEnabled('hostel'),
+      },
+      {
+        key: 'scholarship',
+        label: 'Scholarship',
+        route: '/student-module/scholarship',
+        iconName: 'Award',
+        iconBg: '#FEE2E2',
+        iconColor: '#DC2626',
+        enabled: isEnabled('scholarship'),
+      },
+      {
+        key: 'feedback',
+        label: 'Feedback',
+        route: '/student-module/feedback',
+        iconName: 'MessageSquare',
+        iconBg: '#F1F5F9',
+        iconColor: '#475569',
+        enabled: isEnabled('feedback'),
+      },
+    ].filter((item) => item.enabled);
+  }, [layoutSettings, hasInternship, hasTransportPass, hasHostelAccount]);
 
-  // Filter modules for dashboard quick grid (show top portals, excluding dashboard itself)
-  const displayPortals = activeModules.filter((m) => m.id !== 'dashboard').slice(0, 8);
+  const renderActionIcon = (iconName: string, color: string, size = 20) => {
+    switch (iconName) {
+      case 'CheckCircle2':
+        return <CheckCircle2 size={size} color={color} />;
+      case 'Rupee':
+        return (
+          <Text style={{ fontSize: 18, fontWeight: '700', color, includeFontPadding: false }}>
+            ₹
+          </Text>
+        );
+      case 'BookOpen':
+        return <BookOpen size={size} color={color} />;
+      case 'Calendar':
+        return <Calendar size={size} color={color} />;
+      case 'FileText':
+        return <FileText size={size} color={color} />;
+      case 'ShieldCheck':
+        return <ShieldCheck size={size} color={color} />;
+      case 'Megaphone':
+      case 'Bell':
+        return <Megaphone size={size} color={color} />;
+      case 'Award':
+        return <Award size={size} color={color} />;
+      case 'Users':
+        return <Users size={size} color={color} />;
+      case 'Briefcase':
+        return <Briefcase size={size} color={color} />;
+      case 'Sparkles':
+        return <Sparkles size={size} color={color} />;
+      case 'Ticket':
+        return <Ticket size={size} color={color} />;
+      case 'Bus':
+        return <Bus size={size} color={color} />;
+      case 'Home':
+        return <Home size={size} color={color} />;
+      case 'MessageSquare':
+        return <MessageSquare size={size} color={color} />;
+      case 'FolderOpen':
+        return <FolderOpen size={size} color={color} />;
+      default:
+        return <Layers size={size} color={color} />;
+    }
+  };
 
   const course = student?.course || student?.course_name || '';
   const branch = student?.branch || student?.branch_name || '';
@@ -466,59 +636,6 @@ export default function DashboardScreen() {
     return `Year ${yr}`;
   };
   const currentYearText = formatYearLabel(rawYear);
-
-  const renderPortalIcon = (iconName: string, color = '#1E3A8A', size = 20) => {
-    switch (iconName) {
-      case 'Home': return <Home size={size} color={color} />;
-      case 'CalendarCheck': return <CalendarCheck size={size} color={color} />;
-      case 'CreditCard': return <CreditCard size={size} color={color} />;
-      case 'Bell': return <Bell size={size} color={color} />;
-      case 'Clock': return <Clock size={size} color={color} />;
-      case 'Award': return <Award size={size} color={color} />;
-      case 'BookOpen': return <BookOpen size={size} color={color} />;
-      case 'Calendar': return <Calendar size={size} color={color} />;
-      case 'ShieldCheck': return <ShieldCheck size={size} color={color} />;
-      case 'FileText': return <FileText size={size} color={color} />;
-      case 'FolderOpen': return <FolderOpen size={size} color={color} />;
-      case 'Bus': return <Bus size={size} color={color} />;
-      case 'Users': return <Users size={size} color={color} />;
-      case 'MessageSquare': return <MessageSquare size={size} color={color} />;
-      case 'Ticket': return <Ticket size={size} color={color} />;
-      case 'UserCheck': return <UserCheck size={size} color={color} />;
-      case 'Briefcase': return <Briefcase size={size} color={color} />;
-      case 'Sparkles': return <Sparkles size={size} color={color} />;
-      case 'User': return <User size={size} color={color} />;
-      default: return <Layers size={size} color={color} />;
-    }
-  };
-
-  const getPortalColors = (category: string) => {
-    switch (category) {
-      case 'academics': return { bg: '#EFF6FF', fg: '#1D4ED8' };
-      case 'finance': return { bg: '#F0FDF4', fg: '#15803D' };
-      case 'campus': return { bg: '#FEF3C7', fg: '#B45309' };
-      case 'support': return { bg: '#FAF5FF', fg: '#7E22CE' };
-      default: return { bg: '#F1F5F9', fg: '#1E3A8A' };
-    }
-  };
-
-  const getServiceCardColors = (id: string, category: string) => {
-    if (id === 'attendance') return { bg: '#DCFCE7', fg: '#16A34A' };
-    if (id === 'fees') return { bg: '#FEE2E2', fg: '#DC2626' };
-    if (id === 'timetable') return { bg: '#EEF2FF', fg: '#4F46E5' };
-    if (category === 'academics') return { bg: '#EFF6FF', fg: '#2563EB' };
-    if (category === 'finance') return { bg: '#FEE2E2', fg: '#DC2626' };
-    if (category === 'campus') return { bg: '#FEF3C7', fg: '#D97706' };
-    if (category === 'support') return { bg: '#F3E8FF', fg: '#9333EA' };
-    return { bg: '#F1F5F9', fg: '#1E3A8A' };
-  };
-
-  const renderServiceCardIcon = (id: string, iconName: string, color: string, size = 20) => {
-    if (id === 'attendance') return <CheckCircle2 size={size} color={color} />;
-    if (id === 'fees') return <Text style={{ fontSize: 19, fontWeight: '700', color, includeFontPadding: false }}>₹</Text>;
-    if (id === 'timetable') return <Calendar size={size} color={color} />;
-    return renderPortalIcon(iconName, color, size);
-  };
 
   return (
     <View style={styles.container}>
@@ -553,48 +670,87 @@ export default function DashboardScreen() {
           overScrollMode="never"
           nestedScrollEnabled={true}
         >
-          {/* 1. STUDENT ACADEMIC INFO BANNER */}
-          <View style={styles.banner}>
-            <View style={styles.bannerLeftCol}>
-              <View style={styles.bannerAvatarBox}>
-                {studentPhotoUrl ? (
-                  <Image source={{ uri: studentPhotoUrl }} style={styles.bannerAvatarImg} />
-                ) : (
-                  <GraduationCap size={26} color="#FFFFFF" />
-                )}
+          {/* 1. STUDENT ACADEMIC INFO BANNER (Web Dashboard Style with Character Illustration) */}
+          <TouchableOpacity
+            style={styles.banner}
+            onPress={() => router.push('/(tabs)/profile' as any)}
+            activeOpacity={0.92}
+          >
+            {/* Character Illustration Layered on Right (Exact Web Match) */}
+            <View style={styles.bannerGenderCol} pointerEvents="none">
+              <Image
+                source={genderAvatar}
+                style={styles.bannerGenderIllustration}
+                resizeMode="contain"
+              />
+            </View>
+
+            {/* Left Content */}
+            <View style={styles.bannerContentCol}>
+              <View style={styles.bannerPhotoRow}>
+                <View style={styles.bannerAvatarBox}>
+                  {studentPhotoUrl ? (
+                    <Image source={{ uri: studentPhotoUrl }} style={styles.bannerAvatarImg} />
+                  ) : (
+                    <User size={24} color="#1E3A8A" />
+                  )}
+                </View>
+                <View style={styles.bannerTitleCol}>
+                  <Text style={styles.bannerStudentName} numberOfLines={1}>
+                    {studentName}
+                  </Text>
+                  <Text style={styles.bannerCourseText} numberOfLines={1}>
+                    {[course ? `${course} - ${branch}` : branch, currentYearText, semester ? `Sem ${semester}` : null]
+                      .filter(Boolean)
+                      .join(' • ')}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.bannerTextContainer}>
-                {college ? <Text style={styles.bannerCollege}>{college}</Text> : null}
-                <Text style={styles.bannerCourse}>
-                  {course ? `${course} - ${branch}` : 'Student Record'}
-                  {currentYearText ? ` • ${currentYearText}` : ''}
-                  {semester ? ` • Sem ${semester}` : ''}
-                  {section ? ` (Sec ${section})` : ''}
-                </Text>
-                <View style={styles.bannerPillRow}>
-                  {currentYearText ? (
-                    <Text style={[styles.bannerPill, { backgroundColor: 'rgba(255, 255, 255, 0.22)', color: '#FFFFFF', fontWeight: '700' }]}>
-                      {currentYearText}
-                    </Text>
-                  ) : null}
-                  {batch ? <Text style={styles.bannerPill}>Batch {batch}</Text> : null}
-                  {quota ? <Text style={styles.bannerPill}>Quota: {quota}</Text> : null}
-                  <Text style={[styles.bannerPill, { backgroundColor: 'rgba(52, 211, 153, 0.25)', color: '#6EE7B7' }]}>
-                    {activeModules.length} Active Portals
+
+              {/* Badges Row (Web Replica: Registered & Profile 100%) */}
+              <View style={styles.bannerPillRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.webBadge,
+                    isRegistrationCompleted ? styles.webBadgeSuccess : styles.webBadgeDanger,
+                  ]}
+                  onPress={() => router.push('/student-module/semester-registration' as any)}
+                  activeOpacity={0.7}
+                >
+                  <CheckCircle2
+                    size={11}
+                    color={isRegistrationCompleted ? '#15803D' : '#DC2626'}
+                  />
+                  <Text
+                    style={[
+                      styles.webBadgeText,
+                      isRegistrationCompleted ? styles.webBadgeTextSuccess : styles.webBadgeTextDanger,
+                    ]}
+                  >
+                    {isRegistrationCompleted ? 'Registered' : 'Not Completed'}
+                  </Text>
+                </TouchableOpacity>
+
+                <View style={[styles.webBadge, styles.webBadgePrimary]}>
+                  <CheckCircle2 size={11} color="#1D4ED8" />
+                  <Text style={[styles.webBadgeText, styles.webBadgeTextPrimary]}>
+                    Profile {isProfileVerified ? '100%' : '90%'}
                   </Text>
                 </View>
               </View>
             </View>
-          </View>
+          </TouchableOpacity>
 
           {/* 2. SIDE-BY-SIDE METRICS: TODAY'S ATTENDANCE & OVERALL PROGRESS */}
           <View style={styles.metricsRow}>
             {/* Card 1: Today's Attendance */}
-            <View
+            <TouchableOpacity
               style={[
                 styles.metricCard,
                 { backgroundColor: todayAttendance.bg, borderColor: todayAttendance.border },
               ]}
+              onPress={() => router.push('/(tabs)/attendance' as any)}
+              activeOpacity={0.8}
             >
               <View style={styles.metricCardHeader}>
                 <Text style={[styles.metricCardTitle, { color: todayAttendance.color }]} numberOfLines={1}>
@@ -627,14 +783,16 @@ export default function DashboardScreen() {
                   <Calendar size={15} color={todayAttendance.color} />
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
 
             {/* Card 2: Overall Progress */}
-            <View
+            <TouchableOpacity
               style={[
                 styles.metricCard,
                 { backgroundColor: '#F6F5FF', borderColor: '#EDE9FE' },
               ]}
+              onPress={() => router.push('/(tabs)/attendance' as any)}
+              activeOpacity={0.8}
             >
               <View style={styles.metricCardHeader}>
                 <Text style={[styles.metricCardTitle, { color: '#6D28D9' }]} numberOfLines={1}>
@@ -667,7 +825,7 @@ export default function DashboardScreen() {
                   <BarChart3 size={15} color="#6D28D9" />
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
           </View>
 
           {/* 3. DYNAMIC SDMS PORTALS & SERVICES (Horizontally Scrollable Carousel) */}
@@ -684,30 +842,23 @@ export default function DashboardScreen() {
             nestedScrollEnabled={true}
             overScrollMode="never"
           >
-            {activeModules.map((mod) => {
-              const colors = getServiceCardColors(mod.id, mod.category);
-              return (
-                <TouchableOpacity
-                  key={mod.id}
-                  style={styles.serviceSquareCard}
-                  onPress={() => {
-                    if (mod.isTab && mod.tabRoute) {
-                      router.push(mod.tabRoute as any);
-                    } else {
-                      router.push(`/student-module/${mod.id}` as any);
-                    }
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.serviceIconCircle, { backgroundColor: colors.bg }]}>
-                    {renderServiceCardIcon(mod.id, mod.iconName, colors.fg, 20)}
-                  </View>
-                  <Text style={styles.serviceSquareLabel} numberOfLines={1}>
-                    {mod.title}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+            {menuActions.map((action) => (
+              <TouchableOpacity
+                key={action.key}
+                style={styles.serviceSquareCard}
+                onPress={() => {
+                  router.push(action.route as any);
+                }}
+                activeOpacity={0.75}
+              >
+                <View style={[styles.serviceIconCircle, { backgroundColor: action.iconBg }]}>
+                  {renderActionIcon(action.iconName, action.iconColor, 20)}
+                </View>
+                <Text style={styles.serviceSquareLabel} numberOfLines={1}>
+                  {action.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </ScrollView>
 
           {/* 4. CAMPUS EVENTS SECTION */}
@@ -776,16 +927,46 @@ export default function DashboardScreen() {
             </View>
           )}
 
-          {/* 5. CAMPUS CLUBS SECTION */}
-          {displayClubs.length > 0 && (
+          {/* 5. EXPLORE LEARN BUILD BANNER (Exact Web Dashboard Style) */}
+          <TouchableOpacity
+            style={styles.exploreBanner}
+            onPress={() => router.push('/student-module/clubs' as any)}
+            activeOpacity={0.88}
+          >
+            <View style={styles.exploreBannerLeft}>
+              <Text style={styles.exploreBannerTitle}>
+                Explore{'\n'}Learn{'\n'}Build
+              </Text>
+              <Text style={styles.exploreBannerSubtitle}>
+                Join Clubs, Workshops{'\n'}and Maker Space
+              </Text>
+            </View>
+            <Image
+              source={require('../../assets/learn-build.png')}
+              style={styles.exploreBannerImg}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+
+          {/* 6. CLUBS TO JOIN SECTION (Dynamic - Matches Web Dashboard) */}
+          {isEnabled('clubs') && (
             <View style={styles.sectionContainer}>
               <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionTitle}>Campus Clubs</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={styles.sectionTitle}>Clubs to Join</Text>
+                  {displayClubs.length > 0 && (
+                    <View style={styles.availableCountBadge}>
+                      <Text style={styles.availableCountBadgeText}>
+                        {displayClubs.length} Available
+                      </Text>
+                    </View>
+                  )}
+                </View>
                 <TouchableOpacity
                   onPress={() => router.push('/student-module/clubs' as any)}
                   style={styles.viewAllRow}
                 >
-                  <Text style={styles.viewAllText}>Explore</Text>
+                  <Text style={styles.viewAllText}>View All</Text>
                   <ArrowRight size={13} color="#2563EB" />
                 </TouchableOpacity>
               </View>
@@ -798,65 +979,85 @@ export default function DashboardScreen() {
                 nestedScrollEnabled={true}
                 overScrollMode="never"
               >
-                {displayClubs.map((club) => {
-                  const isJoined = joinedClubIds[club.id] || club.userStatus === 'approved';
-                  return (
+                {displayClubs.length > 0 ? (
+                  displayClubs.map((club: any) => (
                     <TouchableOpacity
                       key={club.id}
                       style={[styles.clubCard, { width: horizontalCardWidth }]}
-                      onPress={() => router.push('/student-module/clubs' as any)}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/student-module/clubs',
+                          params: { clubId: String(club.id) },
+                        } as any)
+                      }
                       activeOpacity={0.85}
                     >
-                      {/* Club Banner Image with Fallback */}
                       <View style={styles.clubCardBanner}>
                         <SafeClubImage club={club} style={styles.clubCardImage} />
-                        <View style={[styles.clubStatusBadge, isJoined && { backgroundColor: '#15803D' }]}>
-                          <Sparkles size={9} color="#FFFFFF" />
+                        <View
+                          style={[
+                            styles.clubStatusBadge,
+                            club.userStatus === 'pending'
+                              ? { backgroundColor: '#B45309' }
+                              : { backgroundColor: '#10B981' },
+                          ]}
+                        >
+                          {club.userStatus === 'pending' ? (
+                            <Clock size={10} color="#FFFFFF" />
+                          ) : (
+                            <Sparkles size={10} color="#FFFFFF" />
+                          )}
                           <Text style={styles.clubStatusBadgeText}>
-                            {isJoined ? 'JOINED' : 'OPEN TO JOIN'}
+                            {club.userStatus === 'pending' ? 'PENDING' : 'OPEN TO JOIN'}
                           </Text>
                         </View>
                       </View>
 
                       <View style={styles.clubCardContent}>
-                        <Text style={styles.clubCategoryText} numberOfLines={1}>{club.category || 'CAMPUS CLUB'}</Text>
                         <Text style={styles.clubTitle} numberOfLines={1}>
                           {club.name}
                         </Text>
                         <Text style={styles.clubDesc} numberOfLines={2}>
-                          {club.description || 'Student group activities and technical projects.'}
+                          {club.description || 'Join activities, workshops, and build skills.'}
                         </Text>
-                      </View>
 
-                      <View style={styles.clubCardFooter}>
-                        <Text style={styles.clubMemberCount}>
-                          {club.memberCount || club.member_count || 0} Members
-                        </Text>
-                        <TouchableOpacity
-                          style={[styles.joinBtn, isJoined && styles.joinedBtn]}
-                          onPress={() => handleJoinClub(club)}
-                          disabled={joiningClubId === club.id || isJoined}
-                        >
-                          <Text style={[styles.joinBtnText, isJoined && styles.joinedBtnText]}>
-                            {isJoined ? 'Joined' : 'Join'}
+                        <View style={styles.clubCardFooter}>
+                          <Text style={styles.clubMemberCount}>
+                            {club.memberCount || club.member_count || 0} Members
                           </Text>
-                        </TouchableOpacity>
+                          <View
+                            style={[
+                              styles.joinBtn,
+                              club.userStatus === 'pending' && styles.joinedBtn,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.joinBtnText,
+                                club.userStatus === 'pending' && styles.joinedBtnText,
+                              ]}
+                            >
+                              {club.userStatus === 'pending' ? 'Pending' : 'View & Join'}
+                            </Text>
+                          </View>
+                        </View>
                       </View>
                     </TouchableOpacity>
-                  );
-                })}
+                  ))
+                ) : (
+                  <View style={[styles.emptyCard, { width: screenWidth - 32 }]}>
+                    <Users size={24} color="#94A3B8" />
+                    <Text style={styles.emptyTitle}>No Clubs Available</Text>
+                    <Text style={styles.emptySub}>Campus student clubs will appear here once active.</Text>
+                  </View>
+                )}
               </ScrollView>
             </View>
           )}
         </ScrollView>
       )}
 
-      {/* SDMS Sidebar Drawer */}
-      <StudentSidebarDrawer
-        visible={drawerVisible}
-        onClose={() => setDrawerVisible(false)}
-        layoutSettings={layoutSettings}
-      />
+
 
 
     </View>
@@ -883,59 +1084,143 @@ const styles = StyleSheet.create({
   },
   banner: {
     backgroundColor: '#1E3A8A',
-    borderRadius: 14,
+    borderRadius: 20,
     padding: 16,
     marginBottom: 14,
+    position: 'relative',
+    overflow: 'hidden',
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 4,
   },
-  bannerLeftCol: {
+  bannerGenderCol: {
+    position: 'absolute',
+    right: -4,
+    bottom: -6,
+    width: 135,
+    height: '115%',
+    alignItems: 'flex-end',
+    justifyContent: 'flex-end',
+    zIndex: 1,
+  },
+  bannerGenderIllustration: {
+    width: '100%',
+    height: '100%',
+    opacity: 0.95,
+  },
+  bannerContentCol: {
+    maxWidth: '68%',
+    zIndex: 2,
+  },
+  bannerPhotoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    marginBottom: 10,
   },
   bannerAvatarBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
   },
   bannerAvatarImg: {
     width: '100%',
     height: '100%',
   },
-  bannerTextContainer: {
+  bannerTitleCol: {
     flex: 1,
   },
-  bannerCollege: {
-    color: '#93C5FD',
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  bannerCourse: {
+  bannerStudentName: {
     color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  bannerCourseText: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 11.5,
+    fontWeight: '600',
     marginTop: 2,
   },
   bannerPillRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginTop: 6,
     flexWrap: 'wrap',
   },
-  bannerPill: {
+  webBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  webBadgeSuccess: {
+    backgroundColor: '#DCFCE7',
+  },
+  webBadgeDanger: {
+    backgroundColor: '#FEE2E2',
+  },
+  webBadgePrimary: {
+    backgroundColor: '#DBEAFE',
+  },
+  webBadgeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#DBEAFE',
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 4,
+  },
+  webBadgeTextSuccess: {
+    color: '#15803D',
+  },
+  webBadgeTextDanger: {
+    color: '#DC2626',
+  },
+  webBadgeTextPrimary: {
+    color: '#1D4ED8',
+  },
+  exploreBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1E3A8A',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 16,
+    overflow: 'hidden',
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  exploreBannerLeft: {
+    flex: 1,
+    zIndex: 2,
+  },
+  exploreBannerTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '900',
+    lineHeight: 22,
+    letterSpacing: -0.3,
+  },
+  exploreBannerSubtitle: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 11.5,
+    marginTop: 6,
+    lineHeight: 16,
+  },
+  exploreBannerImg: {
+    width: 105,
+    height: 75,
   },
   metricsRow: {
     flexDirection: 'row',
@@ -1030,20 +1315,19 @@ const styles = StyleSheet.create({
   },
   servicesHorizontalScroll: {
     paddingVertical: 4,
-    gap: 12,
+    gap: 10,
     marginBottom: 20,
   },
   serviceSquareCard: {
-    width: 78,
-    height: 88,
+    minWidth: 78,
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -1061,19 +1345,19 @@ const styles = StyleSheet.create({
     borderColor: '#CBD5E1',
   },
   serviceIconCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
   },
   serviceSquareLabel: {
     fontSize: 11,
-    fontWeight: '600',
-    color: '#1E293B',
+    fontWeight: '700',
+    color: '#334155',
     textAlign: 'center',
-    width: '100%',
+    includeFontPadding: false,
   },
   portalCard: {
     flexShrink: 0,
@@ -1207,6 +1491,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#2563EB',
   },
+  availableCountBadge: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  availableCountBadgeText: {
+    color: '#1D4ED8',
+    fontSize: 10,
+    fontWeight: '800',
+  },
 
   clubCard: {
     width: 215,
@@ -1327,6 +1622,28 @@ const styles = StyleSheet.create({
   },
   joinedBtnText: {
     color: '#15803D',
+  },
+  emptyCard: {
+    padding: 18,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
+    marginTop: 6,
+  },
+  emptySub: {
+    fontSize: 11,
+    color: '#94A3B8',
+    marginTop: 2,
+    textAlign: 'center',
   },
   fullScreenPageContainer: {
     flex: 1,

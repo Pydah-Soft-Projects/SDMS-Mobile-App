@@ -5,9 +5,15 @@ import { getStudentModuleById } from '../../src/components/StudentSidebarDrawer'
 
 export default function StudentModuleScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  const { id, clubId } = useLocalSearchParams();
   const moduleItem = getStudentModuleById(String(id || ''));
 
-  return <StudentModuleView module={moduleItem} onBack={() => router.back()} />;
+  return (
+    <StudentModuleView
+      module={moduleItem}
+      initialClubId={clubId ? String(clubId) : undefined}
+      onBack={() => router.back()}
+    />
+  );
 }
 

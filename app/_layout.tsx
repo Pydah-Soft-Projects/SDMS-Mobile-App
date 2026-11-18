@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, Alert, AppState, AppStateStatus, Image, Platform, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, AppStateStatus, Image, LogBox, Platform, View } from 'react-native';
 import * as Updates from 'expo-updates';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -9,14 +9,22 @@ import logger from '../src/utils/logger';
 import UpdateModal from '../src/components/UpdateModal';
 import NotificationBanner from '../src/components/NotificationBanner';
 import NotificationPermissionModal from '../src/components/NotificationPermissionModal';
-import notificationService from '../src/services/notificationService';
+import notificationService, { isExpoGo } from '../src/services/notificationService';
 
-// Safely resolve expo-notifications only if native module exists in binary
+// Suppress known Expo Go push notification warning in local development
+LogBox.ignoreLogs([
+  '`expo-notifications` functionality is not fully supported in Expo Go',
+  'expo-notifications: Android Push notifications',
+]);
+
+// Safely resolve expo-notifications only if running in standalone/dev binary (remote push removed from Expo Go in SDK 53+)
 let Notifications: any = null;
-try {
-  Notifications = require('expo-notifications');
-} catch {
-  Notifications = null;
+if (!isExpoGo && Platform.OS !== 'web') {
+  try {
+    Notifications = require('expo-notifications');
+  } catch {
+    Notifications = null;
+  }
 }
 
 function RootNavigation() {
@@ -155,7 +163,9 @@ function RootNavigation() {
   useEffect(() => {
     if (!isAuthenticated || Platform.OS === 'web') return;
 
-    notificationService.registerForPushNotifications();
+    if (!isExpoGo) {
+      notificationService.registerForPushNotifications();
+    }
     notificationService.checkForNewAlerts();
 
     // Check if notification permission modal should be prompted to user

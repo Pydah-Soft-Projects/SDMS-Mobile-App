@@ -1,15 +1,34 @@
-// Safely load Notifications without crashing if native module is absent in older APK binaries
-let Notifications: any = null;
-try {
-  Notifications = require('expo-notifications');
-} catch {
-  Notifications = null;
-}
 import { Platform, Linking, Alert, PermissionsAndroid } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
+import { isRunningInExpoGo } from 'expo';
 import api from '../config/api';
 import logger from '../utils/logger';
 import { isExamRelated } from '../utils/filterUtils';
+
+export const isExpoGo = (() => {
+  try {
+    if (typeof isRunningInExpoGo === 'function' && isRunningInExpoGo()) {
+      return true;
+    }
+    return (
+      Constants.appOwnership === 'expo' ||
+      Constants.executionEnvironment === ExecutionEnvironment.StoreClient
+    );
+  } catch {
+    return false;
+  }
+})();
+
+// Safely load Notifications only in standalone / development builds (remote push is removed from Expo Go in SDK 53+)
+let Notifications: any = null;
+if (!isExpoGo && Platform.OS !== 'web') {
+  try {
+    Notifications = require('expo-notifications');
+  } catch {
+    Notifications = null;
+  }
+}
 
 const PUSH_TOKEN_STORAGE_KEY = '@campo_expo_push_token';
 const LAST_VIEWED_NOTICES_KEY = '@campo_last_notices_viewed_at';
@@ -86,6 +105,7 @@ export const notificationService = {
    */
   async checkHasPermission(): Promise<boolean> {
     if (Platform.OS === 'web') return false;
+    if (isExpoGo) return true;
 
     // 0. Check if user already enabled notifications in-app
     try {
@@ -197,7 +217,7 @@ export const notificationService = {
    * Continues to show until the user actually enables notification access.
    */
   async shouldShowPermissionModal(): Promise<boolean> {
-    if (Platform.OS === 'web') return false;
+    if (Platform.OS === 'web' || isExpoGo) return false;
     try {
       const hasPermission = await this.checkHasPermission();
       // Once granted/enabled, never show again
@@ -224,7 +244,12 @@ export const notificationService = {
    * Register device for remote push notifications (Expo Push API)
    */
   async registerForPushNotifications(): Promise<string | null> {
-    if (Platform.OS === 'web' || !Notifications?.getExpoPushTokenAsync) return null;
+    if (isExpoGo || Platform.OS === 'web' || !Notifications?.getExpoPushTokenAsync) {
+      if (isExpoGo) {
+        logger.info('NOTIFICATIONS', 'Push notification token registration bypassed in Expo Go (available in standalone APK)');
+      }
+      return null;
+    }
 
     try {
       // 1. Android specific notification channel setup

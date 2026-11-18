@@ -1,17 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Platform, StatusBar as RNStatusBar } from 'react-native';
-import { Menu, BellRing } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  Platform,
+  StatusBar as RNStatusBar,
+} from 'react-native';
+import { BellRing, ArrowLeft } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { StudentSidebarDrawer } from './StudentSidebarDrawer';
 import { useAuth } from '../context/AuthContext';
 import notificationService from '../services/notificationService';
+import { getStaticFileUrl } from '../config/api';
 
 interface HeaderProps {
   title: string;
   subtitle?: string;
   showLogout?: boolean;
   showPydianTag?: boolean;
+  showBack?: boolean;
+  onBack?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -19,6 +29,8 @@ export const Header: React.FC<HeaderProps> = ({
   subtitle,
   showLogout = false,
   showPydianTag,
+  showBack = false,
+  onBack,
 }) => {
   const insets = useSafeAreaInsets();
   const topInset = Math.max(
@@ -28,10 +40,10 @@ export const Header: React.FC<HeaderProps> = ({
   );
   const router = useRouter();
   const { user, userType } = useAuth();
-  const [showSidebar, setShowSidebar] = useState(false);
+  const student = user as any;
   const isStudent =
     userType === 'student' ||
-    (!userType && !(user as any)?.role?.includes('admin') && !(user as any)?.role?.includes('staff'));
+    (!userType && !student?.role?.includes('admin') && !student?.role?.includes('staff'));
 
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -43,36 +55,71 @@ export const Header: React.FC<HeaderProps> = ({
   }, [isStudent]);
 
   const shouldShowPydian = showPydianTag || title.toLowerCase().includes('good');
+  const initialLetter =
+    (student?.name || student?.student_name || 'S')?.charAt(0)?.toUpperCase() || 'S';
+  const studentPhotoUri =
+    student?.avatarUrl || student?.student_photo
+      ? getStaticFileUrl(student.avatarUrl || student.student_photo)
+      : null;
+
+  const handleBackPress = () => {
+    if (onBack) {
+      onBack();
+      return;
+    }
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.push('/(tabs)' as any);
+    }
+  };
 
   return (
-    <>
-      <View style={[styles.container, { paddingTop: topInset + 8 }]}>
-        {isStudent && (
+    <View style={[styles.container, { paddingTop: topInset + 8 }]}>
+      {/* Left: Back Button (optional) + Brand Icon + Divider (Matching Web TopHeaderBar) */}
+      <View style={styles.brandGroup}>
+        {showBack && (
           <TouchableOpacity
-            style={styles.menuBtn}
-            onPress={() => setShowSidebar(true)}
-            hitSlop={8}
+            onPress={handleBackPress}
+            style={styles.backBtn}
+            hitSlop={10}
             activeOpacity={0.7}
           >
-            <Menu size={22} color="#1E3A8A" />
+            <ArrowLeft size={20} color="#1E293B" />
           </TouchableOpacity>
         )}
-        <View style={styles.titleContainer}>
-          <View style={styles.titleRow}>
-            <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-              {title}
-            </Text>
-            {shouldShowPydian && (
-              <View style={styles.pydianTag}>
-                <Text style={styles.pydianTagText}>Campo</Text>
-              </View>
-            )}
-          </View>
-          {subtitle && <Text style={styles.subtitle} numberOfLines={1} ellipsizeMode="tail">{subtitle}</Text>}
-        </View>
+        <Image
+          source={require('../../assets/campo-icon.png')}
+          style={styles.brandIcon}
+          resizeMode="contain"
+        />
+        <View style={styles.verticalDivider} />
+      </View>
 
-        <View style={styles.actions}>
-          {isStudent && (
+      {/* Middle: Title & Pydian / Campo Tag */}
+      <View style={styles.titleContainer}>
+        <View style={styles.titleRow}>
+          <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+            {title}
+          </Text>
+          {shouldShowPydian && (
+            <View style={styles.pydianTag}>
+              <Text style={styles.pydianTagText}>Pydian</Text>
+            </View>
+          )}
+        </View>
+        {subtitle && (
+          <Text style={styles.subtitle} numberOfLines={1} ellipsizeMode="tail">
+            {subtitle}
+          </Text>
+        )}
+      </View>
+
+      {/* Right: Notifications Bell + Profile Avatar Button */}
+      <View style={styles.actions}>
+        {isStudent && (
+          <>
+            {/* Notification Bell */}
             <TouchableOpacity
               onPress={() => {
                 setUnreadCount(0);
@@ -81,20 +128,32 @@ export const Header: React.FC<HeaderProps> = ({
               }}
               style={styles.bellBtn}
               hitSlop={8}
+              activeOpacity={0.7}
             >
-              <BellRing size={20} color="#1E3A8A" />
+              <BellRing size={19} color="#1E3A8A" />
               {unreadCount > 0 && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
                 </View>
               )}
             </TouchableOpacity>
-          )}
-        </View>
-      </View>
 
-      <StudentSidebarDrawer visible={showSidebar} onClose={() => setShowSidebar(false)} />
-    </>
+            {/* Profile Avatar Button (Navigates directly to profile, replacing sidebar) */}
+            <TouchableOpacity
+              onPress={() => router.push('/(tabs)/profile' as any)}
+              style={styles.profileBtn}
+              activeOpacity={0.7}
+            >
+              {studentPhotoUri ? (
+                <Image source={{ uri: studentPhotoUri }} style={styles.profileBtnImg} />
+              ) : (
+                <Text style={styles.profileInitialText}>{initialLetter}</Text>
+              )}
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    </View>
   );
 };
 
@@ -109,23 +168,33 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
-  brandLogo: {
-    width: 32,
-    height: 32,
-    marginHorizontal: 8,
+  brandGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
   },
-  menuBtn: {
-    width: 36,
-    height: 36,
+  backBtn: {
+    paddingVertical: 4,
+    paddingRight: 6,
+    paddingLeft: 0,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  brandIcon: {
+    width: 32,
+    height: 32,
     borderRadius: 8,
-    backgroundColor: '#F1F5F9',
-    marginRight: 10,
+  },
+  verticalDivider: {
+    width: 1,
+    height: 22,
+    backgroundColor: '#E2E8F0',
+    marginLeft: 10,
   },
   titleContainer: {
     flex: 1,
     minWidth: 0,
+    justifyContent: 'center',
   },
   titleRow: {
     flexDirection: 'row',
@@ -134,21 +203,22 @@ const styles = StyleSheet.create({
   },
   title: {
     flexShrink: 1,
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '800',
     color: '#0F172A',
+    letterSpacing: -0.2,
   },
   pydianTag: {
     flexShrink: 0,
     backgroundColor: '#FFF7ED',
     borderWidth: 1,
     borderColor: '#FDBA74',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: 7,
+    paddingVertical: 1.5,
     borderRadius: 12,
   },
   pydianTagText: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '800',
     color: '#EA580C',
     letterSpacing: 0.3,
@@ -159,19 +229,18 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   actions: {
-    width: 36,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
+    gap: 8,
     marginLeft: 8,
   },
   bellBtn: {
     position: 'relative',
-    width: 36,
-    height: 36,
+    width: 34,
+    height: 34,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
+    borderRadius: 17,
     backgroundColor: '#F1F5F9',
   },
   badge: {
@@ -179,18 +248,39 @@ const styles = StyleSheet.create({
     top: -2,
     right: -2,
     backgroundColor: '#EF4444',
-    minWidth: 17,
-    height: 17,
-    borderRadius: 8.5,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 3,
     borderWidth: 1.5,
     borderColor: '#FFFFFF',
   },
   badgeText: {
     color: '#FFFFFF',
-    fontSize: 9,
+    fontSize: 8.5,
+    fontWeight: '800',
+  },
+  profileBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#1E3A8A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: '#DBEAFE',
+  },
+  profileBtnImg: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
+  },
+  profileInitialText: {
+    color: '#FFFFFF',
+    fontSize: 13,
     fontWeight: '800',
   },
 });

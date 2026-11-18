@@ -165,6 +165,7 @@ export default function AnnouncementsScreen() {
       <Header
         title={isStaff ? 'Campus Circulars' : 'Circulars & Events'}
         subtitle={isStaff ? 'SDMS Institutional Announcements' : 'Official Student Notices & Events'}
+        showBack
       />
 
       {/* Segmented Tab Switcher */}

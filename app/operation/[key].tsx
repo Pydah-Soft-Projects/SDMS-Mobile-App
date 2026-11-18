@@ -528,9 +528,7 @@ export default function OperationScreen() {
             return true;
           });
         } else if (opKey === 'announcements') {
-          if (activeSubTab === 'polls') {
-            rawList = await staffService.getPolls();
-          } else if (activeSubTab === 'events') {
+          if (activeSubTab === 'events') {
             rawList = await staffService.getEvents();
           } else if (activeSubTab === 'exam_notifications') {
             try {

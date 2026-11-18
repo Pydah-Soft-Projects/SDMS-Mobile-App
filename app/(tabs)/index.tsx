@@ -106,6 +106,18 @@ const SafeClubImage: React.FC<{ club: any; style: any }> = ({ club, style }) => 
   );
 };
 
+// Custom 3D Dashboard Card Images
+const SERVICE_IMAGES: Record<string, any> = {
+  attendance: require('../../assets/dashboard/attendance.png'),
+  academic: require('../../assets/dashboard/academic.png'),
+  fees: require('../../assets/dashboard/fees.png'),
+  timetable: require('../../assets/dashboard/timetable.png'),
+  'internal-marks': require('../../assets/dashboard/results.png'),
+  results: require('../../assets/dashboard/results.png'),
+  library: require('../../assets/dashboard/resources.png'),
+  resources: require('../../assets/dashboard/resources.png'),
+};
+
 export default function DashboardScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -475,6 +487,15 @@ export default function DashboardScreen() {
         enabled: true,
       },
       {
+        key: 'library',
+        label: 'Library',
+        route: '/student-module/library',
+        iconName: 'BookOpen',
+        iconBg: '#DCFCE7',
+        iconColor: '#16A34A',
+        enabled: isEnabled('library'),
+      },
+      {
         key: 'semester-registration',
         label: 'Sem Reg.',
         route: '/student-module/semester-registration',
@@ -509,15 +530,6 @@ export default function DashboardScreen() {
         iconBg: '#FAF5FF',
         iconColor: '#7C3AED',
         enabled: isEnabled('services'),
-      },
-      {
-        key: 'library',
-        label: 'Library',
-        route: '/student-module/library',
-        iconName: 'BookOpen',
-        iconBg: '#DCFCE7',
-        iconColor: '#16A34A',
-        enabled: isEnabled('library'),
       },
       {
         key: 'my-tickets',
@@ -842,23 +854,35 @@ export default function DashboardScreen() {
             nestedScrollEnabled={true}
             overScrollMode="never"
           >
-            {menuActions.map((action) => (
-              <TouchableOpacity
-                key={action.key}
-                style={styles.serviceSquareCard}
-                onPress={() => {
-                  router.push(action.route as any);
-                }}
-                activeOpacity={0.75}
-              >
-                <View style={[styles.serviceIconCircle, { backgroundColor: action.iconBg }]}>
-                  {renderActionIcon(action.iconName, action.iconColor, 20)}
-                </View>
-                <Text style={styles.serviceSquareLabel} numberOfLines={1}>
-                  {action.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {menuActions.map((action) => {
+              const imageSrc = (action as any).image || SERVICE_IMAGES[action.key];
+              return (
+                <TouchableOpacity
+                  key={action.key}
+                  style={styles.serviceActionItem}
+                  onPress={() => {
+                    router.push(action.route as any);
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <View
+                    style={[
+                      styles.serviceRoundedCard,
+                      !imageSrc && { backgroundColor: action.iconBg },
+                    ]}
+                  >
+                    {imageSrc ? (
+                      <Image source={imageSrc} style={styles.serviceImg} resizeMode="contain" />
+                    ) : (
+                      renderActionIcon(action.iconName, action.iconColor, 24)
+                    )}
+                  </View>
+                  <Text style={styles.serviceItemLabel} numberOfLines={1}>
+                    {action.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
 
           {/* 4. CAMPUS EVENTS SECTION */}
@@ -1315,39 +1339,73 @@ const styles = StyleSheet.create({
   },
   servicesHorizontalScroll: {
     paddingVertical: 4,
-    gap: 10,
+    gap: 12,
     marginBottom: 20,
   },
-  serviceSquareCard: {
-    minWidth: 78,
+  serviceActionItem: {
+    width: 72,
+    alignItems: 'center',
+  },
+  serviceRoundedCard: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  serviceImg: {
+    width: 50,
+    height: 50,
+  },
+  serviceItemLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
+    textAlign: 'center',
+    marginTop: 6,
+    width: '100%',
+    includeFontPadding: false,
+  },
+  serviceSquareCard: {
+    minWidth: 84,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 8,
-    paddingVertical: 10,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
-        shadowRadius: 3,
-      },
-      android: {
-        elevation: 1,
-      },
-    }),
+    paddingVertical: 11,
   },
   allServicesCard: {
     backgroundColor: '#F8FAFC',
     borderColor: '#CBD5E1',
   },
   serviceIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 50,
+    height: 50,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  serviceImageContainer: {
+    width: 54,
+    height: 54,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,

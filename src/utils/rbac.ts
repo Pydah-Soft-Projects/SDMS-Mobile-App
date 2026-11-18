@@ -276,7 +276,6 @@ export const SDMS_ADMIN_NAV_TREE: AdminNavItem[] = [
     color: '#7C3AED',
     subItems: [
       { id: 'notices', label: 'Announcements', iconName: 'Megaphone', permission: FRONTEND_MODULES.ANNOUNCEMENTS },
-      { id: 'polls', label: 'Polls', iconName: 'BarChart3', permission: FRONTEND_MODULES.ANNOUNCEMENTS },
       { id: 'sms', label: 'SMS', iconName: 'Smartphone', permission: FRONTEND_MODULES.ANNOUNCEMENTS },
       { id: 'events', label: 'Events', iconName: 'Calendar', permission: FRONTEND_MODULES.ANNOUNCEMENTS },
       { id: 'exam_notifications', label: 'Examination Notifications', iconName: 'Calendar', permission: FRONTEND_MODULES.ANNOUNCEMENTS },

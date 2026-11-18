@@ -20,6 +20,7 @@ interface HeaderProps {
   subtitle?: string;
   showLogout?: boolean;
   showPydianTag?: boolean;
+  showBuddyTag?: boolean;
   showBack?: boolean;
   onBack?: () => void;
 }
@@ -29,6 +30,7 @@ export const Header: React.FC<HeaderProps> = ({
   subtitle,
   showLogout = false,
   showPydianTag,
+  showBuddyTag,
   showBack = false,
   onBack,
 }) => {
@@ -54,7 +56,12 @@ export const Header: React.FC<HeaderProps> = ({
     return unsubscribe;
   }, [isStudent]);
 
-  const shouldShowPydian = showPydianTag || title.toLowerCase().includes('good');
+  const shouldShowBuddy =
+    showBuddyTag !== undefined
+      ? showBuddyTag
+      : showPydianTag !== undefined
+      ? showPydianTag
+      : title.toLowerCase().includes('good');
   const initialLetter =
     (student?.name || student?.student_name || 'S')?.charAt(0)?.toUpperCase() || 'S';
   const studentPhotoUri =
@@ -96,16 +103,14 @@ export const Header: React.FC<HeaderProps> = ({
         <View style={styles.verticalDivider} />
       </View>
 
-      {/* Middle: Title & Pydian / Campo Tag */}
+      {/* Middle: Title & Buddy in Cursive */}
       <View style={styles.titleContainer}>
         <View style={styles.titleRow}>
           <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
             {title}
           </Text>
-          {shouldShowPydian && (
-            <View style={styles.pydianTag}>
-              <Text style={styles.pydianTagText}>Pydian</Text>
-            </View>
+          {shouldShowBuddy && (
+            <Text style={styles.buddyCursiveText}>Buddy</Text>
           )}
         </View>
         {subtitle && (
@@ -208,20 +213,12 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     letterSpacing: -0.2,
   },
-  pydianTag: {
-    flexShrink: 0,
-    backgroundColor: '#FFF7ED',
-    borderWidth: 1,
-    borderColor: '#FDBA74',
-    paddingHorizontal: 7,
-    paddingVertical: 1.5,
-    borderRadius: 12,
-  },
-  pydianTagText: {
-    fontSize: 10.5,
-    fontWeight: '800',
-    color: '#EA580C',
-    letterSpacing: 0.3,
+  buddyCursiveText: {
+    fontFamily: 'DancingScript-Bold',
+    fontSize: 20,
+    color: '#1E3A8A',
+    marginLeft: 3,
+    transform: [{ translateY: -1 }],
   },
   subtitle: {
     fontSize: 11,

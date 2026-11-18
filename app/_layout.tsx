@@ -3,6 +3,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, Alert, AppState, AppStateStatus, Image, LogBox, Platform, View } from 'react-native';
 import * as Updates from 'expo-updates';
+import { useFonts } from 'expo-font';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import logger from '../src/utils/logger';
@@ -10,6 +11,10 @@ import UpdateModal from '../src/components/UpdateModal';
 import NotificationBanner from '../src/components/NotificationBanner';
 import NotificationPermissionModal from '../src/components/NotificationPermissionModal';
 import notificationService, { isExpoGo } from '../src/services/notificationService';
+import { initGlobalFont } from '../src/utils/customFont';
+
+// Initialize global bundled font family
+initGlobalFont();
 
 // Suppress known Expo Go push notification warning in local development
 LogBox.ignoreLogs([
@@ -31,6 +36,17 @@ function RootNavigation() {
   const { isAuthenticated, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+
+  // Load bundled Inter & Cursive fonts
+  const [fontsLoaded, fontError] = useFonts({
+    'Inter-Regular': require('../assets/fonts/Inter-Regular.ttf'),
+    'Inter-Medium': require('../assets/fonts/Inter-Medium.ttf'),
+    'Inter-SemiBold': require('../assets/fonts/Inter-SemiBold.ttf'),
+    'Inter-Bold': require('../assets/fonts/Inter-Bold.ttf'),
+    'DancingScript': require('../assets/fonts/DancingScript-Bold.ttf'),
+    'DancingScript-Bold': require('../assets/fonts/DancingScript-Bold.ttf'),
+    'DancingScript-SemiBold': require('../assets/fonts/DancingScript-SemiBold.ttf'),
+  });
 
   // Official live updates state hook
   const { isUpdateAvailable, isUpdatePending } = Updates.useUpdates();
@@ -243,7 +259,7 @@ function RootNavigation() {
     await notificationService.markPermissionModalDismissed();
   };
 
-  if (isLoading) {
+  if (isLoading || (!fontsLoaded && !fontError)) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
         <Image

@@ -655,7 +655,7 @@ export default function DashboardScreen() {
       <Header
         title={greetingText}
         subtitle={`PIN: ${student?.pin_no || student?.admission_number || 'N/A'}${currentYearText ? ` • ${currentYearText}` : ''}${semester ? ` • Sem ${semester}` : ''}`}
-        showPydianTag={true}
+        showBuddyTag={true}
       />
 
       {loading ? (

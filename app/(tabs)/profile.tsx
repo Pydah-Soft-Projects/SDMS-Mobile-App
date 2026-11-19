@@ -15,10 +15,14 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   User,
+  UserCheck,
+  Users,
   Mail,
   Phone,
+  PhoneCall,
   Building2,
   GraduationCap,
   Calendar,
@@ -35,6 +39,11 @@ import {
   Eye,
   EyeOff,
   CreditCard,
+  Compass,
+  FileText,
+  Award,
+  Heart,
+  Landmark,
 } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import Header from '../../src/components/Header';
@@ -73,6 +82,9 @@ export default function ProfileScreen() {
 
   // Digital ID Card State
   const [showIdCardModal, setShowIdCardModal] = useState(false);
+
+  // Active Tab State (Personal | Contact | Academic)
+  const [activeTab, setActiveTab] = useState<'personal' | 'contact' | 'academic'>('personal');
 
   // Edit Profile Modal State
   const [profileModalVisible, setProfileModalVisible] = useState(false);
@@ -204,17 +216,17 @@ export default function ProfileScreen() {
   const handleOpenEditModal = () => {
     setEditMobile(
       displayData.student_mobile ||
-        getStudentData('Student Mobile number') ||
-        displayData.phone ||
-        ''
+      getStudentData('Student Mobile number') ||
+      displayData.phone ||
+      ''
     );
     setEditEmail(
       displayData.email || getStudentData('Email') || student?.email || ''
     );
     setEditAddress(
       displayData.student_address ||
-        getStudentData('Student Address') ||
-        ''
+      getStudentData('Student Address') ||
+      ''
     );
     setEditCity(
       displayData.city_village || getStudentData('City') || ''
@@ -392,122 +404,129 @@ export default function ProfileScreen() {
             />
           }
         >
-          {/* Top Banner (Deep Blue with subtle decorative accents) */}
-          <View style={styles.topBanner}>
-            <View style={styles.bannerGlow1} />
-            <View style={styles.bannerGlow2} />
+          {/* 1. HERO BANNER CARD (Vibrant Royal Blue Gradient with Building Watermark) */}
+          <LinearGradient
+            colors={['#0047BA', '#0052CC', '#0284C7']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.heroCard}
+          >
+            {/* Campus Architectural Building Watermark in Top Right */}
+            <Building2
+              size={135}
+              color="rgba(255, 255, 255, 0.13)"
+              style={styles.heroWatermark}
+            />
+
+            {/* Top Row: Avatar on Left, Name & Adm/Pin Pills on Right */}
+            <View style={styles.heroTopRow}>
+              <View style={styles.heroAvatarWrapper}>
+                <View style={styles.heroAvatarCircle}>
+                  {photoUrl ? (
+                    <Image source={{ uri: photoUrl }} style={styles.heroAvatarImg} />
+                  ) : (
+                    <View style={styles.heroAvatarFallback}>
+                      <User size={42} color="#0052CC" />
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.heroNameCol}>
+                <Text style={styles.heroStudentName} numberOfLines={2}>
+                  {displayData.student_name || displayData.name || user?.name || 'Student'}
+                </Text>
+                <View style={styles.heroPillsRow}>
+                  <View style={styles.heroPillBadge}>
+                    <Text style={styles.heroPillText}>
+                      Adm: {displayData.admission_number || student?.admission_number || '—'}
+                    </Text>
+                  </View>
+                  <View style={styles.heroPillBadge}>
+                    <Text style={styles.heroPillText}>
+                      Pin:{' '}
+                      {displayData.pin_no ||
+                        displayData.pin_number ||
+                        displayData.pin ||
+                        getStudentData('PIN') ||
+                        getStudentData('Pin Number') ||
+                        getStudentData('Pin No') ||
+                        'Not Assigned'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          </LinearGradient>
+
+          {/* Floating Academic Info Subcard (Overlapping the bottom edge of blue card) */}
+          <View style={styles.academicFloatingCard}>
+            <View style={styles.academicRow}>
+              <Building2 size={17} color="#0052CC" />
+              <Text style={styles.academicRowText} numberOfLines={1}>
+                {displayData.college || getStudentData('College') || '—'}
+              </Text>
+            </View>
+
+            <View style={styles.academicRow}>
+              <GraduationCap size={17} color="#1E293B" />
+              <Text style={styles.academicRowText} numberOfLines={1}>
+                {courseBranch}
+              </Text>
+            </View>
+
+            <View style={[styles.academicRow, { borderBottomWidth: 0 }]}>
+              <Calendar size={17} color="#EA580C" />
+              <Text style={styles.academicRowText} numberOfLines={1}>
+                Year {displayData.current_year || getStudentData('Year') || '—'} / Sem{' '}
+                {displayData.current_semester || getStudentData('Semister') || '—'}
+              </Text>
+            </View>
           </View>
 
-          {/* Profile Card overlapping banner */}
-          <View style={styles.profileCard}>
-            {/* Circular Profile Avatar */}
-            <View style={styles.avatarWrapper}>
-              <View style={styles.avatarCircle}>
-                {photoUrl ? (
-                  <Image source={{ uri: photoUrl }} style={styles.avatarImg} />
-                ) : (
-                  <View style={styles.avatarFallback}>
-                    <User size={46} color="#1E3A8A" />
-                  </View>
-                )}
-              </View>
-            </View>
-
-            {/* Student Name */}
-            <Text style={styles.studentName} numberOfLines={2}>
-              {displayData.student_name || displayData.name || user?.name || 'Student'}
-            </Text>
-
-            {/* Admission & PIN Pills */}
-            <View style={styles.pillsRow}>
-              <View style={styles.pillBadge}>
-                <Text style={styles.pillText}>
-                  Adm: {displayData.admission_number || student?.admission_number || '—'}
-                </Text>
-              </View>
-              <View style={styles.pillBadge}>
-                <Text style={styles.pillText}>
-                  Pin:{' '}
-                  {displayData.pin_no ||
-                    displayData.pin_number ||
-                    displayData.pin ||
-                    getStudentData('PIN') ||
-                    getStudentData('Pin Number') ||
-                    getStudentData('Pin No') ||
-                    'Not Assigned'}
-                </Text>
-              </View>
-            </View>
-
-            {/* Academic Subcard: College, Branch & Year with Icons */}
-            <View style={styles.academicSubCard}>
-              <View style={styles.academicItem}>
-                <Building2 size={15} color="#1E3A8A" />
-                <Text style={styles.academicText} numberOfLines={1}>
-                  {displayData.college || getStudentData('College') || '—'}
-                </Text>
-              </View>
-
-              <View style={styles.academicItem}>
-                <GraduationCap size={15} color="#16A34A" />
-                <Text style={styles.academicText} numberOfLines={1}>
-                  {courseBranch}
-                </Text>
-              </View>
-
-              <View style={styles.academicItem}>
-                <Calendar size={15} color="#D97706" />
-                <Text style={styles.academicText} numberOfLines={1}>
-                  Year {displayData.current_year || getStudentData('Year') || '—'} / Sem{' '}
-                  {displayData.current_semester || getStudentData('Semister') || '—'}
-                </Text>
-              </View>
-            </View>
-
-            {/* Action Buttons: Edit Profile, Change Password & ID Card */}
-            <View style={styles.actionButtonsRow}>
-              <TouchableOpacity
-                style={[
-                  styles.actionBtn,
-                  pendingRequest ? styles.actionBtnWarning : styles.actionBtnPrimary,
-                ]}
-                onPress={handleOpenEditModal}
-                activeOpacity={0.8}
-              >
-                {pendingRequest ? (
-                  <Clock size={13} color="#FFFFFF" />
-                ) : (
-                  <Edit3 size={13} color="#FFFFFF" />
-                )}
-                <Text style={styles.actionBtnText} numberOfLines={1}>
-                  {pendingRequest ? 'Pending' : 'Edit Profile'}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.actionBtnDark]}
-                onPress={() => setPasswordModalVisible(true)}
-                activeOpacity={0.8}
-              >
-                <Lock size={13} color="#FFFFFF" />
-                <Text style={styles.actionBtnText} numberOfLines={1}>
-                  Password
-                </Text>
-              </TouchableOpacity>
-
-              {isStudent && (
-                <TouchableOpacity
-                  style={[styles.actionBtn, styles.actionBtnOrange]}
-                  onPress={() => setShowIdCardModal(true)}
-                  activeOpacity={0.8}
-                >
-                  <CreditCard size={13} color="#FFFFFF" />
-                  <Text style={styles.actionBtnText} numberOfLines={1}>
-                    ID Card
-                  </Text>
-                </TouchableOpacity>
+          {/* 2. ACTION BUTTONS ROW: Edit Profile, Password & ID Card */}
+          <View style={styles.actionButtonsRow}>
+            <TouchableOpacity
+              style={[
+                styles.actionBtn,
+                pendingRequest ? styles.actionBtnWarning : styles.actionBtnPrimary,
+              ]}
+              onPress={handleOpenEditModal}
+              activeOpacity={0.8}
+            >
+              {pendingRequest ? (
+                <Clock size={14} color="#FFFFFF" />
+              ) : (
+                <Edit3 size={14} color="#FFFFFF" />
               )}
-            </View>
+              <Text style={styles.actionBtnText} numberOfLines={1}>
+                {pendingRequest ? 'Pending' : 'Edit Profile'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionBtnDark]}
+              onPress={() => setPasswordModalVisible(true)}
+              activeOpacity={0.8}
+            >
+              <Lock size={14} color="#FFFFFF" />
+              <Text style={styles.actionBtnText} numberOfLines={1}>
+                Password
+              </Text>
+            </TouchableOpacity>
+
+            {isStudent && (
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.actionBtnOrange]}
+                onPress={() => setShowIdCardModal(true)}
+                activeOpacity={0.8}
+              >
+                <CreditCard size={14} color="#FFFFFF" />
+                <Text style={styles.actionBtnText} numberOfLines={1}>
+                  ID Card
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Pending Request Status Banner */}
@@ -588,132 +607,214 @@ export default function ProfileScreen() {
             </View>
           )}
 
-          {/* Cards Container: Personal Details & Connect Details */}
+          {/* 3. SEGMENTED TABS PILL BAR: Personal | Contact | Academic */}
+          {isStudent && (
+            <View style={styles.tabBarContainer}>
+              <TouchableOpacity
+                style={[styles.tabBtn, activeTab === 'personal' && styles.tabBtnActive]}
+                onPress={() => setActiveTab('personal')}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.tabBtnText,
+                    activeTab === 'personal' && styles.tabBtnTextActive,
+                  ]}
+                >
+                  Personal
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.tabBtn, activeTab === 'contact' && styles.tabBtnActive]}
+                onPress={() => setActiveTab('contact')}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.tabBtnText,
+                    activeTab === 'contact' && styles.tabBtnTextActive,
+                  ]}
+                >
+                  Contact
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.tabBtn, activeTab === 'academic' && styles.tabBtnActive]}
+                onPress={() => setActiveTab('academic')}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.tabBtnText,
+                    activeTab === 'academic' && styles.tabBtnTextActive,
+                  ]}
+                >
+                  Academic
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* 4. DETAILS CARD WITH ICON ROWS (Matching exact image alignment) */}
           {isStudent ? (
-            <View style={styles.sectionsContainer}>
-              {/* 1. PERSONAL DETAILS CARD (Soft Blue container) */}
-              <View style={styles.cardBlue}>
-                <View style={styles.cardHeaderBlue}>
-                  <View style={styles.cardIconBlue}>
-                    <User size={16} color="#FFFFFF" />
-                  </View>
-                  <Text style={styles.cardTitleBlue}>PERSONAL DETAILS</Text>
+            <View style={styles.detailsCard}>
+              {/* Card Header with Icon Box */}
+              <View style={styles.detailsCardHeader}>
+                <View style={styles.detailsCardIconBox}>
+                  {activeTab === 'personal' && <User size={16} color="#FFFFFF" />}
+                  {activeTab === 'contact' && <Phone size={16} color="#FFFFFF" />}
+                  {activeTab === 'academic' && <GraduationCap size={16} color="#FFFFFF" />}
                 </View>
-
-                {/* Row 1: Father Name | Gender | DOB */}
-                <View style={styles.infoGridRow}>
-                  <View style={{ flex: 1.2 }}>
-                    <InfoItem
-                      label="Father"
-                      value={displayData.father_name || getStudentData('Father Name')}
-                    />
-                  </View>
-                  <View style={{ flex: 0.9 }}>
-                    <InfoItem
-                      label="Gender"
-                      value={displayData.gender || getStudentData('Gender')}
-                    />
-                  </View>
-                  <View style={{ flex: 0.9 }}>
-                    <InfoItem
-                      label="DOB"
-                      value={formatDate(displayData.dob || getStudentData('DOB'))}
-                    />
-                  </View>
-                </View>
-
-                {/* Row 2: Caste / Subcaste | Aadhar Number */}
-                <View style={[styles.infoGridRow, styles.dividerBlue]}>
-                  <View style={{ flex: 1 }}>
-                    <InfoItem
-                      label="Caste / Subcaste"
-                      value={displayData.caste || getStudentData('Caste')}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <InfoItem
-                      label="Aadhar Number"
-                      value={displayData.adhar_no || getStudentData('Adhar No')}
-                    />
-                  </View>
-                </View>
+                <Text style={styles.detailsCardTitle}>
+                  {activeTab === 'personal' && 'Personal Details'}
+                  {activeTab === 'contact' && 'Contact Details'}
+                  {activeTab === 'academic' && 'Academic Details'}
+                </Text>
               </View>
 
-              {/* 2. CONNECT DETAILS CARD (Soft Amber container) */}
-              <View style={styles.cardAmber}>
-                <View style={styles.cardHeaderAmber}>
-                  <View style={styles.cardIconAmber}>
-                    <MapPin size={16} color="#FFFFFF" />
-                  </View>
-                  <Text style={styles.cardTitleAmber}>CONNECT DETAILS</Text>
+              {/* TAB 1: PERSONAL DETAILS */}
+              {activeTab === 'personal' && (
+                <View>
+                  <DetailRow
+                    icon={User}
+                    label="Father Name"
+                    value={displayData.father_name || getStudentData('Father Name') || getStudentData('Father')}
+                  />
+                  <DetailRow
+                    icon={UserCheck}
+                    label="Gender"
+                    value={displayData.gender || getStudentData('Gender')}
+                  />
+                  <DetailRow
+                    icon={Calendar}
+                    label="Date of Birth"
+                    value={formatDate(displayData.dob || getStudentData('DOB') || getStudentData('Date of Birth'))}
+                  />
+                  <DetailRow
+                    icon={Users}
+                    label="Caste / Subcaste"
+                    value={displayData.caste || getStudentData('Caste') || getStudentData('Sub Caste') || getStudentData('Caste / Subcaste')}
+                  />
+                  <DetailRow
+                    icon={CreditCard}
+                    label="Aadhar Number"
+                    value={displayData.adhar_no || displayData.aadhar_number || getStudentData('Adhar No') || getStudentData('Aadhar Number') || getStudentData('Aadhar')}
+                  />
+                  {(displayData.mother_name || getStudentData('Mother Name')) && (
+                    <DetailRow
+                      icon={Heart}
+                      label="Mother Name"
+                      value={displayData.mother_name || getStudentData('Mother Name')}
+                    />
+                  )}
+                  {(displayData.blood_group || getStudentData('Blood Group')) && (
+                    <DetailRow
+                      icon={ShieldAlert}
+                      label="Blood Group"
+                      value={displayData.blood_group || getStudentData('Blood Group')}
+                      isLast
+                    />
+                  )}
                 </View>
+              )}
 
-                {/* Row 1: Student Mobile | Parent 1 | Parent 2 */}
-                <View style={styles.infoGridRow}>
-                  <View style={{ flex: 1.1 }}>
-                    <InfoItem
-                      label="Student Mobile"
-                      value={
-                        displayData.student_mobile ||
-                        getStudentData('Student Mobile number')
-                      }
+              {/* TAB 2: CONTACT DETAILS */}
+              {activeTab === 'contact' && (
+                <View>
+                  <DetailRow
+                    icon={Phone}
+                    label="Student Mobile"
+                    value={displayData.student_mobile || displayData.mobile || student?.mobile || getStudentData('Student Mobile') || getStudentData('Student Mobile number')}
+                  />
+                  <DetailRow
+                    icon={Mail}
+                    label="Student Email"
+                    value={displayData.student_email || displayData.email || student?.email || getStudentData('Student Email')}
+                  />
+                  <DetailRow
+                    icon={PhoneCall}
+                    label="Parent Mobile 1"
+                    value={displayData.parent_mobile || displayData.parent_mobile1 || getStudentData('Parent Mobile') || getStudentData('Parent Mobile Number 1') || getStudentData('Father Mobile')}
+                  />
+                  {(displayData.parent_mobile2 || getStudentData('Parent Mobile Number 2')) && (
+                    <DetailRow
+                      icon={PhoneCall}
+                      label="Parent Mobile 2"
+                      value={displayData.parent_mobile2 || getStudentData('Parent Mobile Number 2')}
                     />
-                  </View>
-                  <View style={{ flex: 0.95 }}>
-                    <InfoItem
-                      label="Parent 1"
-                      value={
-                        displayData.parent_mobile1 ||
-                        getStudentData('Parent Mobile Number 1')
-                      }
-                    />
-                  </View>
-                  <View style={{ flex: 0.95 }}>
-                    <InfoItem
-                      label="Parent 2"
-                      value={
-                        displayData.parent_mobile2 ||
-                        getStudentData('Parent Mobile Number 2')
-                      }
-                    />
-                  </View>
+                  )}
+                  <DetailRow
+                    icon={MapPin}
+                    label="Full Address"
+                    value={displayData.student_address || displayData.address || getStudentData('Student Address') || getStudentData('Address')}
+                  />
+                  <DetailRow
+                    icon={Building2}
+                    label="City / Village"
+                    value={displayData.city_village || displayData.city || getStudentData('City') || getStudentData('Town')}
+                  />
+                  <DetailRow
+                    icon={Compass}
+                    label="Mandal"
+                    value={displayData.mandal_name || displayData.mandal || getStudentData('Mandal')}
+                  />
+                  <DetailRow
+                    icon={MapPin}
+                    label="District"
+                    value={displayData.district || getStudentData('District')}
+                    isLast
+                  />
                 </View>
+              )}
 
-                {/* Row 2: Full Address | City / Village */}
-                <View style={[styles.infoGridRow, styles.dividerAmber]}>
-                  <View style={{ flex: 1.2 }}>
-                    <InfoItem
-                      label="Full Address"
-                      value={
-                        displayData.student_address ||
-                        getStudentData('Student Address')
-                      }
-                    />
-                  </View>
-                  <View style={{ flex: 0.8 }}>
-                    <InfoItem
-                      label="City / Village"
-                      value={displayData.city_village || getStudentData('City')}
-                    />
-                  </View>
+              {/* TAB 3: ACADEMIC DETAILS */}
+              {activeTab === 'academic' && (
+                <View>
+                  <DetailRow
+                    icon={FileText}
+                    label="Admission Number"
+                    value={displayData.admission_number || student?.admission_number}
+                  />
+                  <DetailRow
+                    icon={CreditCard}
+                    label="PIN / Roll No"
+                    value={displayData.pin_no || displayData.pin_number || displayData.pin || getStudentData('PIN')}
+                  />
+                  <DetailRow
+                    icon={Building2}
+                    label="College"
+                    value={displayData.college || getStudentData('College')}
+                  />
+                  <DetailRow
+                    icon={GraduationCap}
+                    label="Course"
+                    value={displayData.course || getStudentData('Course')}
+                  />
+                  <DetailRow
+                    icon={BookOpen}
+                    label="Branch"
+                    value={displayData.branch || getStudentData('Branch')}
+                  />
+                  <DetailRow
+                    icon={Calendar}
+                    label="Year & Semester"
+                    value={`Year ${displayData.current_year || getStudentData('Year') || '—'} / Sem ${displayData.current_semester || getStudentData('Semister') || '—'}`}
+                  />
+                  <DetailRow
+                    icon={Clock}
+                    label="Section / Batch"
+                    value={displayData.section || getStudentData('Section') || displayData.batch || getStudentData('Batch')}
+                  />
+                  <DetailRow
+                    icon={Award}
+                    label="Regulation"
+                    value={displayData.regulation || getStudentData('Regulation')}
+                    isLast
+                  />
                 </View>
-
-                {/* Row 3: Mandal | District */}
-                <View style={[styles.infoGridRow, styles.dividerAmber]}>
-                  <View style={{ flex: 1 }}>
-                    <InfoItem
-                      label="Mandal"
-                      value={displayData.mandal_name || getStudentData('Mandal')}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <InfoItem
-                      label="District"
-                      value={displayData.district || getStudentData('District')}
-                    />
-                  </View>
-                </View>
-              </View>
+              )}
             </View>
           ) : (
             /* Staff fallback view */
@@ -992,25 +1093,34 @@ export default function ProfileScreen() {
   );
 }
 
-// Compact, crisp InfoItem component matching the web layout
-function InfoItem({
+// Clean, aligned DetailRow component matching the user's executive design
+function DetailRow({
+  icon: Icon,
   label,
   value,
+  isLast = false,
 }: {
+  icon: any;
   label: string;
   value?: string | number | null;
+  isLast?: boolean;
 }) {
   const displayVal =
-    value !== undefined && value !== null && String(value).trim() !== ''
+    value !== undefined &&
+    value !== null &&
+    String(value).trim() !== '' &&
+    String(value) !== 'null' &&
+    String(value) !== 'undefined'
       ? String(value)
       : '—';
 
   return (
-    <View style={styles.infoItemCard}>
-      <Text style={styles.infoItemLabel} numberOfLines={1}>
-        {label}
-      </Text>
-      <Text style={styles.infoItemValue} numberOfLines={2}>
+    <View style={[styles.detailRow, isLast && { borderBottomWidth: 0 }]}>
+      <View style={styles.detailRowLabelGroup}>
+        <Icon size={16} color="#0052CC" />
+        <Text style={styles.detailRowLabel}>{label}</Text>
+      </View>
+      <Text style={styles.detailRowValue} numberOfLines={2}>
         {displayVal}
       </Text>
     </View>
@@ -1034,163 +1144,154 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   content: {
-    padding: 12,
+    padding: 14,
     maxWidth: 720,
     alignSelf: 'center',
     width: '100%',
   },
-  // Top Banner (matches web gradient backdrop)
-  topBanner: {
-    height: 110,
-    backgroundColor: '#1E3A8A',
-    borderRadius: 20,
+  // 1. HERO BANNER CARD
+  heroCard: {
+    borderRadius: 24,
+    paddingTop: 18,
+    paddingHorizontal: 16,
+    paddingBottom: 42,
     overflow: 'hidden',
     position: 'relative',
-  },
-  bannerGlow1: {
-    position: 'absolute',
-    top: -30,
-    right: -30,
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  bannerGlow2: {
-    position: 'absolute',
-    bottom: -30,
-    left: -30,
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  // Profile Card
-  profileCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    marginTop: -45,
-    marginHorizontal: 4,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    alignItems: 'center',
-    shadowColor: '#0F172A',
+    shadowColor: '#0047BA',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.2,
     shadowRadius: 10,
     elevation: 4,
   },
-  avatarWrapper: {
-    marginTop: -48,
-    marginBottom: 8,
+  heroWatermark: {
+    position: 'absolute',
+    top: -8,
+    right: 4,
+    opacity: 0.16,
   },
-  avatarCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 4,
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  heroAvatarWrapper: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  heroAvatarCircle: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    borderWidth: 3.5,
     borderColor: '#FFFFFF',
+    backgroundColor: '#FFFFFF',
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
   },
-  avatarImg: {
+  heroAvatarImg: {
     width: '100%',
     height: '100%',
   },
-  avatarFallback: {
+  heroAvatarFallback: {
     width: '100%',
     height: '100%',
     backgroundColor: '#EFF6FF',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  studentName: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#0F172A',
-    textAlign: 'center',
-    letterSpacing: -0.3,
+  heroNameCol: {
+    flex: 1,
+    justifyContent: 'center',
   },
-  pillsRow: {
+  heroStudentName: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: 8,
+    letterSpacing: -0.2,
+  },
+  heroPillsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 6,
-  },
-  pillBadge: {
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1,
-    borderColor: '#DBEAFE',
-    paddingHorizontal: 10,
-    paddingVertical: 3.5,
-    borderRadius: 10,
-  },
-  pillText: {
-    color: '#1D4ED8',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.2,
-  },
-  // Academic SubCard
-  academicSubCard: {
-    width: '100%',
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 14,
-    padding: 10,
-    marginTop: 12,
     gap: 6,
   },
-  academicItem: {
+  heroPillBadge: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  heroPillText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#0047BA',
+    letterSpacing: 0.2,
+  },
+  // Floating Academic Subcard (Overlapping bottom edge of blue hero card)
+  academicFloatingCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    marginTop: -28,
+    marginHorizontal: 10,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    zIndex: 10,
+  },
+  academicRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
-  academicText: {
-    fontSize: 12,
+  academicRowText: {
+    fontSize: 14,
     fontWeight: '700',
-    color: '#334155',
+    color: '#1E293B',
     flex: 1,
   },
-  // Action Buttons Row (Edit Profile, Change Password & ID Card)
+  // 2. Action Buttons Row (Edit Profile, Password, ID Card)
   actionButtonsRow: {
     width: '100%',
     flexDirection: 'row',
-    gap: 6,
+    gap: 8,
     marginTop: 14,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    marginBottom: 14,
   },
   actionBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 9,
-    paddingHorizontal: 4,
+    gap: 6,
+    paddingVertical: 12,
     borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
   actionBtnPrimary: {
-    backgroundColor: '#1E3A8A',
+    backgroundColor: '#0052CC',
   },
   actionBtnWarning: {
     backgroundColor: '#D97706',
@@ -1198,18 +1299,14 @@ const styles = StyleSheet.create({
   actionBtnDark: {
     backgroundColor: '#1E293B',
   },
-  actionBtnEmerald: {
-    backgroundColor: '#059669', // matching web emerald-600
-  },
   actionBtnOrange: {
-    backgroundColor: '#EA580C', // Vibrant orange
+    backgroundColor: '#EA580C',
   },
   actionBtnText: {
     color: '#FFFFFF',
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontWeight: '800',
     letterSpacing: 0.2,
-    textTransform: 'uppercase',
   },
   // Pending Request Banner
   pendingBanner: {
@@ -1360,113 +1457,109 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
   },
-  // Sections Container
-  sectionsContainer: {
-    gap: 14,
-    marginTop: 14,
-  },
-  // 1. Personal Details Card (Blue theme matching web)
-  cardBlue: {
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1,
-    borderColor: '#DBEAFE',
-    borderRadius: 18,
-    padding: 12,
-  },
-  cardHeaderBlue: {
+  // 3. SEGMENTED TABS CONTAINER
+  tabBarContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 30,
+    padding: 4,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#DBEAFE',
-    marginBottom: 10,
-  },
-  cardIconBlue: {
-    width: 30,
-    height: 30,
-    borderRadius: 9,
-    backgroundColor: '#1E3A8A',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardTitleBlue: {
-    fontSize: 12.5,
-    fontWeight: '900',
-    color: '#1E3A8A',
-    letterSpacing: 0.8,
-  },
-  dividerBlue: {
-    borderTopWidth: 1,
-    borderTopColor: '#DBEAFE',
-    paddingTop: 8,
-    marginTop: 8,
-  },
-  // 2. Connect Details Card (Amber theme matching web)
-  cardAmber: {
-    backgroundColor: '#FEF3C7',
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-    borderRadius: 18,
-    padding: 12,
-  },
-  cardHeaderAmber: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#FDE68A',
-    marginBottom: 10,
-  },
-  cardIconAmber: {
-    width: 30,
-    height: 30,
-    borderRadius: 9,
-    backgroundColor: '#D97706',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardTitleAmber: {
-    fontSize: 12.5,
-    fontWeight: '900',
-    color: '#B45309',
-    letterSpacing: 0.8,
-  },
-  dividerAmber: {
-    borderTopWidth: 1,
-    borderTopColor: '#FDE68A',
-    paddingTop: 8,
-    marginTop: 8,
-  },
-  // Shared InfoItem Grid Rows
-  infoGridRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  infoItemCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 11,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    minHeight: 50,
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  tabBtn: {
+    flex: 1,
+    alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 24,
   },
-  infoItemLabel: {
-    fontSize: 9.5,
-    fontWeight: '800',
+  tabBtnActive: {
+    backgroundColor: '#0047BA',
+    shadowColor: '#0047BA',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  tabBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
     color: '#64748B',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginBottom: 2,
   },
-  infoItemValue: {
-    fontSize: 12.5,
+  tabBtnTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  // 4. DETAILS CARD
+  detailsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  detailsCardHeader: {
+    backgroundColor: '#EFF6FF',
+    borderRadius: 14,
+    padding: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  detailsCardIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#0047BA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  detailsCardTitle: {
+    fontSize: 15.5,
+    fontWeight: '800',
+    color: '#0047BA',
+    letterSpacing: -0.2,
+  },
+  // DETAIL ROW TABLE ITEMS
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  detailRowLabelGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  detailRowLabel: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  detailRowValue: {
+    fontSize: 13.5,
     fontWeight: '800',
     color: '#0F172A',
-    lineHeight: 16,
+    textAlign: 'right',
+    marginLeft: 12,
   },
   // Staff fallback card
   staffCard: {

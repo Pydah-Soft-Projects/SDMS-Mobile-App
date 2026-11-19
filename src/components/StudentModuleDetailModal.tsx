@@ -53,6 +53,7 @@ import StudentTimetableView from './StudentTimetableView';
 import StudentLibraryView from './StudentLibraryView';
 import StudentFeesView from './StudentFeesView';
 import StudentFeedbackView from './StudentFeedbackView';
+import StudentTransportView from './StudentTransportView';
 import logger from '../utils/logger';
 import studentService from '../services/studentService';
 import Header from './Header';
@@ -998,48 +999,7 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
 
             {/* 8. Transport Details */}
             {module.id === 'transport' && (
-              <View style={styles.section}>
-                {data && (data.hasActivePass || data.activePass) ? (
-                  <View style={styles.card}>
-                    <View style={styles.cardHeader}>
-                      <Text style={styles.cardTitle}>College Bus Allocation</Text>
-                      <View style={[styles.pillBadge, { backgroundColor: '#DCFCE7' }]}>
-                        <Text style={[styles.pillBadgeText, { color: '#15803D' }]}>ACTIVE PASS</Text>
-                      </View>
-                    </View>
-                    <View style={styles.infoRow}>
-                      <Text style={styles.infoLabel}>Route:</Text>
-                      <Text style={styles.infoVal}>
-                        {data.activePass?.route_name || data.route?.route_name || 'Designated Route'}
-                      </Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                      <Text style={styles.infoLabel}>Bus Number:</Text>
-                      <Text style={styles.infoVal}>
-                        {data.activePass?.bus_number || data.bus?.bus_number || 'Campus Bus'}
-                      </Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                      <Text style={styles.infoLabel}>Boarding Stop:</Text>
-                      <Text style={styles.infoVal}>
-                        {data.activePass?.stop_name || data.stop?.stop_name || 'Scheduled Stop'}
-                      </Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                      <Text style={styles.infoLabel}>Schedule:</Text>
-                      <Text style={styles.infoVal}>Morning: 07:30 AM • Evening: 04:30 PM</Text>
-                    </View>
-                  </View>
-                ) : (
-                  <View style={styles.emptyCard}>
-                    <Bus size={28} color="#94A3B8" />
-                    <Text style={styles.emptyTitle}>No Active Bus Pass</Text>
-                    <Text style={styles.emptySub}>
-                      No active bus pass or route allocation found for admission #{admissionNo}.
-                    </Text>
-                  </View>
-                )}
-              </View>
+              <StudentTransportView data={data} student={student} />
             )}
 
             {/* 9. Student Clubs */}

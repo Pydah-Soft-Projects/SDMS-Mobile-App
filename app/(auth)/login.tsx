@@ -252,7 +252,8 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   roundedInputWrapper: {
-    borderRadius: 20,
+    borderRadius: 28,
+    paddingHorizontal: 18,
   },
   errorBanner: {
     flexDirection: 'row',
@@ -262,7 +263,7 @@ const styles = StyleSheet.create({
     borderColor: '#FCA5A5',
     paddingVertical: 10,
     paddingHorizontal: 12,
-    borderRadius: 10,
+    borderRadius: 14,
     marginBottom: 18,
   },
   errorIcon: {
@@ -287,7 +288,7 @@ const styles = StyleSheet.create({
   },
   submitBtn: {
     backgroundColor: '#1E3A8A',
-    borderRadius: 20,
+    borderRadius: 28,
     height: 52,
   },
   footer: {

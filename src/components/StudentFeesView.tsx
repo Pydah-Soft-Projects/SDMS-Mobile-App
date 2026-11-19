@@ -230,7 +230,7 @@ export default function StudentFeesView({
         setError(response?.data?.message || 'Failed to load fee details');
       }
     } catch (err: any) {
-      logger.error('STUDENT_FEES_VIEW', 'Error fetching fee details', err.message);
+      logger.warn('STUDENT_FEES_VIEW', 'Error fetching fee details', err.message);
       setError('Unable to fetch fee information. Please pull to refresh or retry.');
     } finally {
       setLoading(false);

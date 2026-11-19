@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, Alert, AppState, AppStateStatus, Image, LogBox, Platform, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, AppStateStatus, Image, Platform, View, LogBox } from 'react-native';
+
+LogBox.ignoreAllLogs(true);
 import * as Updates from 'expo-updates';
 import { useFonts } from 'expo-font';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';

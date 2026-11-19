@@ -80,17 +80,21 @@ api.interceptors.response.use(
       fullUrl.includes('/otp/verify') ||
       fullUrl.includes('/sso-session');
 
-    // Do not abruptly drop the session or kick out the user on incidental 401s.
-    // Persistent mobile authentication keeps the user logged in until they explicitly sign out.
-    // Only clear credentials if the core auth verification explicitly confirms the account was deactivated or revoked.
+    // Handle 401 Unauthorized: clear session when token has expired, is invalid, or revoked
     if (status === 401 && !isLoginEndpoint) {
       logger.warn('AUTH', 'Received 401 Unauthorized response', { fullUrl, errMsg });
-      const isAccountRevoked =
-        fullUrl.includes('/auth/verify') &&
-        (errData?.deactivated || errData?.revoked || errData?.message === 'Account deactivated');
+      const errMsgLower = (errMsg || '').toLowerCase();
+      const isSessionInvalid =
+        fullUrl.includes('/auth/verify') ||
+        errMsgLower.includes('expired') ||
+        errMsgLower.includes('invalid') ||
+        errMsgLower.includes('token') ||
+        errData?.deactivated ||
+        errData?.revoked ||
+        errData?.message === 'Account deactivated';
 
-      if (isAccountRevoked) {
-        logger.warn('AUTH', 'Session revoked by server - clearing credentials');
+      if (isSessionInvalid) {
+        logger.warn('AUTH', 'Session invalid or expired - clearing stored credentials');
         try {
           await AsyncStorage.multiRemove([
             STORAGE_KEYS.TOKEN,

@@ -11,6 +11,8 @@
     "build:apk": "eas build -p android --profile production-apk",
     "build:android:apk": "eas build -p android --profile production-apk",
     "build:apk:local": "eas build -p android --profile production-apk --local",
+    "build:ipa": "eas build -p ios --profile preview",
+    "build:ipa:local": "eas build -p ios --profile preview --local",
     "update": "eas update --branch production",
     "update:production": "eas update --branch production",
     "update:preview": "eas update --branch preview"

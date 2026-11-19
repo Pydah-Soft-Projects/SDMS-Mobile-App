@@ -59,6 +59,47 @@ export const announcementService = {
       return this.getStudentAnnouncements();
     }
   },
+
+  /**
+   * Fetch active campus polls for the student
+   * Endpoint: GET /api/polls/student
+   */
+  async getStudentPolls(): Promise<any[]> {
+    try {
+      const response = await api.get('/polls/student');
+      return response.data?.data || (Array.isArray(response.data) ? response.data : []);
+    } catch (e: any) {
+      logger.error('POLLS', 'Failed to fetch student polls', e.message);
+      return [];
+    }
+  },
+
+  /**
+   * Fetch active polls for admin/staff
+   * Endpoint: GET /api/polls/admin
+   */
+  async getAdminPolls(): Promise<any[]> {
+    try {
+      const response = await api.get('/polls/admin');
+      return response.data?.data || (Array.isArray(response.data) ? response.data : []);
+    } catch {
+      return this.getStudentPolls();
+    }
+  },
+
+  /**
+   * Cast a vote for a poll option
+   * Endpoint: POST /api/polls/:id/vote
+   */
+  async votePoll(pollId: number | string, optionIndex: number): Promise<boolean> {
+    try {
+      const response = await api.post(`/polls/${pollId}/vote`, { option_index: optionIndex });
+      return response.data?.success || false;
+    } catch (e: any) {
+      logger.error('POLLS', 'Failed to cast vote on poll', e.message);
+      throw e;
+    }
+  },
 };
 
 export default announcementService;

@@ -46,6 +46,8 @@ import {
   Briefcase,
   Home,
   Megaphone,
+  Vote,
+  Wrench,
 } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import Header from '../../src/components/Header';
@@ -577,6 +579,15 @@ export default function DashboardScreen() {
         iconColor: '#475569',
         enabled: isEnabled('feedback'),
       },
+      {
+        key: 'polls',
+        label: 'Polls',
+        route: { pathname: '/(tabs)/announcements', params: { tab: 'polls' } },
+        iconName: 'Vote',
+        iconBg: '#EFF6FF',
+        iconColor: '#1E3A8A',
+        enabled: true,
+      },
     ].filter((item) => item.enabled);
   }, [layoutSettings, hasInternship, hasTransportPass, hasHostelAccount]);
 
@@ -617,6 +628,8 @@ export default function DashboardScreen() {
         return <Home size={size} color={color} />;
       case 'MessageSquare':
         return <MessageSquare size={size} color={color} />;
+      case 'Vote':
+        return <Vote size={size} color={color} />;
       case 'FolderOpen':
         return <FolderOpen size={size} color={color} />;
       default:
@@ -1072,6 +1085,41 @@ export default function DashboardScreen() {
                   </View>
                 )}
               </ScrollView>
+            </View>
+          )}
+
+          {/* ANY PROBLEMS - REPORT US SECTION */}
+          {isEnabled('my-tickets') && (
+            <View style={styles.sectionContainer}>
+              <TouchableOpacity
+                style={styles.reportProblemCard}
+                onPress={() => router.push('/student-module/my-tickets' as any)}
+                activeOpacity={0.88}
+              >
+                <View style={styles.reportProblemBannerContainer}>
+                  <Image
+                    source={require('../../assets/dashboard/maintenance-report.webp')}
+                    style={styles.reportProblemBannerImg}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.reportProblemBannerOverlay}>
+                    <Text style={styles.reportProblemImageTitle}>
+                      Any Issues{'\n'}Buddy?
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.reportProblemBody}>
+                  <Text style={styles.reportProblemSub}>
+                    Spot something that needs fixing on campus? Flag it in seconds and track real-time resolution right from your pocket.
+                  </Text>
+
+                  <View style={styles.reportProblemFooter}>
+                    <Text style={styles.reportProblemBtnText}>Raise Maintenance Ticket</Text>
+                    <ChevronRight size={16} color="#FFFFFF" />
+                  </View>
+                </View>
+              </TouchableOpacity>
             </View>
           )}
         </ScrollView>
@@ -1882,5 +1930,76 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  reportProblemCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+  reportProblemBannerContainer: {
+    width: '100%',
+    height: 150,
+    backgroundColor: '#1E3A8A',
+    position: 'relative',
+  },
+  reportProblemBannerImg: {
+    width: '100%',
+    height: '100%',
+  },
+  reportProblemBannerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(15, 23, 42, 0.32)',
+  },
+  reportProblemImageTitle: {
+    fontSize: 23,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    textAlign: 'left',
+    lineHeight: 29,
+    letterSpacing: -0.4,
+    textShadowColor: 'rgba(0, 0, 0, 0.65)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 6,
+  },
+  reportProblemBody: {
+    padding: 16,
+    gap: 12,
+  },
+  reportProblemSub: {
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 18,
+  },
+  reportProblemFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1E3A8A',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 6,
+  },
+  reportProblemBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
 });

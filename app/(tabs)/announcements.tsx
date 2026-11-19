@@ -29,6 +29,7 @@ import {
   X,
   ChevronRight,
   Maximize2,
+  Vote,
 } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import Header from '../../src/components/Header';
@@ -68,15 +69,18 @@ export default function AnnouncementsScreen() {
   const isStaff = userType === 'staff' || userType === 'admin';
   const params = useLocalSearchParams<{ tab?: string }>();
 
-  // Active Tab: 'announcements' | 'events'
-  const [activeTab, setActiveTab] = useState<'announcements' | 'events'>(
-    params.tab === 'events' ? 'events' : 'announcements'
+  // Active Tab: 'announcements' | 'events' | 'polls'
+  const [activeTab, setActiveTab] = useState<'announcements' | 'events' | 'polls'>(
+    params.tab === 'polls' ? 'polls' : params.tab === 'events' ? 'events' : 'announcements'
   );
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [events, setEvents] = useState<any[]>([]);
+  const [polls, setPolls] = useState<any[]>([]);
+  const [selectedPollOptions, setSelectedPollOptions] = useState<{ [pollId: string | number]: number }>({});
+  const [votingPollId, setVotingPollId] = useState<number | string | null>(null);
   const [registeringEventId, setRegisteringEventId] = useState<number | string | null>(null);
   const [hasPermission, setHasPermission] = useState(true);
 
@@ -90,7 +94,9 @@ export default function AnnouncementsScreen() {
   const [fullScreenImageUrl, setFullScreenImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (params.tab === 'events') {
+    if (params.tab === 'polls') {
+      setActiveTab('polls');
+    } else if (params.tab === 'events') {
       setActiveTab('events');
     } else if (params.tab === 'announcements') {
       setActiveTab('announcements');
@@ -108,11 +114,14 @@ export default function AnnouncementsScreen() {
 
   const loadData = async () => {
     try {
-      const [announcesData, eventsData, permissionStatus] = await Promise.all([
+      const [announcesData, eventsData, pollsData, permissionStatus] = await Promise.all([
         isStaff
           ? announcementService.getAdminAnnouncements()
           : announcementService.getStudentAnnouncements(),
         studentService.getEvents(),
+        isStaff
+          ? announcementService.getAdminPolls()
+          : announcementService.getStudentPolls(),
         notificationService.checkHasPermission(),
       ]);
 
@@ -121,6 +130,7 @@ export default function AnnouncementsScreen() {
 
       setAnnouncements(filteredAnnouncements);
       setEvents(filteredEvents);
+      setPolls(pollsData || []);
       setHasPermission(permissionStatus);
 
       // Mark all notices as seen when the screen loads
@@ -128,6 +138,7 @@ export default function AnnouncementsScreen() {
     } catch {
       setAnnouncements([]);
       setEvents([]);
+      setPolls([]);
     } finally {
       setLoading(false);
     }
@@ -179,6 +190,55 @@ export default function AnnouncementsScreen() {
     }
   };
 
+  const handleVote = async (pollId: number | string, optionIndex: number, optionText?: string) => {
+    Alert.alert(
+      'Confirm Your Vote',
+      `Are you sure you want to vote for "${optionText || 'this option'}"? Once recorded, your vote cannot be changed.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm & Submit',
+          onPress: async () => {
+            setVotingPollId(pollId);
+            try {
+              await announcementService.votePoll(pollId, optionIndex);
+              Alert.alert('Vote Recorded!', 'Thank you! Your response has been recorded.');
+              // Optimistically update local poll state
+              setPolls((prev) =>
+                prev.map((p) => {
+                  if (p.id === pollId) {
+                    const newCounts = Array.isArray(p.vote_counts) ? [...p.vote_counts] : [];
+                    newCounts[optionIndex] = (newCounts[optionIndex] || 0) + 1;
+                    return {
+                      ...p,
+                      has_voted: true,
+                      selected_option: optionIndex,
+                      total_votes: (p.total_votes || 0) + 1,
+                      vote_counts: newCounts,
+                    };
+                  }
+                  return p;
+                })
+              );
+              // Fetch fresh polls from backend
+              const freshPolls = isStaff
+                ? await announcementService.getAdminPolls()
+                : await announcementService.getStudentPolls();
+              if (Array.isArray(freshPolls) && freshPolls.length > 0) {
+                setPolls(freshPolls);
+              }
+            } catch (err: any) {
+              const msg = err.response?.data?.message || err.message || 'Failed to submit vote. Please try again.';
+              Alert.alert('Voting Notice', msg);
+            } finally {
+              setVotingPollId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const getPriorityStyle = (priority: string) => {
     switch (priority?.toLowerCase()) {
       case 'urgent':
@@ -193,8 +253,8 @@ export default function AnnouncementsScreen() {
   return (
     <View style={styles.container}>
       <Header
-        title={isStaff ? 'Campus Circulars' : 'Circulars & Events'}
-        subtitle={isStaff ? 'SDMS Institutional Announcements' : 'Official Student Notices & Events'}
+        title={isStaff ? 'Campus Circulars' : 'Notices, Events & Polls'}
+        subtitle={isStaff ? 'SDMS Institutional Announcements' : 'Official Notices, Campus Events & Live Polls'}
         showBack
       />
 
@@ -206,9 +266,9 @@ export default function AnnouncementsScreen() {
             onPress={() => setActiveTab('announcements')}
             activeOpacity={0.8}
           >
-            <Bell size={15} color={activeTab === 'announcements' ? '#1E3A8A' : '#64748B'} />
-            <Text style={[styles.tabText, activeTab === 'announcements' && styles.tabTextActive]}>
-              Circulars & Notices
+            <Bell size={14} color={activeTab === 'announcements' ? '#1E3A8A' : '#64748B'} />
+            <Text style={[styles.tabText, activeTab === 'announcements' && styles.tabTextActive]} numberOfLines={1}>
+              Circulars
             </Text>
           </TouchableOpacity>
 
@@ -217,10 +277,24 @@ export default function AnnouncementsScreen() {
             onPress={() => setActiveTab('events')}
             activeOpacity={0.8}
           >
-            <CalendarDays size={15} color={activeTab === 'events' ? '#1E3A8A' : '#64748B'} />
-            <Text style={[styles.tabText, activeTab === 'events' && styles.tabTextActive]}>
-              Campus Events
+            <CalendarDays size={14} color={activeTab === 'events' ? '#1E3A8A' : '#64748B'} />
+            <Text style={[styles.tabText, activeTab === 'events' && styles.tabTextActive]} numberOfLines={1}>
+              Events
             </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'polls' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('polls')}
+            activeOpacity={0.8}
+          >
+            <Vote size={14} color={activeTab === 'polls' ? '#1E3A8A' : '#64748B'} />
+            <Text style={[styles.tabText, activeTab === 'polls' && styles.tabTextActive]} numberOfLines={1}>
+              Polls
+            </Text>
+            {polls.some((p) => !p.has_voted) ? (
+              <View style={styles.tabUnvotedDot} />
+            ) : null}
           </TouchableOpacity>
         </View>
       </View>
@@ -482,6 +556,227 @@ export default function AnnouncementsScreen() {
                   <Text style={styles.emptyTitle}>No Upcoming Events</Text>
                   <Text style={styles.emptyText}>
                     There are no scheduled campus events at this moment. Check back soon!
+                  </Text>
+                </View>
+              )}
+            </>
+          )}
+
+          {/* TAB 3: CAMPUS POLLS & VOTING */}
+          {activeTab === 'polls' && (
+            <>
+              {polls.length > 0 ? (
+                polls.map((poll: any) => {
+                  const options: string[] = Array.isArray(poll.options) ? poll.options : [];
+                  const totalVotes = poll.total_votes || 0;
+                  const voteCounts: number[] = Array.isArray(poll.vote_counts) ? poll.vote_counts : [];
+                  const timeLeft = poll.end_time ? new Date(poll.end_time).getTime() - Date.now() : null;
+                  const isUrgent = timeLeft !== null && timeLeft > 0 && timeLeft < 86400000;
+                  const isEnded = timeLeft !== null && timeLeft <= 0;
+                  const isVotingThis = votingPollId === poll.id;
+
+                  const formattedCreated = poll.created_at
+                    ? new Date(poll.created_at).toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })
+                    : '';
+                  const formattedEnd = poll.end_time
+                    ? new Date(poll.end_time).toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })
+                    : '';
+
+                  return (
+                    <View key={poll.id} style={styles.pollCard}>
+                      {/* Top Header Badge Row */}
+                      <View style={styles.pollHeaderRow}>
+                        <View style={styles.pollTagBadge}>
+                          <Vote size={12} color="#1E3A8A" />
+                          <Text style={styles.pollTagText}>CAMPUS POLL</Text>
+                        </View>
+
+                        {poll.has_voted ? (
+                          <View style={styles.pollStatusBadgeVoted}>
+                            <CheckCircle2 size={12} color="#059669" />
+                            <Text style={styles.pollStatusTextVoted}>VOTED</Text>
+                          </View>
+                        ) : isEnded ? (
+                          <View style={styles.pollStatusBadgeEnded}>
+                            <Clock size={12} color="#64748B" />
+                            <Text style={styles.pollStatusTextEnded}>CLOSED</Text>
+                          </View>
+                        ) : isUrgent ? (
+                          <View style={styles.pollStatusBadgeUrgent}>
+                            <Clock size={12} color="#DC2626" />
+                            <Text style={styles.pollStatusTextUrgent}>ENDING SOON</Text>
+                          </View>
+                        ) : (
+                          <View style={styles.pollStatusBadgeActive}>
+                            <Clock size={12} color="#1E3A8A" />
+                            <Text style={styles.pollStatusTextActive}>ACTIVE</Text>
+                          </View>
+                        )}
+                      </View>
+
+                      {/* Poll Question */}
+                      <Text style={styles.pollQuestionText}>{poll.question}</Text>
+
+                      {/* Meta: Created Date, End Date, Total Votes */}
+                      <View style={styles.pollMetaRow}>
+                        {formattedCreated ? (
+                          <View style={styles.dateRow}>
+                            <Calendar size={11} color="#94A3B8" />
+                            <Text style={styles.pollDateText}>{formattedCreated}</Text>
+                          </View>
+                        ) : null}
+                        {formattedEnd ? (
+                          <View style={styles.dateRow}>
+                            <Clock size={11} color={isUrgent ? '#DC2626' : '#94A3B8'} />
+                            <Text style={[styles.pollDateText, isUrgent && { color: '#DC2626', fontWeight: '700' }]}>
+                              {isEnded ? 'Closed' : `Ends ${formattedEnd}`}
+                            </Text>
+                          </View>
+                        ) : null}
+                        <Text style={styles.pollVotesCountText}>
+                          {totalVotes} {totalVotes === 1 ? 'Vote' : 'Votes'}
+                        </Text>
+                      </View>
+
+                      {/* If NOT voted & NOT ended: Interactive Voting Options */}
+                      {!poll.has_voted && !isEnded ? (
+                        <View style={styles.pollOptionsContainer}>
+                          <Text style={styles.pollInstructionText}>Select an option to cast your vote:</Text>
+                          {options.map((opt: string, optIdx: number) => {
+                            const isSelected = selectedPollOptions[poll.id] === optIdx;
+                            return (
+                              <TouchableOpacity
+                                key={optIdx}
+                                style={[
+                                  styles.pollOptionBtn,
+                                  isSelected && styles.pollOptionBtnSelected,
+                                  isVotingThis && { opacity: 0.6 },
+                                ]}
+                                onPress={() => setSelectedPollOptions((prev) => ({ ...prev, [poll.id]: optIdx }))}
+                                disabled={isVotingThis}
+                                activeOpacity={0.7}
+                              >
+                                <Text style={[styles.pollOptionBtnText, isSelected && styles.pollOptionBtnTextSelected]}>
+                                  {opt}
+                                </Text>
+                                <View style={[styles.pollRadioCircle, isSelected && styles.pollRadioCircleSelected]}>
+                                  {isVotingThis && isSelected ? (
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                  ) : isSelected ? (
+                                    <View style={styles.pollRadioDotInner} />
+                                  ) : null}
+                                </View>
+                              </TouchableOpacity>
+                            );
+                          })}
+
+                          {selectedPollOptions[poll.id] !== undefined && (
+                            <TouchableOpacity
+                              style={[styles.confirmVoteBtn, isVotingThis && { opacity: 0.7 }]}
+                              onPress={() => {
+                                const selectedIdx = selectedPollOptions[poll.id];
+                                const optText = options[selectedIdx];
+                                handleVote(poll.id, selectedIdx, optText);
+                              }}
+                              disabled={isVotingThis}
+                              activeOpacity={0.8}
+                            >
+                              {isVotingThis ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                              ) : (
+                                <CheckCircle2 size={16} color="#FFFFFF" />
+                              )}
+                              <Text style={styles.confirmVoteBtnText}>Confirm & Cast Vote</Text>
+                            </TouchableOpacity>
+                          )}
+
+                          <Text style={styles.pollConfidentialHint}>
+                            Your response is anonymous and strictly confidential.
+                          </Text>
+                        </View>
+                      ) : (
+                        /* If VOTED or ENDED: Live Poll Breakdown & Percentages */
+                        <View style={styles.pollResultsContainer}>
+                          {poll.has_voted && (
+                            <View style={styles.pollConfirmedBanner}>
+                              <CheckCircle2 size={16} color="#059669" />
+                              <Text style={styles.pollConfirmedText}>
+                                Your vote has been recorded! Live breakdown:
+                              </Text>
+                            </View>
+                          )}
+
+                          <View style={styles.pollResultsList}>
+                            {options.map((opt: string, optIdx: number) => {
+                              const count = voteCounts[optIdx] || 0;
+                              const divisor = totalVotes > 0 ? totalVotes : 1;
+                              const pct = Math.round((count / divisor) * 100);
+                              const isMyChoice = poll.selected_option === optIdx;
+
+                              return (
+                                <View
+                                  key={optIdx}
+                                  style={[styles.pollResultItem, isMyChoice && styles.pollResultItemMyChoice]}
+                                >
+                                  <View style={styles.pollResultItemHeader}>
+                                    <View style={styles.pollResultItemLeft}>
+                                      <Text
+                                        style={[
+                                          styles.pollResultOptionText,
+                                          isMyChoice && styles.pollResultOptionTextMyChoice,
+                                        ]}
+                                      >
+                                        {opt}
+                                      </Text>
+                                      {isMyChoice && (
+                                        <View style={styles.myChoicePill}>
+                                          <Text style={styles.myChoicePillText}>Your Choice ✓</Text>
+                                        </View>
+                                      )}
+                                    </View>
+                                    <Text
+                                      style={[
+                                        styles.pollResultPctText,
+                                        isMyChoice && styles.pollResultPctTextMyChoice,
+                                      ]}
+                                    >
+                                      {pct}% <Text style={styles.pollResultCountText}>({count})</Text>
+                                    </Text>
+                                  </View>
+
+                                  {/* Visual Progress Bar */}
+                                  <View style={styles.pollProgressBarTrack}>
+                                    <View
+                                      style={[
+                                        styles.pollProgressBarFill,
+                                        { width: `${pct}%` },
+                                        isMyChoice ? styles.pollProgressBarFillMyChoice : null,
+                                      ]}
+                                    />
+                                  </View>
+                                </View>
+                              );
+                            })}
+                          </View>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <Vote size={36} color="#CBD5E1" />
+                  <Text style={styles.emptyTitle}>No Active Polls</Text>
+                  <Text style={styles.emptyText}>
+                    There are no open campus polls or voting sessions right now. Check back later!
                   </Text>
                 </View>
               )}
@@ -1225,5 +1520,319 @@ const styles = StyleSheet.create({
   fullscreenImage: {
     width: Dimensions.get('window').width,
     height: Dimensions.get('window').height * 0.82,
+  },
+  tabUnvotedDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#D97706',
+    marginLeft: -2,
+  },
+  // Polls Card Styling
+  pollCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  pollHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  pollTagBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+  },
+  pollTagText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#1E3A8A',
+    letterSpacing: 0.5,
+  },
+  pollStatusBadgeActive: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  pollStatusTextActive: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#1E3A8A',
+  },
+  pollStatusBadgeVoted: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  pollStatusTextVoted: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  pollStatusBadgeUrgent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  pollStatusTextUrgent: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#DC2626',
+  },
+  pollStatusBadgeEnded: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  pollStatusTextEnded: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  pollQuestionText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0F172A',
+    lineHeight: 22,
+  },
+  pollMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 12,
+    paddingBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  pollDateText: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  pollVotesCountText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1E3A8A',
+    marginLeft: 'auto',
+  },
+  pollOptionsContainer: {
+    gap: 8,
+    paddingTop: 4,
+  },
+  pollInstructionText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: '#64748B',
+    marginBottom: 2,
+  },
+  pollOptionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  pollOptionBtnSelected: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#1E3A8A',
+  },
+  pollOptionBtnText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginRight: 10,
+  },
+  pollOptionBtnTextSelected: {
+    color: '#1E3A8A',
+    fontWeight: '800',
+  },
+  pollRadioCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  pollRadioCircleSelected: {
+    borderColor: '#1E3A8A',
+    backgroundColor: '#1E3A8A',
+  },
+  pollRadioDotInner: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FFFFFF',
+  },
+  confirmVoteBtn: {
+    backgroundColor: '#1E3A8A',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 6,
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  confirmVoteBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  pollConfidentialHint: {
+    fontSize: 10.5,
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  pollResultsContainer: {
+    gap: 12,
+    paddingTop: 4,
+  },
+  pollConfirmedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  pollConfirmedText: {
+    flex: 1,
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  pollResultsList: {
+    gap: 10,
+  },
+  pollResultItem: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 6,
+  },
+  pollResultItemMyChoice: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#BFDBFE',
+  },
+  pollResultItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  pollResultItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  pollResultOptionText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  pollResultOptionTextMyChoice: {
+    fontWeight: '800',
+    color: '#1E3A8A',
+  },
+  myChoicePill: {
+    backgroundColor: '#1E3A8A',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  myChoicePillText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  pollResultPctText: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#475569',
+  },
+  pollResultPctTextMyChoice: {
+    color: '#1E3A8A',
+  },
+  pollResultCountText: {
+    fontSize: 10.5,
+    fontWeight: '500',
+    color: '#94A3B8',
+  },
+  pollProgressBarTrack: {
+    height: 7,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 4,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  pollProgressBarFill: {
+    height: '100%',
+    backgroundColor: '#64748B',
+    borderRadius: 4,
+  },
+  pollProgressBarFillMyChoice: {
+    backgroundColor: '#1E3A8A',
   },
 });

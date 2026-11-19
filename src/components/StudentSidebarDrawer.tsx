@@ -40,6 +40,7 @@ import {
   Layers,
   GraduationCap,
   Sparkles,
+  Vote,
 } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { getStaticFileUrl } from '../config/api';
@@ -53,6 +54,7 @@ export interface SDMSModuleItem extends StudentModuleItem {
   layoutKey: string;
   isTab?: boolean;
   tabRoute?: string;
+  tabParam?: string;
 }
 
 /**
@@ -119,6 +121,7 @@ export const SDMS_STUDENT_SECTIONS: {
         iconName: 'Calendar',
         isTab: true,
         tabRoute: '/(tabs)/announcements',
+        tabParam: 'events',
       },
       {
         id: 'semester-registration',
@@ -181,6 +184,18 @@ export const SDMS_STUDENT_SECTIONS: {
         iconName: 'Bell',
         isTab: true,
         tabRoute: '/(tabs)/announcements',
+        tabParam: 'announcements',
+      },
+      {
+        id: 'polls',
+        layoutKey: 'polls',
+        title: 'Campus Polls',
+        subtitle: 'Student Voting & Live Opinion Polls',
+        category: 'campus',
+        iconName: 'Vote',
+        isTab: true,
+        tabRoute: '/(tabs)/announcements',
+        tabParam: 'polls',
       },
       {
         id: 'clubs',
@@ -432,7 +447,11 @@ export const StudentSidebarDrawer: React.FC<StudentSidebarDrawerProps> = ({
   const handleItemPress = (item: SDMSModuleItem) => {
     handleClose();
     if (item.isTab && item.tabRoute) {
-      router.push(item.tabRoute as any);
+      if (item.tabParam) {
+        router.push({ pathname: item.tabRoute as any, params: { tab: item.tabParam } } as any);
+      } else {
+        router.push(item.tabRoute as any);
+      }
     } else {
       router.push(`/student-module/${item.id}` as any);
     }
@@ -458,6 +477,7 @@ export const StudentSidebarDrawer: React.FC<StudentSidebarDrawerProps> = ({
       case 'UserCheck': return <UserCheck size={size} color={color} />;
       case 'Briefcase': return <Briefcase size={size} color={color} />;
       case 'Sparkles': return <Sparkles size={size} color={color} />;
+      case 'Vote': return <Vote size={size} color={color} />;
       case 'User': return <User size={size} color={color} />;
       default: return <Layers size={size} color={color} />;
     }

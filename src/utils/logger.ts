@@ -31,9 +31,9 @@ class LoggerService {
       details,
     };
 
-    // Print ONLY errors to developer terminal
-    const prefix = `[${entry.timestamp}] [ERROR] [${tag}]`;
-    console.error(prefix, message, details ? JSON.stringify(details) : '');
+    // Print to developer terminal without triggering LogBox UI overlays
+    const prefix = `[${entry.timestamp}] [${tag}]`;
+    console.warn(prefix, message, details ? JSON.stringify(details) : '');
 
     this.logs.unshift(entry);
     if (this.logs.length > this.maxLogs) {

@@ -37,14 +37,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(JSON.parse(storedUser));
           setUserType(storedType || 'student');
 
-          // Silently refresh token in the background to upgrade to long-lived 10-year token
+          // Silently verify and refresh token in the background
           authService.verifyToken().then((res) => {
             if (res?.token && res.token !== storedToken) {
               setToken(res.token);
               AsyncStorage.setItem(STORAGE_KEYS.TOKEN, res.token);
             }
-          }).catch(() => {
-            // Keep persistent session even if offline or network drops
+          }).catch((err: any) => {
+            // If the server explicitly rejected the token as invalid or expired (401), clear credentials
+            if (err?.response?.status === 401) {
+              logout();
+            }
           });
         }
       } catch (e) {
@@ -123,8 +126,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setToken(res.token);
         await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, res.token);
       }
-    } catch {
-      // Do not log out on transient errors; keep persistent session intact
+    } catch (err: any) {
+      if (err?.response?.status === 401) {
+        await logout();
+      }
     }
   };
 

@@ -76,7 +76,7 @@ export const studentService = {
       }
       return null;
     } catch (e: any) {
-      logger.error('STUDENT_SERVICE', 'Failed to fetch attendance', e.message);
+      logger.warn('STUDENT_SERVICE', 'Failed to fetch attendance', e.message);
       return null;
     }
   },
@@ -144,7 +144,7 @@ export const studentService = {
         summary: data.summary || { totalFee: totalAmount, totalPaid: paidAmount, dueAmount },
       };
     } catch (e: any) {
-      logger.error('STUDENT_SERVICE', 'Failed to fetch fee details', e.message);
+      logger.warn('STUDENT_SERVICE', 'Failed to fetch fee details', e.message);
       return null;
     }
   },

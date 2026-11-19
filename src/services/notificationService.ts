@@ -183,7 +183,7 @@ export const notificationService = {
           const granted = await PermissionsAndroid.request(
             PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
             {
-              title: 'Campo Student Portal Notifications',
+              title: 'Campo Buddy Notifications',
               message: 'Allow notifications for campus circulars, urgent announcements, and events.',
               buttonPositive: 'Allow',
               buttonNegative: 'Don\'t Allow',

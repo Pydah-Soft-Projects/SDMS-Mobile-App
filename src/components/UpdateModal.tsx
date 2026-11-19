@@ -64,7 +64,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
           <Text style={styles.subtitle}>
             {isPending
               ? 'The latest update has been downloaded. Restart now to enjoy the refreshed interface and newest features.'
-              : 'A new version of Campo Student App is available with performance improvements and UI refinements.'}
+              : 'A new version of Campo Buddy is available with performance improvements and UI refinements.'}
           </Text>
 
           {/* Highlight Bullets */}

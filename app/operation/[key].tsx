@@ -72,6 +72,7 @@ import api from '../../src/config/api';
 import { useAuth } from '../../src/context/AuthContext';
 import staffService from '../../src/services/staffService';
 import { isFullAccessRole, hasWriteAccess, SDMS_ADMIN_NAV_TREE } from '../../src/utils/rbac';
+import { OperationsSkeleton } from '../../src/components/SkeletonLoader';
 import logger from '../../src/utils/logger';
 
 export default function OperationScreen() {
@@ -2938,10 +2939,7 @@ export default function OperationScreen() {
 
       {/* Main Content Area */}
       {loading ? (
-        <View style={styles.loader}>
-          <ActivityIndicator size="large" color="#1E3A8A" />
-          <Text style={styles.loaderText}>Loading live SDMS records...</Text>
-        </View>
+        <OperationsSkeleton />
       ) : (
         <ScrollView
           ref={scrollRef}

@@ -28,6 +28,7 @@ import {
 } from 'lucide-react-native';
 import api from '../config/api';
 import feeService from '../services/feeService';
+import { FeesSkeleton } from './SkeletonLoader';
 import logger from '../utils/logger';
 
 interface StudentFeesViewProps {
@@ -593,12 +594,7 @@ export default function StudentFeesView({
 
   // Loading indicator
   if (loading && !feeData) {
-    return (
-      <View style={styles.loaderContainer}>
-        <ActivityIndicator size="large" color="#1E3A8A" />
-        <Text style={styles.loaderText}>Syncing fee structure & records...</Text>
-      </View>
-    );
+    return <FeesSkeleton />;
   }
 
   // Error state

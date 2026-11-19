@@ -14,6 +14,7 @@ import { Calendar, CheckCircle2, XCircle, Clock, AlertTriangle, CalendarDays } f
 import { useAuth } from '../../src/context/AuthContext';
 import Header from '../../src/components/Header';
 import StaffAttendanceView from '../../src/components/StaffAttendanceView';
+import { AttendanceSkeleton } from '../../src/components/SkeletonLoader';
 import studentService from '../../src/services/studentService';
 import { StudentAttendanceData, AttendanceTotals } from '../../src/types';
 import logger from '../../src/utils/logger';
@@ -124,10 +125,7 @@ export default function AttendanceScreen() {
       </View>
 
       {loading ? (
-        <View style={styles.loader}>
-          <ActivityIndicator size="large" color="#1E3A8A" />
-          <Text style={styles.loaderText}>Loading attendance data...</Text>
-        </View>
+        <AttendanceSkeleton />
       ) : (
         <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) + 84 }]}

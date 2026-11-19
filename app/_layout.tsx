@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import logger from '../src/utils/logger';
 import UpdateModal from '../src/components/UpdateModal';
+import { SkeletonBox } from '../src/components/SkeletonLoader';
 import NotificationBanner from '../src/components/NotificationBanner';
 import NotificationPermissionModal from '../src/components/NotificationPermissionModal';
 import notificationService, { isExpoGo } from '../src/services/notificationService';
@@ -260,13 +261,13 @@ function RootNavigation() {
 
   if (isLoading || (!fontsLoaded && !fontError)) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF', gap: 16 }}>
         <Image
           source={require('../assets/campo-icon.png')}
-          style={{ width: 84, height: 84, marginBottom: 20 }}
+          style={{ width: 84, height: 84 }}
           resizeMode="contain"
         />
-        <ActivityIndicator size="large" color="#1E3A8A" />
+        <SkeletonBox width={140} height={8} borderRadius={4} />
       </View>
     );
   }

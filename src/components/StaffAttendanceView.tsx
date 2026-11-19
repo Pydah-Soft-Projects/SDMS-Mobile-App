@@ -26,6 +26,7 @@ import Header from './Header';
 import StatCard from './StatCard';
 import api from '../config/api';
 import staffService from '../services/staffService';
+import { AttendanceSkeleton } from './SkeletonLoader';
 import logger from '../utils/logger';
 
 interface CollegeAttendanceItem {
@@ -147,10 +148,7 @@ export const StaffAttendanceView: React.FC = () => {
       <Header title="Attendance Monitoring" subtitle="Institution-wide Attendance Operations" />
 
       {loading ? (
-        <View style={styles.loader}>
-          <ActivityIndicator size="large" color="#1E3A8A" />
-          <Text style={styles.loaderText}>Syncing college attendance records...</Text>
-        </View>
+        <AttendanceSkeleton />
       ) : (
         <ScrollView
           contentContainerStyle={styles.content}

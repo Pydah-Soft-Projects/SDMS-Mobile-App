@@ -38,6 +38,7 @@ import {
   Crosshair,
 } from 'lucide-react-native';
 import api from '../config/api';
+import { ModuleContentSkeleton } from './SkeletonLoader';
 
 const RNWebView = WebView as any;
 
@@ -645,14 +646,9 @@ export const StudentTransportView: React.FC<StudentTransportViewProps> = ({
   // Past Requests List
   const requestsList = transportData?.requests || [];
 
-  // Loading state
+  // Loading skeleton state (No spinning loaders)
   if (loading && !transportData) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#16A34A" />
-        <Text style={styles.loadingText}>Loading Transport Pass & Routes...</Text>
-      </View>
-    );
+    return <ModuleContentSkeleton />;
   }
 
   // ═════════════════════════════════════════════════════════════════════════

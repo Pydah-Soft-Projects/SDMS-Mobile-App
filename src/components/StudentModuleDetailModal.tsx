@@ -54,6 +54,7 @@ import StudentLibraryView from './StudentLibraryView';
 import StudentFeesView from './StudentFeesView';
 import StudentFeedbackView from './StudentFeedbackView';
 import StudentTransportView from './StudentTransportView';
+import { ModuleContentSkeleton } from './SkeletonLoader';
 import logger from '../utils/logger';
 import studentService from '../services/studentService';
 import Header from './Header';
@@ -605,10 +606,9 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
         />
 
         {loading ? (
-          <View style={styles.loaderContainer}>
-            <ActivityIndicator size="large" color="#1E3A8A" />
-            <Text style={styles.loaderText}>Syncing records with SDMS...</Text>
-          </View>
+          <ScrollView contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 24) + 24 }]} showsVerticalScrollIndicator={false}>
+            <ModuleContentSkeleton />
+          </ScrollView>
         ) : (
           <ScrollView contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 24) + 24 }]} showsVerticalScrollIndicator={false}>
             {/* 1. Timetable View (Matches Image 1 design & live period highlighting) */}

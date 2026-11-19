@@ -38,6 +38,7 @@ import {
 } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import Header from '../../src/components/Header';
+import { ProfileSkeleton } from '../../src/components/SkeletonLoader';
 import api, { getStaticFileUrl } from '../../src/config/api';
 import authService from '../../src/services/authService';
 import DigitalStudentIdCardModal from '../../src/components/DigitalStudentIdCardModal';
@@ -372,10 +373,7 @@ export default function ProfileScreen() {
       />
 
       {loading ? (
-        <View style={styles.loaderCenter}>
-          <ActivityIndicator size="large" color="#1E3A8A" />
-          <Text style={styles.loaderText}>Loading student profile...</Text>
-        </View>
+        <ProfileSkeleton />
       ) : (
         <ScrollView
           contentContainerStyle={[

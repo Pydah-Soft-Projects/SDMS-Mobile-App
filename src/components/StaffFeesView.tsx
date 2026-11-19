@@ -14,6 +14,7 @@ import { CreditCard, Search, Receipt, CheckCircle, Clock, ChevronRight, User } f
 import Header from './Header';
 import CustomInput from './CustomInput';
 import CustomButton from './CustomButton';
+import { SkeletonBox } from './SkeletonLoader';
 import api from '../config/api';
 import logger from '../utils/logger';
 
@@ -186,8 +187,17 @@ export const StaffFeesView: React.FC = () => {
         <Text style={styles.sectionTitle}>Institutional Fee Heads ({headers.length})</Text>
 
         {loading ? (
-          <View style={styles.loader}>
-            <ActivityIndicator size="small" color="#1E3A8A" />
+          <View style={{ gap: 8, marginTop: 4 }}>
+            {[1, 2, 3].map((idx) => (
+              <View key={`fee_head_skel_${idx}`} style={[styles.headCard, { opacity: 0.8 }]}>
+                <SkeletonBox width={36} height={36} borderRadius={8} />
+                <View style={{ flex: 1, gap: 4 }}>
+                  <SkeletonBox width="60%" height={14} borderRadius={4} />
+                  <SkeletonBox width="35%" height={10} borderRadius={4} />
+                </View>
+                <SkeletonBox width={60} height={16} borderRadius={4} />
+              </View>
+            ))}
           </View>
         ) : headers && headers.length > 0 ? (
           headers.map((head, index) => {

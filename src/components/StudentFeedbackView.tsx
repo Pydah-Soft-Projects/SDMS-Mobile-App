@@ -29,6 +29,7 @@ import {
   RotateCw,
 } from 'lucide-react-native';
 import api from '../config/api';
+import { FeedbackSkeleton, QuestionFormSkeleton } from './SkeletonLoader';
 
 /* ── Helper: Format Title Case ─────────────────────────────────────── */
 const toTitleCase = (str?: string) => {
@@ -64,6 +65,94 @@ const RATING_DESCRIPTIONS: { [key: number]: string } = {
   3: 'Good — Meets expectations',
   4: 'Very Good — Exceeds expectations',
   5: 'Excellent — Outstanding instruction',
+};
+
+/* ── Dynamic Field Type Resolver (Never drops fields or assumes hardcoded formats) ── */
+type QuestionKind = 'rating' | 'boolean' | 'choice' | 'checkbox' | 'long_text' | 'short_text';
+
+const getQuestionFieldKind = (q: any): QuestionKind => {
+  const rawType = String(
+    q.questionType ||
+    q.question_type ||
+    q.type ||
+    q.fieldType ||
+    q.field_type ||
+    ''
+  )
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  const text = String(q.questionText || q.question_text || q.label || '').trim().toLowerCase();
+  const options = Array.isArray(q.options) ? q.options : [];
+
+  // 1. Rating scale detection
+  if (
+    rawType.includes('rating') ||
+    rawType.includes('scale') ||
+    rawType.includes('star') ||
+    (rawType === 'number' && Number(q.maxValue || q.max_value || 5) <= 10) ||
+    ((text.includes('rate') || text.includes('rating') || text.includes('score')) && options.length === 0 && !rawType.includes('text'))
+  ) {
+    return 'rating';
+  }
+
+  // 2. Boolean / Yes-No detection
+  if (
+    rawType === 'yes_no' ||
+    rawType === 'yesno' ||
+    rawType === 'boolean' ||
+    rawType === 'bool' ||
+    (options.length === 2 && options.some((o: any) => /^yes$/i.test(String(o).trim())) && options.some((o: any) => /^no$/i.test(String(o).trim())))
+  ) {
+    return 'boolean';
+  }
+
+  // 3. Multi-Select / Checkbox
+  if (
+    rawType.includes('checkbox') ||
+    rawType.includes('multi_select') ||
+    rawType.includes('multiselect') ||
+    rawType.includes('multiple_select')
+  ) {
+    return 'checkbox';
+  }
+
+  // 4. Single-Select / Radio / Dropdown / Option choices
+  if (
+    rawType === 'radio' ||
+    rawType === 'multiple_choice' ||
+    rawType === 'select' ||
+    rawType === 'dropdown' ||
+    rawType === 'single_select' ||
+    rawType === 'choice' ||
+    (options.length > 0 && !rawType.includes('text'))
+  ) {
+    return 'choice';
+  }
+
+  // 5. Long Text / Textarea / Essay / Paragraph / Open-Ended / Remarks / Comments / Suggestions
+  if (
+    rawType.includes('textarea') ||
+    rawType.includes('text_area') ||
+    rawType.includes('long') ||
+    rawType.includes('paragraph') ||
+    rawType.includes('open_ended') ||
+    rawType.includes('open_text') ||
+    rawType.includes('essay') ||
+    rawType.includes('remark') ||
+    rawType.includes('comment') ||
+    rawType.includes('suggestion') ||
+    rawType.includes('feedback') ||
+    /\b(remarks?|suggestions?|comments?|describe|explain|feedback|elaborate|opinion|reasons?|why)\b/i.test(text)
+  ) {
+    return 'long_text';
+  }
+
+  // 6. Short Text / Text Input / Single Line
+  // Dynamic fallback ensures an input box is ALWAYS rendered for typing!
+  return 'short_text';
 };
 
 const formatDate = (iso?: string) => {
@@ -206,10 +295,55 @@ export const StudentFeedbackView: React.FC<StudentFeedbackViewProps> = ({
     setResponses({});
     setFormLoading(true);
 
+    const formId = activePub.formId || activePub.form_id || (activePub.form && (activePub.form.id || activePub.form.form_id));
+
     try {
-      const res = await api.get(`/student-feedback/forms/${activePub.formId}`);
+      const res = await api.get(`/student-feedback/forms/${formId}`);
       if (res.data?.success) {
-        setFormQuestions(res.data.data?.questions || []);
+        const rawQuestions =
+          res.data.data?.questions ||
+          res.data.data?.formFields ||
+          res.data.data?.form_fields ||
+          res.data.questions ||
+          (Array.isArray(res.data.data) ? res.data.data : []);
+
+        const parsedQuestions = (Array.isArray(rawQuestions) ? rawQuestions : []).map((q: any, idx: number) => {
+          const id = q.id !== undefined && q.id !== null ? String(q.id) : (q._id !== undefined && q._id !== null ? String(q._id) : `q_${idx}`);
+          const questionText = String(q.questionText || q.question_text || q.label || q.title || q.text || '').trim();
+          const rawType = String(q.questionType || q.question_type || q.type || q.fieldType || q.field_type || '').trim();
+          const isRequired = Boolean(q.isRequired || q.is_required || q.required);
+
+          let options: string[] = [];
+          const rawOpts = q.options ?? q.options_json ?? q.choices;
+          if (Array.isArray(rawOpts)) {
+            options = rawOpts.map((o) => (typeof o === 'object' && o !== null ? (o.label || o.value || o.text || String(o)) : String(o)));
+          } else if (typeof rawOpts === 'string' && rawOpts.trim()) {
+            try {
+              const parsed = JSON.parse(rawOpts);
+              if (Array.isArray(parsed)) {
+                options = parsed.map((o) => (typeof o === 'object' && o !== null ? (o.label || o.value || o.text || String(o)) : String(o)));
+              } else {
+                options = rawOpts.split(',').map((s) => s.trim()).filter(Boolean);
+              }
+            } catch {
+              options = rawOpts.split(',').map((s) => s.trim()).filter(Boolean);
+            }
+          }
+
+          return {
+            ...q,
+            id,
+            questionText,
+            questionType: rawType,
+            isRequired,
+            options,
+            minValue: q.minValue ?? q.min_value ?? 1,
+            maxValue: q.maxValue ?? q.max_value ?? 5,
+            placeholder: q.placeholder || '',
+          };
+        });
+
+        setFormQuestions(parsedQuestions);
       } else {
         Alert.alert('Notice', 'Could not load the feedback form questions.');
         setModalPub(null);
@@ -234,9 +368,12 @@ export const StudentFeedbackView: React.FC<StudentFeedbackViewProps> = ({
     if (!modalPub || !modalSubject) return;
 
     // Check required questions
-    const missing = formQuestions.filter((q) => {
-      const resp = responses[q.id];
-      return q.isRequired && (resp === undefined || resp === '' || (Array.isArray(resp) && resp.length === 0));
+    const missing = formQuestions.filter((q, qIdx) => {
+      const qId = q.id !== undefined && q.id !== null ? String(q.id) : `q_${qIdx}`;
+      const isReq = Boolean(q.isRequired || q.is_required || q.required);
+      if (!isReq) return false;
+      const resp = responses[qId] ?? responses[q.id];
+      return resp === undefined || resp === null || resp === '' || (Array.isArray(resp) && resp.length === 0);
     });
 
     if (missing.length > 0) {
@@ -248,11 +385,16 @@ export const StudentFeedbackView: React.FC<StudentFeedbackViewProps> = ({
     }
 
     // Build payload with standardized shortcut fields
-    const answersPayload: { [key: string]: any } = { ...responses };
-    formQuestions.forEach((q) => {
-      const text = String(q.questionText || '').toLowerCase();
-      const val = responses[q.id];
-      if (val === undefined) return;
+    const answersPayload: { [key: string]: any } = {};
+    Object.keys(responses).forEach((k) => {
+      answersPayload[k] = responses[k];
+    });
+    formQuestions.forEach((q, qIdx) => {
+      const qId = q.id !== undefined && q.id !== null ? String(q.id) : `q_${qIdx}`;
+      const text = String(q.questionText || q.question_text || q.label || '').toLowerCase();
+      const val = responses[qId] ?? responses[q.id];
+      if (val === undefined || val === null) return;
+      answersPayload[qId] = val;
       if (text.includes('units covered') || text.includes('unit')) answersPayload['unitsCovered'] = String(val);
       if (text.includes('rate') || text.includes('rating')) answersPayload['facultyRating'] = Number(val);
       if (text.includes('unit status') || text.includes('status')) answersPayload['unitStatus'] = String(val);
@@ -289,12 +431,7 @@ export const StudentFeedbackView: React.FC<StudentFeedbackViewProps> = ({
   };
 
   if (loading) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#1E3A8A" />
-        <Text style={styles.loadingText}>Loading faculty evaluations & courses...</Text>
-      </View>
-    );
+    return <FeedbackSkeleton />;
   }
 
   if (!publications.length) {
@@ -545,10 +682,7 @@ export const StudentFeedbackView: React.FC<StudentFeedbackViewProps> = ({
 
             {/* Questions Form Content */}
             {formLoading ? (
-              <View style={styles.modalLoading}>
-                <ActivityIndicator size="large" color="#1E3A8A" />
-                <Text style={styles.modalLoadingText}>Loading evaluation questions...</Text>
-              </View>
+              <QuestionFormSkeleton />
             ) : (
               <ScrollView
                 showsVerticalScrollIndicator={true}
@@ -556,19 +690,21 @@ export const StudentFeedbackView: React.FC<StudentFeedbackViewProps> = ({
                 overScrollMode="never"
               >
                 {formQuestions.map((q: any, qIdx: number) => {
-                  const qType = String(q.questionType || q.type || '')
-                    .trim()
-                    .toLowerCase();
-                  const currentVal = responses[q.id];
+                  const qId = q.id !== undefined && q.id !== null ? String(q.id) : `q_${qIdx}`;
+                  const qText = q.questionText || q.question_text || q.label || `Question ${qIdx + 1}`;
+                  const isRequired = Boolean(q.isRequired || q.is_required || q.required);
+                  const fieldKind = getQuestionFieldKind(q);
+                  const currentVal = responses[qId] ?? responses[q.id];
+                  const options: string[] = Array.isArray(q.options) && q.options.length > 0 ? q.options : ['1', '2', '3', '4', '5'];
 
                   return (
-                    <View key={q.id || qIdx} style={styles.questionCard}>
+                    <View key={qId} style={styles.questionCard}>
                       {/* Question Index Badge */}
                       <View style={styles.questionMetaRow}>
                         <Text style={styles.questionIndexText}>
                           Question {qIdx + 1} of {formQuestions.length}
                         </Text>
-                        {q.isRequired && (
+                        {isRequired && (
                           <View style={styles.requiredPill}>
                             <Text style={styles.requiredPillText}>REQUIRED</Text>
                           </View>
@@ -576,19 +712,19 @@ export const StudentFeedbackView: React.FC<StudentFeedbackViewProps> = ({
                       </View>
 
                       {/* Question Text */}
-                      <Text style={styles.questionText}>{q.questionText}</Text>
+                      <Text style={styles.questionText}>{qText}</Text>
 
                       {/* 1. Star Rating (1 to 5) */}
-                      {(qType === 'rating_scale' || qType === 'rating') && (
+                      {fieldKind === 'rating' && (
                         <View style={styles.starRatingContainer}>
                           <View style={styles.starsRow}>
                             {[1, 2, 3, 4, 5].map((star) => {
-                              const isFilled = (currentVal || 0) >= star;
+                              const isFilled = (Number(currentVal) || 0) >= star;
                               return (
                                 <TouchableOpacity
                                   key={star}
                                   style={styles.starTouch}
-                                  onPress={() => setResponses((prev) => ({ ...prev, [q.id]: star }))}
+                                  onPress={() => setResponses((prev) => ({ ...prev, [qId]: star }))}
                                   activeOpacity={0.7}
                                 >
                                   <Star
@@ -608,7 +744,7 @@ export const StudentFeedbackView: React.FC<StudentFeedbackViewProps> = ({
 
                           {currentVal ? (
                             <Text style={styles.ratingDescText}>
-                              {RATING_DESCRIPTIONS[currentVal] || `Score ${currentVal} of 5`}
+                              {RATING_DESCRIPTIONS[Number(currentVal)] || `Score ${currentVal} of 5`}
                             </Text>
                           ) : (
                             <Text style={styles.ratingHintText}>Tap a star to rate</Text>
@@ -616,19 +752,19 @@ export const StudentFeedbackView: React.FC<StudentFeedbackViewProps> = ({
                         </View>
                       )}
 
-                      {/* 2. Multiple Choice / Radio (Units or Options) */}
-                      {(qType === 'multiple_choice' || qType === 'radio') && (
+                      {/* 2. Multiple Choice / Radio / Dropdown Options */}
+                      {fieldKind === 'choice' && (
                         <View style={styles.optionsWrap}>
-                          {(q.options || ['1', '2', '3', '4', '5']).map((opt: string, oIdx: number) => {
+                          {options.map((opt: string, oIdx: number) => {
                             const isSelected = String(currentVal) === String(opt);
-                            const isUnits = String(q.questionText || '').toLowerCase().includes('unit');
+                            const isUnits = qText.toLowerCase().includes('unit');
                             const label = isUnits && !isNaN(Number(opt)) ? `Unit ${opt}` : opt;
 
                             return (
                               <TouchableOpacity
                                 key={oIdx}
                                 style={[styles.optionPill, isSelected && styles.optionPillActive]}
-                                onPress={() => setResponses((prev) => ({ ...prev, [q.id]: opt }))}
+                                onPress={() => setResponses((prev) => ({ ...prev, [qId]: opt }))}
                                 activeOpacity={0.8}
                               >
                                 {isSelected && <Check size={13} color="#FFFFFF" style={{ marginRight: 4 }} />}
@@ -646,8 +782,44 @@ export const StudentFeedbackView: React.FC<StudentFeedbackViewProps> = ({
                         </View>
                       )}
 
-                      {/* 3. Yes / No */}
-                      {(qType === 'yes_no' || qType === 'boolean') && (
+                      {/* 3. Checkbox / Multi-Select */}
+                      {fieldKind === 'checkbox' && (
+                        <View style={styles.optionsWrap}>
+                          {options.map((opt: string, oIdx: number) => {
+                            const selectedList: string[] = Array.isArray(currentVal) ? currentVal : [];
+                            const isSelected = selectedList.includes(String(opt));
+
+                            return (
+                              <TouchableOpacity
+                                key={oIdx}
+                                style={[styles.checkboxPill, isSelected && styles.checkboxPillActive]}
+                                onPress={() => {
+                                  const updated = isSelected
+                                    ? selectedList.filter((s) => s !== String(opt))
+                                    : [...selectedList, String(opt)];
+                                  setResponses((prev) => ({ ...prev, [qId]: updated }));
+                                }}
+                                activeOpacity={0.8}
+                              >
+                                <View style={[styles.checkboxIndicator, isSelected && styles.checkboxIndicatorActive]}>
+                                  {isSelected && <Check size={11} color="#FFFFFF" />}
+                                </View>
+                                <Text
+                                  style={[
+                                    styles.checkboxPillText,
+                                    isSelected && styles.checkboxPillTextActive,
+                                  ]}
+                                >
+                                  {opt}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      )}
+
+                      {/* 4. Yes / No */}
+                      {fieldKind === 'boolean' && (
                         <View style={styles.yesNoRow}>
                           {['Yes', 'No'].map((choice) => {
                             const isSelected = String(currentVal) === choice;
@@ -655,7 +827,7 @@ export const StudentFeedbackView: React.FC<StudentFeedbackViewProps> = ({
                               <TouchableOpacity
                                 key={choice}
                                 style={[styles.yesNoBtn, isSelected && styles.yesNoBtnActive]}
-                                onPress={() => setResponses((prev) => ({ ...prev, [q.id]: choice }))}
+                                onPress={() => setResponses((prev) => ({ ...prev, [qId]: choice }))}
                                 activeOpacity={0.8}
                               >
                                 {isSelected && <Check size={14} color="#FFFFFF" style={{ marginRight: 6 }} />}
@@ -673,20 +845,28 @@ export const StudentFeedbackView: React.FC<StudentFeedbackViewProps> = ({
                         </View>
                       )}
 
-                      {/* 4. Text / Textarea Remarks */}
-                      {(qType === 'textarea' ||
-                        qType === 'text' ||
-                        qType === 'long_answer' ||
-                        qType === 'paragraph' ||
-                        qType === 'remarks') && (
+                      {/* 5. Long Text / Textarea Remarks */}
+                      {fieldKind === 'long_text' && (
                         <TextInput
-                          style={styles.textInput}
-                          placeholder="Enter your feedback, suggestions, or comments..."
+                          style={styles.longTextInput}
+                          placeholder={q.placeholder || "Enter your detailed response, feedback, or comments..."}
                           placeholderTextColor="#94A3B8"
                           multiline
-                          numberOfLines={3}
-                          value={currentVal || ''}
-                          onChangeText={(txt) => setResponses((prev) => ({ ...prev, [q.id]: txt }))}
+                          numberOfLines={4}
+                          value={typeof currentVal === 'string' ? currentVal : ''}
+                          onChangeText={(txt) => setResponses((prev) => ({ ...prev, [qId]: txt }))}
+                        />
+                      )}
+
+                      {/* 6. Short Text / Text Input */}
+                      {fieldKind === 'short_text' && (
+                        <TextInput
+                          style={styles.shortTextInput}
+                          placeholder={q.placeholder || "Enter your response..."}
+                          placeholderTextColor="#94A3B8"
+                          value={typeof currentVal === 'string' ? currentVal : (currentVal !== undefined && currentVal !== null ? String(currentVal) : '')}
+                          onChangeText={(txt) => setResponses((prev) => ({ ...prev, [qId]: txt }))}
+                          returnKeyType="done"
                         />
                       )}
                     </View>
@@ -1332,6 +1512,68 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     minHeight: 70,
     textAlignVertical: 'top',
+  },
+  shortTextInput: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 13,
+    color: '#0F172A',
+    minHeight: 46,
+  },
+  longTextInput: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 13,
+    color: '#0F172A',
+    minHeight: 90,
+    textAlignVertical: 'top',
+  },
+  checkboxPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    marginRight: 8,
+    marginBottom: 8,
+    gap: 8,
+  },
+  checkboxPillActive: {
+    borderColor: '#1E3A8A',
+    backgroundColor: '#EFF6FF',
+  },
+  checkboxPillText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  checkboxPillTextActive: {
+    color: '#1E3A8A',
+    fontWeight: '700',
+  },
+  checkboxIndicator: {
+    width: 18,
+    height: 18,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  checkboxIndicatorActive: {
+    borderColor: '#1E3A8A',
+    backgroundColor: '#1E3A8A',
   },
   privacyNoteBox: {
     flexDirection: 'row',

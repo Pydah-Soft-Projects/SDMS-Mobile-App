@@ -32,6 +32,7 @@ import {
 } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import Header from '../../src/components/Header';
+import { AnnouncementsSkeleton } from '../../src/components/SkeletonLoader';
 import announcementService from '../../src/services/announcementService';
 import studentService from '../../src/services/studentService';
 import notificationService from '../../src/services/notificationService';
@@ -225,10 +226,7 @@ export default function AnnouncementsScreen() {
       </View>
 
       {loading ? (
-        <View style={styles.loader}>
-          <ActivityIndicator size="large" color="#1E3A8A" />
-          <Text style={styles.loaderText}>Loading updates & notifications...</Text>
-        </View>
+        <AnnouncementsSkeleton />
       ) : (
         <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) + 84 }]}

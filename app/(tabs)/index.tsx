@@ -50,6 +50,7 @@ import {
 import { useAuth } from '../../src/context/AuthContext';
 import Header from '../../src/components/Header';
 import StaffDashboard from '../../src/components/StaffDashboard';
+import { DashboardSkeleton } from '../../src/components/SkeletonLoader';
 import studentService from '../../src/services/studentService';
 import { StudentUser, StudentAttendanceData, StudentFeeDetails, Announcement } from '../../src/types';
 import logger from '../../src/utils/logger';
@@ -659,10 +660,7 @@ export default function DashboardScreen() {
       />
 
       {loading ? (
-        <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color="#1E3A8A" />
-          <Text style={styles.loaderText}>Syncing SDMS Student Records...</Text>
-        </View>
+        <DashboardSkeleton paddingHorizontal={horizontalPadding} />
       ) : (
         <ScrollView
           contentContainerStyle={[
@@ -712,9 +710,7 @@ export default function DashboardScreen() {
                     {studentName}
                   </Text>
                   <Text style={styles.bannerCourseText} numberOfLines={1}>
-                    {[course ? `${course} - ${branch}` : branch, currentYearText, semester ? `Sem ${semester}` : null]
-                      .filter(Boolean)
-                      .join(' • ')}
+                    {course && branch ? `${course} - ${branch}` : (course || branch || 'Student')}
                   </Text>
                 </View>
               </View>

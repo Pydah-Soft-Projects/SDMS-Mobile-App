@@ -497,7 +497,7 @@ export default function ProfileScreen() {
 
               {isStudent && (
                 <TouchableOpacity
-                  style={[styles.actionBtn, styles.actionBtnEmerald]}
+                  style={[styles.actionBtn, styles.actionBtnOrange]}
                   onPress={() => setShowIdCardModal(true)}
                   activeOpacity={0.8}
                 >
@@ -1200,6 +1200,9 @@ const styles = StyleSheet.create({
   },
   actionBtnEmerald: {
     backgroundColor: '#059669', // matching web emerald-600
+  },
+  actionBtnOrange: {
+    backgroundColor: '#EA580C', // Vibrant orange
   },
   actionBtnText: {
     color: '#FFFFFF',

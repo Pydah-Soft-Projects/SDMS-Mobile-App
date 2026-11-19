@@ -15,6 +15,12 @@ web-build/
 android/
 ios/
 
+# Keystores & sensitive mobile credentials
+*.jks
+*.keystore
+*.p12
+*-adminsdk-*.json
+
 # Environment files
 .env
 .env.local

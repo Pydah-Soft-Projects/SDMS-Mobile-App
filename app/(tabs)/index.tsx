@@ -9,12 +9,14 @@ import {
   ActivityIndicator,
   useWindowDimensions,
   Image,
+  ImageBackground,
   Modal,
   Alert,
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   CalendarCheck,
   CreditCard,
@@ -925,19 +927,6 @@ export default function DashboardScreen() {
                   >
                     <View style={styles.eventCardBanner}>
                       <SafeEventImage uri={item.imageUrl} style={styles.eventCardImage} />
-                      <View
-                        style={[
-                          styles.eventCategoryBadge,
-                          {
-                            backgroundColor:
-                              item.type === 'event' ? '#9333EA' : '#4F46E5',
-                          },
-                        ]}
-                      >
-                        <Text style={styles.eventCategoryText}>
-                          {item.category.toUpperCase()}
-                        </Text>
-                      </View>
                     </View>
 
                     <View style={styles.eventCardBody}>
@@ -945,8 +934,32 @@ export default function DashboardScreen() {
                         {item.title}
                       </Text>
                       <View style={styles.eventCardMeta}>
-                        <Clock size={11} color="#94A3B8" />
-                        <Text style={styles.eventCardDate}>{item.dateFormatted}</Text>
+                        <View style={styles.eventCardDateGroup}>
+                          <Clock size={11} color="#94A3B8" />
+                          <Text style={styles.eventCardDate}>{item.dateFormatted}</Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.eventCategoryTag,
+                            {
+                              backgroundColor:
+                                item.type === 'event' ? '#F3E8FF' : '#EEF2FF',
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.eventCategoryTagText,
+                              {
+                                color:
+                                  item.type === 'event' ? '#7E22CE' : '#4338CA',
+                              },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {item.category.toUpperCase()}
+                          </Text>
+                        </View>
                       </View>
                     </View>
 
@@ -960,25 +973,34 @@ export default function DashboardScreen() {
             </View>
           )}
 
-          {/* 5. EXPLORE LEARN BUILD BANNER (Exact Web Dashboard Style) */}
+          {/* 5. EXPLORE LEARN BUILD BANNER (Full Card Background) */}
           <TouchableOpacity
-            style={styles.exploreBanner}
+            style={styles.exploreBannerContainer}
             onPress={() => router.push('/student-module/clubs' as any)}
             activeOpacity={0.88}
           >
-            <View style={styles.exploreBannerLeft}>
-              <Text style={styles.exploreBannerTitle} numberOfLines={1}>
-                Explore Learn Build
-              </Text>
-              <Text style={styles.exploreBannerSubtitle}>
-                Join Clubs, Workshops{'\n'}and Maker Space
-              </Text>
-            </View>
-            <Image
+            <ImageBackground
               source={require('../../assets/learn-build.webp')}
-              style={styles.exploreBannerImg}
-              resizeMode="contain"
-            />
+              style={styles.exploreBanner}
+              imageStyle={styles.exploreBannerBgImage}
+              resizeMode="cover"
+            >
+              <LinearGradient
+                colors={['rgba(3, 14, 45, 0.78)', 'rgba(3, 14, 45, 0.38)', 'transparent']}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={styles.exploreBannerOverlay}
+              >
+                <View style={styles.exploreBannerLeft}>
+                  <Text style={styles.exploreBannerTitle} numberOfLines={1}>
+                    Explore Learn Build
+                  </Text>
+                  <Text style={styles.exploreBannerSubtitle}>
+                    Join Clubs, Workshops{'\n'}and Maker Space
+                  </Text>
+                </View>
+              </LinearGradient>
+            </ImageBackground>
           </TouchableOpacity>
 
           {/* 6. CLUBS TO JOIN SECTION (Dynamic - Matches Web Dashboard) */}
@@ -1254,44 +1276,61 @@ const styles = StyleSheet.create({
   webBadgeTextPrimary: {
     color: '#1D4ED8',
   },
-  exploreBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#1E3A8A',
-    borderRadius: 20,
-    padding: 16,
+  exploreBannerContainer: {
     marginBottom: 16,
+    borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#1E3A8A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.16,
     shadowRadius: 8,
     elevation: 3,
   },
+  exploreBanner: {
+    width: '100%',
+    minHeight: 110,
+    borderRadius: 20,
+    overflow: 'hidden',
+    justifyContent: 'center',
+  },
+  exploreBannerBgImage: {
+    borderRadius: 20,
+  },
+  exploreBannerOverlay: {
+    flex: 1,
+    minHeight: 110,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 18,
+    paddingHorizontal: 18,
+    borderRadius: 20,
+  },
   exploreBannerLeft: {
     flex: 1,
-    paddingRight: 8,
+    paddingRight: 10,
     zIndex: 2,
     justifyContent: 'center',
   },
   exploreBannerTitle: {
     color: '#FFFFFF',
-    fontSize: 16.5,
+    fontSize: 17,
     fontWeight: '900',
-    lineHeight: 21,
+    lineHeight: 22,
     letterSpacing: -0.2,
+    textShadowColor: 'rgba(0, 0, 0, 0.45)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   exploreBannerSubtitle: {
-    color: 'rgba(255, 255, 255, 0.82)',
-    fontSize: 11.5,
+    color: 'rgba(255, 255, 255, 0.92)',
+    fontSize: 12,
     marginTop: 4,
-    lineHeight: 16,
-  },
-  exploreBannerImg: {
-    width: 155,
-    height: 90,
-    marginRight: -4,
+    lineHeight: 16.5,
+    fontWeight: '500',
+    textShadowColor: 'rgba(0, 0, 0, 0.45)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   metricsRow: {
     flexDirection: 'row',
@@ -1549,19 +1588,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  eventCategoryBadge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 6,
-    zIndex: 2,
+  eventCategoryTag: {
+    paddingHorizontal: 6,
+    paddingVertical: 2.5,
+    borderRadius: 5,
   },
-  eventCategoryText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#FFFFFF',
+  eventCategoryTagText: {
+    fontSize: 8.5,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
   eventCardBody: {
     padding: 10,
@@ -1575,8 +1610,15 @@ const styles = StyleSheet.create({
   eventCardMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'space-between',
+    gap: 6,
     marginTop: 6,
+  },
+  eventCardDateGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexShrink: 1,
   },
   eventCardDate: {
     fontSize: 10,

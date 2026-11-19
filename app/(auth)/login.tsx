@@ -90,126 +90,145 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
-      style={styles.container}
-    >
-      <StatusBar style="dark" />
+    <View style={styles.container}>
+      <StatusBar style="dark" translucent backgroundColor="transparent" />
 
-      <ScrollView
-        ref={scrollRef}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+      {/* Background Image: Campo Login BG (WebP format, precisely fit edge-to-edge) */}
+      <Image
+        source={require('../../assets/Campo-Login-BG.webp')}
+        style={styles.backgroundImage}
+        resizeMode="stretch"
+      />
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
+        style={styles.keyboardView}
       >
-        {/* Branding & Welcome Header */}
-        <View style={styles.header}>
-          <Image
-            source={require('../../assets/campo-logo.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Branding & Welcome Header */}
+          <View style={styles.header}>
+            <Image
+              source={require('../../assets/campo-logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
 
-          <View style={styles.portalBadge}>
-            <Text style={styles.portalBadgeText}>STUDENT PORTAL</Text>
+            <Text style={styles.welcomeTitle}>Welcome Back Buddy</Text>
           </View>
 
-          <Text style={styles.welcomeTitle}>Welcome Back</Text>
-        </View>
+          {/* Form Container */}
+          <View style={styles.formContainer}>
+            {/* Error Banner */}
+            {error && (
+              <View style={styles.errorBanner}>
+                <AlertCircle size={18} color="#B91C1C" style={styles.errorIcon} />
+                <Text style={styles.errorBannerText}>{error}</Text>
+              </View>
+            )}
 
-        {/* Clean Input Form (Without background card box) */}
-        <View style={styles.formContainer}>
-          {/* Error Banner */}
-          {error && (
-            <View style={styles.errorBanner}>
-              <AlertCircle size={18} color="#B91C1C" style={styles.errorIcon} />
-              <Text style={styles.errorBannerText}>{error}</Text>
+            {/* Roll Number / PIN / Email Field */}
+            <CustomInput
+              label="Roll Number / PIN / Email"
+              placeholder="e.g. 246T1A0301 or PIN"
+              value={identifier}
+              onChangeText={(text) => {
+                setIdentifier(text);
+                if (error) setError(null);
+              }}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="next"
+              inputWrapperStyle={styles.roundedInputWrapper}
+              leftIcon={<User size={19} color="#64748B" />}
+            />
+
+            {/* Password Field */}
+            <CustomInput
+              label="Password"
+              placeholder="Enter your password"
+              value={password}
+              onChangeText={(text) => {
+                setPassword(text);
+                if (error) setError(null);
+              }}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
+              onFocus={handlePasswordFocus}
+              onBlur={() => setIsPasswordFocused(false)}
+              inputWrapperStyle={styles.roundedInputWrapper}
+              leftIcon={<Lock size={19} color="#64748B" />}
+              rightIcon={
+                showPassword ? <EyeOff size={19} color="#64748B" /> : <Eye size={19} color="#64748B" />
+              }
+              onRightIconPress={() => setShowPassword(!showPassword)}
+            />
+
+            {/* Forgot Password Link */}
+            <View style={styles.actionsRow}>
+              <TouchableOpacity
+                onPress={() => router.push('/(auth)/forgot-password')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.forgotText}>Forgot Password?</Text>
+              </TouchableOpacity>
             </View>
-          )}
 
-          {/* Roll Number / PIN / Email Field */}
-          <CustomInput
-            label="Roll Number / PIN / Email"
-            placeholder="e.g. 246T1A0301 or PIN"
-            value={identifier}
-            onChangeText={(text) => {
-              setIdentifier(text);
-              if (error) setError(null);
-            }}
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="next"
-            leftIcon={<User size={19} color="#64748B" />}
-          />
-
-          {/* Password Field */}
-          <CustomInput
-            label="Password"
-            placeholder="Enter your password"
-            value={password}
-            onChangeText={(text) => {
-              setPassword(text);
-              if (error) setError(null);
-            }}
-            secureTextEntry={!showPassword}
-            autoCapitalize="none"
-            returnKeyType="done"
-            onSubmitEditing={handleLogin}
-            onFocus={handlePasswordFocus}
-            onBlur={() => setIsPasswordFocused(false)}
-            leftIcon={<Lock size={19} color="#64748B" />}
-            rightIcon={
-              showPassword ? <EyeOff size={19} color="#64748B" /> : <Eye size={19} color="#64748B" />
-            }
-            onRightIconPress={() => setShowPassword(!showPassword)}
-          />
-
-          {/* Forgot Password Link */}
-          <View style={styles.actionsRow}>
-            <TouchableOpacity
-              onPress={() => router.push('/(auth)/forgot-password')}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Text style={styles.forgotText}>Forgot Password?</Text>
-            </TouchableOpacity>
+            {/* Submit Button */}
+            <CustomButton
+              title="Sign In as Student"
+              onPress={handleLogin}
+              isLoading={loading}
+              icon={!loading ? <ArrowRight size={18} color="#FFFFFF" /> : undefined}
+              style={styles.submitBtn}
+            />
           </View>
 
-          {/* Submit Button */}
-          <CustomButton
-            title="Sign In as Student"
-            onPress={handleLogin}
-            isLoading={loading}
-            icon={!loading ? <ArrowRight size={18} color="#FFFFFF" /> : undefined}
-            style={styles.submitBtn}
-          />
-        </View>
-
-        {/* Footer / Support Notice */}
-        <View style={styles.footer}>
-          <View style={styles.securityRow}>
-            <ShieldCheck size={14} color="#64748B" />
-            <Text style={styles.securityText}>Secured by Campo Unified Authentication</Text>
+          {/* Footer / Support Notice */}
+          <View style={styles.footer}>
+            <View style={styles.securityRow}>
+              <ShieldCheck size={14} color="#64748B" />
+              <Text style={styles.securityText}>Secured by Campo Unified Authentication</Text>
+            </View>
+            <Text style={styles.supportText}>
+              Need assistance? Reach out to your Campus Administration
+            </Text>
           </View>
-          <Text style={styles.supportText}>
-            Need assistance? Reach out to your Campus Administration
-          </Text>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F0F6FF',
+  },
+  backgroundImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  keyboardView: {
+    flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'ios' ? 50 : 40,
-    paddingBottom: 60,
+    paddingTop: Platform.OS === 'ios' ? 56 : 46,
+    paddingBottom: 40,
     justifyContent: 'center',
   },
   header: {
@@ -221,21 +240,6 @@ const styles = StyleSheet.create({
     height: 58,
     marginBottom: 16,
   },
-  portalBadge: {
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#DBEAFE',
-    marginBottom: 12,
-  },
-  portalBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#1D4ED8',
-    letterSpacing: 0.8,
-  },
   welcomeTitle: {
     fontSize: 24,
     fontWeight: '800',
@@ -244,15 +248,11 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
     marginBottom: 6,
   },
-  welcomeSubtitle: {
-    fontSize: 13.5,
-    lineHeight: 20,
-    color: '#64748B',
-    textAlign: 'center',
-    paddingHorizontal: 16,
-  },
   formContainer: {
     width: '100%',
+  },
+  roundedInputWrapper: {
+    borderRadius: 20,
   },
   errorBanner: {
     flexDirection: 'row',
@@ -287,8 +287,8 @@ const styles = StyleSheet.create({
   },
   submitBtn: {
     backgroundColor: '#1E3A8A',
-    borderRadius: 12,
-    height: 50,
+    borderRadius: 20,
+    height: 52,
   },
   footer: {
     alignItems: 'center',

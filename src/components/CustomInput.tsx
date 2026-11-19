@@ -20,6 +20,7 @@ interface CustomInputProps extends TextInputProps {
   onRightIconPress?: () => void;
   dark?: boolean;
   containerStyle?: StyleProp<ViewStyle>;
+  inputWrapperStyle?: StyleProp<ViewStyle>;
 }
 
 export const CustomInput: React.FC<CustomInputProps> = ({
@@ -31,6 +32,7 @@ export const CustomInput: React.FC<CustomInputProps> = ({
   onRightIconPress,
   dark = false,
   containerStyle,
+  inputWrapperStyle,
   style,
   onFocus,
   onBlur,
@@ -86,7 +88,7 @@ export const CustomInput: React.FC<CustomInputProps> = ({
 
       <Pressable
         onPress={() => inputRef.current?.focus()}
-        style={[styles.baseWrapper, getWrapperStyle()]}
+        style={[styles.baseWrapper, getWrapperStyle(), inputWrapperStyle]}
       >
         {leftIcon && (
           <View style={styles.leftIconContainer} pointerEvents="none">

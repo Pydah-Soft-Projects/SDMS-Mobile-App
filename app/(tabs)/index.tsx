@@ -54,6 +54,7 @@ import {
 import { useAuth } from '../../src/context/AuthContext';
 import Header from '../../src/components/Header';
 import StaffDashboard from '../../src/components/StaffDashboard';
+import ParentDashboardView from '../../src/components/ParentDashboardView';
 import { DashboardSkeleton } from '../../src/components/SkeletonLoader';
 import studentService from '../../src/services/studentService';
 import { StudentUser, StudentAttendanceData, StudentFeeDetails, Announcement } from '../../src/types';
@@ -93,10 +94,7 @@ const SafeClubImage: React.FC<{ club: any; style: any }> = ({ club, style }) => 
   if (!clubUrl || loadError) {
     return (
       <View style={[style, styles.clubCardImageFallback]}>
-        <Image source={fallback} style={[style, { opacity: 0.55 }]} resizeMode="cover" />
-        <View style={styles.clubFallbackOverlay}>
-          <Users size={26} color="#FFFFFF" />
-        </View>
+        <Image source={fallback} style={[styles.clubCardImage, { opacity: 0.85 }]} resizeMode="contain" />
       </View>
     );
   }
@@ -105,7 +103,7 @@ const SafeClubImage: React.FC<{ club: any; style: any }> = ({ club, style }) => 
     <Image
       source={{ uri: clubUrl }}
       style={style}
-      resizeMode="cover"
+      resizeMode="contain"
       onError={() => setLoadError(true)}
     />
   );
@@ -139,6 +137,11 @@ export default function DashboardScreen() {
   // If staff or admin user, render Staff Management Dashboard
   if (userType === 'staff' || userType === 'admin') {
     return <StaffDashboard />;
+  }
+
+  // If parent user, render Parent Portal Dashboard
+  if (userType === 'parent') {
+    return <ParentDashboardView />;
   }
 
   const [loading, setLoading] = useState(true);
@@ -1660,10 +1663,13 @@ const styles = StyleSheet.create({
   },
   clubCardBanner: {
     width: '100%',
-    height: 100,
+    height: 110,
     position: 'relative',
     backgroundColor: '#0F172A',
     overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 4,
   },
   clubCardImage: {
     width: '100%',

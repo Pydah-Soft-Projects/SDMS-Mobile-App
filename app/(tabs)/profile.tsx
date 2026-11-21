@@ -50,6 +50,7 @@ import Header from '../../src/components/Header';
 import { ProfileSkeleton } from '../../src/components/SkeletonLoader';
 import api, { getStaticFileUrl } from '../../src/config/api';
 import authService from '../../src/services/authService';
+import parentService from '../../src/services/parentService';
 import DigitalStudentIdCardModal from '../../src/components/DigitalStudentIdCardModal';
 
 export default function ProfileScreen() {
@@ -97,21 +98,28 @@ export default function ProfileScreen() {
   const [submittingProfileRequest, setSubmittingProfileRequest] = useState(false);
 
   const fetchProfileData = useCallback(async () => {
-    if (!admissionNo) {
+    if (!admissionNo && userType !== 'parent') {
       setLoading(false);
       return;
     }
     try {
-      const res = await api.get(`/students/${encodeURIComponent(admissionNo)}`);
-      if (res.data?.success && res.data.data) {
-        setStudentData(res.data.data);
-      } else if (res.data && typeof res.data === 'object') {
-        setStudentData(res.data.data || res.data.student || res.data);
+      if (userType === 'parent') {
+        const parentProfile = await parentService.getProfile();
+        if (parentProfile) {
+          setStudentData(parentProfile);
+        }
+      } else {
+        const res = await api.get(`/students/${encodeURIComponent(admissionNo)}`);
+        if (res.data?.success && res.data.data) {
+          setStudentData(res.data.data);
+        } else if (res.data && typeof res.data === 'object') {
+          setStudentData(res.data.data || res.data.student || res.data);
+        }
       }
     } catch {
       // Keep existing data or user fallback
     }
-  }, [admissionNo]);
+  }, [admissionNo, userType]);
 
   const fetchStudentRequests = useCallback(async () => {
     if (!isStudent) return;

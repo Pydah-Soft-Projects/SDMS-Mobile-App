@@ -250,7 +250,7 @@ export const authService = {
     logger.info('AUTH', `Selecting student ID ${studentId} for parent`);
     const response = await api.post(
       '/auth/parent/select-student',
-      { studentId },
+      { selectionToken, studentId },
       { headers: { Authorization: `Bearer ${selectionToken}` } }
     );
     return response.data;

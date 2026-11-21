@@ -15,7 +15,6 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   User,
-  Users,
   Calendar,
   CreditCard,
   ChevronRight,
@@ -37,6 +36,7 @@ import {
   Layers,
 } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
+import Header from './Header';
 import parentService, { ParentChildSummary, ParentDashboardSummary } from '../services/parentService';
 import { getStaticFileUrl } from '../config/api';
 import { DashboardSkeleton } from './SkeletonLoader';
@@ -52,9 +52,22 @@ export const ParentDashboardView: React.FC = () => {
   const [dashboardData, setDashboardData] = useState<ParentDashboardSummary | null>(null);
   const [profileData, setProfileData] = useState<any>(null);
   const [feeSummary, setFeeSummary] = useState<any>(null);
-  const [childrenList, setChildrenList] = useState<ParentChildSummary[]>([]);
+  const [childrenList, setChildrenList] = useState<ParentChildSummary[]>(() => {
+    if (Array.isArray(parentUser?.students) && parentUser.students.length > 0) {
+      return parentUser.students;
+    }
+    return [];
+  });
   const [switchingChildId, setSwitchingChildId] = useState<number | string | null>(null);
   const [showIdCardModal, setShowIdCardModal] = useState(false);
+
+  // Dynamic greeting: Good Morning, Good Afternoon, or Good Evening
+  const greetingText = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  }, []);
 
   const loadAllData = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -79,6 +92,8 @@ export const ParentDashboardView: React.FC = () => {
       }
       if (childrenRes.status === 'fulfilled' && Array.isArray(childrenRes.value)) {
         setChildrenList(childrenRes.value);
+      } else if (Array.isArray(parentUser?.students) && parentUser.students.length > 0) {
+        setChildrenList(parentUser.students);
       }
     } catch (e) {
       console.error('Failed to load parent dashboard:', e);
@@ -86,7 +101,7 @@ export const ParentDashboardView: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [parentUser?.students]);
 
   useEffect(() => {
     loadAllData();
@@ -164,342 +179,330 @@ export const ParentDashboardView: React.FC = () => {
   const announcements = dashboardData?.latestAnnouncements || [];
 
   if (loading && !dashboardData && !profileData) {
-    return <DashboardSkeleton />;
+    return (
+      <View style={styles.container}>
+        <Header
+          title={greetingText}
+          tagText="Parent"
+          tagColor="#B47B2B"
+        />
+        <DashboardSkeleton />
+      </View>
+    );
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => loadAllData(true)} tintColor="#0047BA" />
-      }
-    >
-      {/* 1. MULTI-CHILD SELECTOR (If parent has multiple children) */}
-      {childrenList.length > 1 && (
-        <View style={styles.childSwitcherBanner}>
-          <View style={styles.childSwitcherTitleRow}>
-            <Users size={16} color="#0047BA" />
-            <Text style={styles.childSwitcherHeading}>Select Active Ward:</Text>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.childChipsScroll}>
-            {childrenList.map((c) => {
-              const isActive = String(c.id) === String(parentUser?.studentId || parentUser?.id);
-              return (
-                <TouchableOpacity
-                  key={c.id}
-                  style={[styles.childChip, isActive && styles.childChipActive]}
-                  onPress={() => handleSwitchChild(c.id)}
-                  disabled={switchingChildId !== null || isActive}
-                  activeOpacity={0.8}
-                >
-                  {switchingChildId === c.id ? (
-                    <ActivityIndicator size="small" color={isActive ? '#FFFFFF' : '#0047BA'} />
-                  ) : (
-                    <>
-                      <Text style={[styles.childChipName, isActive && styles.childChipNameActive]}>
-                        {c.student_name}
-                      </Text>
-                      <Text style={[styles.childChipAdm, isActive && styles.childChipAdmActive]}>
-                        ({c.admission_number})
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-      )}
+    <View style={styles.container}>
+      {/* Top Header matching Image 1: [Campo Logo] | Good Morning Parent */}
+      <Header
+        title={greetingText}
+        tagText="Parent"
+        tagColor="#B47B2B"
+      />
 
-      {/* 2. ROYAL BLUE WARD HERO CARD */}
-      <LinearGradient
-        colors={['#003896', '#0047BA', '#0284C7']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.heroCard}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => loadAllData(true)} tintColor="#0047BA" />
+        }
       >
-        {/* Top Badges Row */}
-        <View style={styles.heroTopRow}>
-          <View style={styles.parentRolePill}>
-            <ShieldCheck size={12} color="#FFFFFF" />
-            <Text style={styles.parentRolePillText}>PARENT PORTAL</Text>
-          </View>
+        {/* ROYAL BLUE WARD HERO CARD */}
+        <LinearGradient
+          colors={['#003896', '#0047BA', '#0284C7']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.heroCard}
+        >
+          {/* Top Badges Row */}
+          <View style={styles.heroTopRow}>
+            <View style={styles.parentRolePill}>
+              <ShieldCheck size={12} color="#FFFFFF" />
+              <Text style={styles.parentRolePillText}>PARENT PORTAL</Text>
+            </View>
 
-          {childrenList.length > 1 && (
-            <TouchableOpacity
-              style={styles.switchChildBtn}
-              onPress={() => {
-                const nextChild = childrenList.find((c) => String(c.id) !== String(parentUser?.studentId || parentUser?.id));
-                if (nextChild) handleSwitchChild(nextChild.id);
-              }}
-              activeOpacity={0.8}
-            >
-              <ArrowUpDown size={12} color="#FFFFFF" />
-              <Text style={styles.switchChildBtnText}>Switch Ward</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Student Avatar & Basic Info */}
-        <View style={styles.heroMainRow}>
-          <View style={styles.avatarWrap}>
-            {photoUrl ? (
-              <Image source={{ uri: photoUrl }} style={styles.avatarImg} resizeMode="cover" />
-            ) : (
-              <View style={styles.avatarFallback}>
-                <User size={36} color="#FFFFFF" />
-              </View>
+            {childrenList.length > 1 && (
+              <TouchableOpacity
+                style={styles.switchChildBtn}
+                onPress={() => {
+                  const nextChild = childrenList.find((c) => String(c.id) !== String(parentUser?.studentId || parentUser?.id));
+                  if (nextChild) handleSwitchChild(nextChild.id);
+                }}
+                disabled={switchingChildId !== null}
+                activeOpacity={0.8}
+              >
+                {switchingChildId !== null ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <ArrowUpDown size={12} color="#FFFFFF" />
+                    <Text style={styles.switchChildBtnText}>Switch Ward</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             )}
           </View>
 
-          <View style={styles.heroInfoCol}>
-            <Text style={styles.heroStudentName} numberOfLines={1}>
-              {studentName}
-            </Text>
-            <View style={styles.pillsRow}>
-              <View style={styles.codePill}>
-                <Text style={styles.codePillText}>Adm: {admissionNo}</Text>
-              </View>
-              {pinNo && pinNo !== admissionNo ? (
-                <View style={styles.codePill}>
-                  <Text style={styles.codePillText}>PIN: {pinNo}</Text>
+          {/* Student Avatar & Basic Info */}
+          <View style={styles.heroMainRow}>
+            <View style={styles.avatarWrap}>
+              {photoUrl ? (
+                <Image source={{ uri: photoUrl }} style={styles.avatarImg} resizeMode="cover" />
+              ) : (
+                <View style={styles.avatarFallback}>
+                  <User size={36} color="#FFFFFF" />
                 </View>
-              ) : null}
+              )}
             </View>
-            <Text style={styles.heroCollegeText} numberOfLines={1}>
-              {collegeName}
-            </Text>
-            <Text style={styles.heroBranchText}>
-              {courseBranch} • {yearSem}
-            </Text>
-          </View>
-        </View>
 
-        {/* Action Buttons: Digital ID Card & Ward Profile */}
-        <View style={styles.heroActionsRow}>
+            <View style={styles.heroInfoCol}>
+              <Text style={styles.heroStudentName} numberOfLines={1}>
+                {studentName}
+              </Text>
+              <View style={styles.pillsRow}>
+                <View style={styles.codePill}>
+                  <Text style={styles.codePillText}>Adm: {admissionNo}</Text>
+                </View>
+                {pinNo && pinNo !== admissionNo ? (
+                  <View style={styles.codePill}>
+                    <Text style={styles.codePillText}>PIN: {pinNo}</Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text style={styles.heroCollegeText} numberOfLines={1}>
+                {collegeName}
+              </Text>
+              <Text style={styles.heroBranchText}>
+                {courseBranch} • {yearSem}
+              </Text>
+            </View>
+          </View>
+
+          {/* Action Buttons: Digital ID Card & Ward Profile */}
+          <View style={styles.heroActionsRow}>
+            <TouchableOpacity
+              style={styles.heroActionBtnOutline}
+              onPress={() => setShowIdCardModal(true)}
+              activeOpacity={0.8}
+            >
+              <CreditCard size={14} color="#FFFFFF" />
+              <Text style={styles.heroActionBtnOutlineText}>Digital ID Card</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.heroActionBtnFilled}
+              onPress={() => router.push('/(tabs)/profile')}
+              activeOpacity={0.85}
+            >
+              <User size={14} color="#0047BA" />
+              <Text style={styles.heroActionBtnFilledText}>Full Profile</Text>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+
+        {/* 3. FOUR QUICK METRIC CARDS */}
+        <View style={styles.metricsGrid}>
+          {/* Metric 1: Attendance */}
           <TouchableOpacity
-            style={styles.heroActionBtnOutline}
-            onPress={() => setShowIdCardModal(true)}
+            style={[styles.metricCard, styles.metricBlue]}
+            onPress={() => router.push('/(tabs)/attendance')}
             activeOpacity={0.8}
           >
-            <CreditCard size={14} color="#FFFFFF" />
-            <Text style={styles.heroActionBtnOutlineText}>Digital ID Card</Text>
+            <View style={styles.metricTopRow}>
+              <Text style={styles.metricLabel}>Attendance</Text>
+              <CheckCircle2 size={16} color="#0047BA" />
+            </View>
+            <Text style={[styles.metricNumber, { color: '#0047BA' }]}>{attendancePercentage}%</Text>
+            <Text style={styles.metricSub}>Live Academic Status</Text>
+          </TouchableOpacity>
+
+          {/* Metric 2: Fee Dues */}
+          <TouchableOpacity
+            style={[styles.metricCard, feeDuesAmount > 0 ? styles.metricOrange : styles.metricGreen]}
+            onPress={() => router.push('/(tabs)/fees')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.metricTopRow}>
+              <Text style={styles.metricLabel}>Fee Dues</Text>
+              <CreditCard size={16} color={feeDuesAmount > 0 ? '#D97706' : '#16A34A'} />
+            </View>
+            <Text
+              style={[
+                styles.metricNumber,
+                { color: feeDuesAmount > 0 ? '#B45309' : '#15803D' },
+              ]}
+            >
+              {feeDuesAmount > 0 ? `₹${feeDuesAmount.toLocaleString('en-IN')}` : 'All Clear'}
+            </Text>
+            <Text style={styles.metricSub}>{feeDuesAmount > 0 ? 'Payment Pending' : 'No Overdue Dues'}</Text>
+          </TouchableOpacity>
+
+          {/* Metric 3: Today's Class Status */}
+          <View style={[styles.metricCard, styles.metricPurple]}>
+            <View style={styles.metricTopRow}>
+              <Text style={styles.metricLabel}>Today&apos;s Status</Text>
+              <Clock size={16} color="#9333EA" />
+            </View>
+            <Text style={[styles.metricNumber, { color: '#9333EA' }]}>{todayStatus}</Text>
+            <Text style={styles.metricSub}>Daily Attendance Log</Text>
+          </View>
+
+          {/* Metric 4: Academic Progress */}
+          <TouchableOpacity
+            style={[styles.metricCard, styles.metricTeal]}
+            onPress={() => router.push('/student-module/timetable' as any)}
+            activeOpacity={0.8}
+          >
+            <View style={styles.metricTopRow}>
+              <Text style={styles.metricLabel}>Timetable</Text>
+              <GraduationCap size={16} color="#0D9488" />
+            </View>
+            <Text style={[styles.metricNumber, { color: '#0D9488' }]}>{yearSem.split('•')[0]}</Text>
+            <Text style={styles.metricSub}>View Daily Periods ›</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* 4. QUICK PORTAL SERVICES */}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>Portals & Services</Text>
+        </View>
+
+        <View style={styles.servicesGrid}>
+          <TouchableOpacity
+            style={styles.serviceTile}
+            onPress={() => router.push('/(tabs)/attendance')}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.serviceIconBox, { backgroundColor: '#EFF6FF' }]}>
+              <CheckCircle2 size={22} color="#0047BA" />
+            </View>
+            <Text style={styles.serviceTileLabel}>Attendance</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.heroActionBtnFilled}
-            onPress={() => router.push('/(tabs)/profile')}
-            activeOpacity={0.85}
+            style={styles.serviceTile}
+            onPress={() => router.push('/(tabs)/fees')}
+            activeOpacity={0.8}
           >
-            <User size={14} color="#0047BA" />
-            <Text style={styles.heroActionBtnFilledText}>Full Profile</Text>
+            <View style={[styles.serviceIconBox, { backgroundColor: '#F0FDF4' }]}>
+              <CreditCard size={22} color="#16A34A" />
+            </View>
+            <Text style={styles.serviceTileLabel}>Fee Dues</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.serviceTile}
+            onPress={() => router.push('/student-module/timetable' as any)}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.serviceIconBox, { backgroundColor: '#FFF7ED' }]}>
+              <Clock size={22} color="#EA580C" />
+            </View>
+            <Text style={styles.serviceTileLabel}>Timetable</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.serviceTile}
+            onPress={() => router.push('/student-module/transport' as any)}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.serviceIconBox, { backgroundColor: '#FAF5FF' }]}>
+              <Bus size={22} color="#9333EA" />
+            </View>
+            <Text style={styles.serviceTileLabel}>Bus (GPS)</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.serviceTile}
+            onPress={() => router.push('/student-module/calendar' as any)}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.serviceIconBox, { backgroundColor: '#EFF6FF' }]}>
+              <Calendar size={22} color="#0284C7" />
+            </View>
+            <Text style={styles.serviceTileLabel}>Calendar</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.serviceTile}
+            onPress={() => router.push('/(tabs)/announcements')}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.serviceIconBox, { backgroundColor: '#FEF2F2' }]}>
+              <Megaphone size={22} color="#DC2626" />
+            </View>
+            <Text style={styles.serviceTileLabel}>Notices</Text>
           </TouchableOpacity>
         </View>
-      </LinearGradient>
 
-      {/* 3. FOUR QUICK METRIC CARDS */}
-      <View style={styles.metricsGrid}>
-        {/* Metric 1: Attendance */}
-        <TouchableOpacity
-          style={[styles.metricCard, styles.metricBlue]}
-          onPress={() => router.push('/(tabs)/attendance')}
-          activeOpacity={0.8}
-        >
-          <View style={styles.metricTopRow}>
-            <Text style={styles.metricLabel}>Attendance</Text>
-            <CheckCircle2 size={16} color="#0047BA" />
-          </View>
-          <Text style={[styles.metricNumber, { color: '#0047BA' }]}>{attendancePercentage}%</Text>
-          <Text style={styles.metricSub}>Live Academic Status</Text>
-        </TouchableOpacity>
-
-        {/* Metric 2: Fee Dues */}
-        <TouchableOpacity
-          style={[styles.metricCard, feeDuesAmount > 0 ? styles.metricOrange : styles.metricGreen]}
-          onPress={() => router.push('/(tabs)/fees')}
-          activeOpacity={0.8}
-        >
-          <View style={styles.metricTopRow}>
-            <Text style={styles.metricLabel}>Fee Dues</Text>
-            <CreditCard size={16} color={feeDuesAmount > 0 ? '#D97706' : '#16A34A'} />
-          </View>
-          <Text
-            style={[
-              styles.metricNumber,
-              { color: feeDuesAmount > 0 ? '#B45309' : '#15803D' },
-            ]}
-          >
-            {feeDuesAmount > 0 ? `₹${feeDuesAmount.toLocaleString('en-IN')}` : 'All Clear'}
-          </Text>
-          <Text style={styles.metricSub}>{feeDuesAmount > 0 ? 'Payment Pending' : 'No Overdue Dues'}</Text>
-        </TouchableOpacity>
-
-        {/* Metric 3: Today's Class Status */}
-        <View style={[styles.metricCard, styles.metricPurple]}>
-          <View style={styles.metricTopRow}>
-            <Text style={styles.metricLabel}>Today&apos;s Status</Text>
-            <Clock size={16} color="#9333EA" />
-          </View>
-          <Text style={[styles.metricNumber, { color: '#9333EA' }]}>{todayStatus}</Text>
-          <Text style={styles.metricSub}>Daily Attendance Log</Text>
-        </View>
-
-        {/* Metric 4: Academic Progress */}
-        <TouchableOpacity
-          style={[styles.metricCard, styles.metricTeal]}
-          onPress={() => router.push('/student-module/timetable' as any)}
-          activeOpacity={0.8}
-        >
-          <View style={styles.metricTopRow}>
-            <Text style={styles.metricLabel}>Timetable</Text>
-            <GraduationCap size={16} color="#0D9488" />
-          </View>
-          <Text style={[styles.metricNumber, { color: '#0D9488' }]}>{yearSem.split('•')[0]}</Text>
-          <Text style={styles.metricSub}>View Daily Periods ›</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* 4. QUICK PORTAL SERVICES */}
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>Portals & Services</Text>
-      </View>
-
-      <View style={styles.servicesGrid}>
-        <TouchableOpacity
-          style={styles.serviceTile}
-          onPress={() => router.push('/(tabs)/attendance')}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.serviceIconBox, { backgroundColor: '#EFF6FF' }]}>
-            <CheckCircle2 size={22} color="#0047BA" />
-          </View>
-          <Text style={styles.serviceTileLabel}>Attendance</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.serviceTile}
-          onPress={() => router.push('/(tabs)/fees')}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.serviceIconBox, { backgroundColor: '#F0FDF4' }]}>
-            <CreditCard size={22} color="#16A34A" />
-          </View>
-          <Text style={styles.serviceTileLabel}>Fee Dues</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.serviceTile}
-          onPress={() => router.push('/student-module/timetable' as any)}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.serviceIconBox, { backgroundColor: '#FFF7ED' }]}>
-            <Clock size={22} color="#EA580C" />
-          </View>
-          <Text style={styles.serviceTileLabel}>Timetable</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.serviceTile}
-          onPress={() => router.push('/student-module/transport' as any)}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.serviceIconBox, { backgroundColor: '#FAF5FF' }]}>
-            <Bus size={22} color="#9333EA" />
-          </View>
-          <Text style={styles.serviceTileLabel}>Bus (GPS)</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.serviceTile}
-          onPress={() => router.push('/student-module/calendar' as any)}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.serviceIconBox, { backgroundColor: '#EFF6FF' }]}>
-            <Calendar size={22} color="#0284C7" />
-          </View>
-          <Text style={styles.serviceTileLabel}>Calendar</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.serviceTile}
-          onPress={() => router.push('/(tabs)/announcements')}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.serviceIconBox, { backgroundColor: '#FEF2F2' }]}>
-            <Megaphone size={22} color="#DC2626" />
-          </View>
-          <Text style={styles.serviceTileLabel}>Notices</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* 5. TODAY'S CLASSES */}
-      {todayClasses.length > 0 && (
-        <View style={styles.sectionWrap}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Today&apos;s Classes</Text>
-            <TouchableOpacity onPress={() => router.push('/student-module/timetable' as any)}>
-              <Text style={styles.viewAllText}>Full Schedule ›</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.classesList}>
-            {todayClasses.map((item, idx) => (
-              <View key={item.id || idx} style={styles.classCard}>
-                <View style={styles.classSlotBox}>
-                  <Text style={styles.classSlotText}>P{item.slot_order || idx + 1}</Text>
+        {/* 5. TODAY'S CLASSES */}
+        {todayClasses.length > 0 && (
+          <View style={styles.sectionWrap}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Today&apos;s Classes</Text>
+              <TouchableOpacity onPress={() => router.push('/student-module/timetable' as any)}>
+                <Text style={styles.viewAllText}>Full Schedule ›</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.classesList}>
+              {todayClasses.map((item, idx) => (
+                <View key={item.id || idx} style={styles.classCard}>
+                  <View style={styles.classSlotBox}>
+                    <Text style={styles.classSlotText}>P{item.slot_order || idx + 1}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.classSubjectTitle}>{item.subject_name || 'Academic Lecture'}</Text>
+                    <Text style={styles.classTimeText}>
+                      {item.start_time} – {item.end_time}
+                      {item.faculty_name ? ` • ${item.faculty_name}` : ''}
+                    </Text>
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.classSubjectTitle}>{item.subject_name || 'Academic Lecture'}</Text>
-                  <Text style={styles.classTimeText}>
-                    {item.start_time} – {item.end_time}
-                    {item.faculty_name ? ` • ${item.faculty_name}` : ''}
-                  </Text>
-                </View>
-              </View>
-            ))}
+              ))}
+            </View>
           </View>
-        </View>
-      )}
+        )}
 
-      {/* 6. LATEST ANNOUNCEMENTS */}
-      {announcements.length > 0 && (
-        <View style={styles.sectionWrap}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Latest Notices & Circulars</Text>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/announcements')}>
-              <Text style={styles.viewAllText}>View All ›</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.announcementsList}>
-            {announcements.slice(0, 3).map((item, idx) => (
-              <View key={item.id || idx} style={styles.announcementCard}>
-                <View style={styles.announcementIconBox}>
-                  <Megaphone size={16} color="#0047BA" />
+        {/* 6. LATEST ANNOUNCEMENTS */}
+        {announcements.length > 0 && (
+          <View style={styles.sectionWrap}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Latest Notices & Circulars</Text>
+              <TouchableOpacity onPress={() => router.push('/(tabs)/announcements')}>
+                <Text style={styles.viewAllText}>View All ›</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.announcementsList}>
+              {announcements.slice(0, 3).map((item, idx) => (
+                <View key={item.id || idx} style={styles.announcementCard}>
+                  <View style={styles.announcementIconBox}>
+                    <Megaphone size={16} color="#0047BA" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.announcementTitle} numberOfLines={2}>
+                      {item.title}
+                    </Text>
+                    <Text style={styles.announcementDate}>
+                      {item.created_at ? new Date(item.created_at).toLocaleDateString('en-IN') : 'Recent Circular'}
+                    </Text>
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.announcementTitle} numberOfLines={2}>
-                    {item.title}
-                  </Text>
-                  <Text style={styles.announcementDate}>
-                    {item.created_at ? new Date(item.created_at).toLocaleDateString('en-IN') : 'Recent Circular'}
-                  </Text>
-                </View>
-              </View>
-            ))}
+              ))}
+            </View>
           </View>
-        </View>
-      )}
+        )}
 
-      {/* Digital ID Card Modal */}
-      {showIdCardModal && (
-        <DigitalStudentIdCardModal
-          visible={showIdCardModal}
-          onClose={() => setShowIdCardModal(false)}
-          student={student}
-        />
-      )}
-    </ScrollView>
+        {/* Digital ID Card Modal */}
+        {showIdCardModal && (
+          <DigitalStudentIdCardModal
+            visible={showIdCardModal}
+            onClose={() => setShowIdCardModal(false)}
+            student={student}
+          />
+        )}
+      </ScrollView>
+    </View>
   );
 };
 
@@ -508,68 +511,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
+  scroll: {
+    flex: 1,
+  },
   scrollContent: {
     padding: 16,
     paddingBottom: 40,
     gap: 16,
-  },
-  childSwitcherBanner: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  childSwitcherTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  childSwitcherHeading: {
-    fontSize: 12.5,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  childChipsScroll: {
-    gap: 8,
-  },
-  childChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 10,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  childChipActive: {
-    backgroundColor: '#0047BA',
-    borderColor: '#0047BA',
-  },
-  childChipName: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#334155',
-  },
-  childChipNameActive: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-  },
-  childChipAdm: {
-    fontSize: 10.5,
-    color: '#64748B',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-  },
-  childChipAdmActive: {
-    color: 'rgba(255, 255, 255, 0.85)',
   },
 
   // HERO CARD

@@ -2,16 +2,19 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS, setSessionExpiryHandler } from '../config/api';
 import authService, { StudentLoginPayload, StaffLoginPayload } from '../services/authService';
-import { StudentUser, StaffUser, UserRole } from '../types';
+import parentService from '../services/parentService';
+import { StudentUser, StaffUser, ParentUser, UserRole } from '../types';
 
 interface AuthContextType {
   token: string | null;
   userType: UserRole | null;
-  user: StudentUser | StaffUser | null;
+  user: StudentUser | StaffUser | ParentUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   studentLogin: (payload: StudentLoginPayload) => Promise<void>;
   staffLogin: (payload: StaffLoginPayload) => Promise<void>;
+  parentLogin: (token: string, user: ParentUser) => Promise<void>;
+  switchChild: (studentId: number | string) => Promise<boolean>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
 }
@@ -21,7 +24,7 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [token, setToken] = useState<string | null>(null);
   const [userType, setUserType] = useState<UserRole | null>(null);
-  const [user, setUser] = useState<StudentUser | StaffUser | null>(null);
+  const [user, setUser] = useState<StudentUser | StaffUser | ParentUser | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Restore stored session on mount
@@ -103,6 +106,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const parentLogin = async (parentToken: string, parentUser: ParentUser) => {
+    setIsLoading(true);
+    try {
+      setToken(parentToken);
+      setUser(parentUser);
+      setUserType('parent');
+
+      await AsyncStorage.multiSet([
+        [STORAGE_KEYS.TOKEN, parentToken],
+        [STORAGE_KEYS.USER, JSON.stringify(parentUser)],
+        [STORAGE_KEYS.USER_TYPE, 'parent'],
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const switchChild = async (studentId: number | string): Promise<boolean> => {
+    try {
+      const res = await parentService.switchChild(studentId);
+      if (res.success && res.token && res.user) {
+        setToken(res.token);
+        setUser(res.user);
+        setUserType('parent');
+
+        await AsyncStorage.multiSet([
+          [STORAGE_KEYS.TOKEN, res.token],
+          [STORAGE_KEYS.USER, JSON.stringify(res.user)],
+          [STORAGE_KEYS.USER_TYPE, 'parent'],
+        ]);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  };
+
   const logout = async () => {
     setIsLoading(true);
     try {
@@ -143,6 +184,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         studentLogin,
         staffLogin,
+        parentLogin,
+        switchChild,
         logout,
         refreshSession,
       }}

@@ -48,10 +48,33 @@ export interface StaffUser {
   branchId?: number;
 }
 
+export interface ParentUser {
+  id: number | string;
+  studentId: number | string;
+  role: 'parent';
+  admission_number: string;
+  student_name: string;
+  name?: string;
+  parent_mobile: string;
+  student_photo?: string;
+  avatarUrl?: string;
+  college?: string;
+  college_name?: string;
+  course?: string;
+  course_name?: string;
+  branch?: string;
+  branch_name?: string;
+  current_year?: number | string;
+  current_semester?: number | string;
+  [key: string]: any;
+}
+
+export type AnyUser = StudentUser | StaffUser | ParentUser;
+
 export interface AuthSession {
   token: string;
   userType: UserRole;
-  user: StudentUser | StaffUser;
+  user: StudentUser | StaffUser | ParentUser;
 }
 
 // Attendance Types from SDMS /api/attendance/student
@@ -90,6 +113,19 @@ export interface StudentAttendanceData {
     endDate?: string;
     totals: AttendanceTotals;
     series?: AttendanceSeriesItem[];
+  };
+  daily?: {
+    records?: Array<{
+      date: string;
+      total?: number;
+      present: number;
+      absent: number;
+      notPosted?: number;
+      percentage?: number;
+      dayStatus?: string;
+      sessions?: any[];
+    }>;
+    totals?: any;
   };
 }
 

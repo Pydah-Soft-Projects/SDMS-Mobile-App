@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "5775271362",
+    "project_id": "campo-buddy",
+    "storage_bucket": "campo-buddy.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:5775271362:android:8dc5f50b85cfa8eac7625b",
+        "android_client_info": {
+          "package_name": "com.pydahsoft.campobuddy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDdKw-A6CwR4sysbfNg2LBuNKG87QgGqCk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

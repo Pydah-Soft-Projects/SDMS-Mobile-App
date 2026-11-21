@@ -93,10 +93,7 @@ const SafeClubImage: React.FC<{ club: any; style: any }> = ({ club, style }) => 
   if (!clubUrl || loadError) {
     return (
       <View style={[style, styles.clubCardImageFallback]}>
-        <Image source={fallback} style={[style, { opacity: 0.55 }]} resizeMode="cover" />
-        <View style={styles.clubFallbackOverlay}>
-          <Users size={26} color="#FFFFFF" />
-        </View>
+        <Image source={fallback} style={[styles.clubCardImage, { opacity: 0.85 }]} resizeMode="contain" />
       </View>
     );
   }
@@ -105,7 +102,7 @@ const SafeClubImage: React.FC<{ club: any; style: any }> = ({ club, style }) => 
     <Image
       source={{ uri: clubUrl }}
       style={style}
-      resizeMode="cover"
+      resizeMode="contain"
       onError={() => setLoadError(true)}
     />
   );
@@ -1660,10 +1657,13 @@ const styles = StyleSheet.create({
   },
   clubCardBanner: {
     width: '100%',
-    height: 100,
+    height: 110,
     position: 'relative',
     backgroundColor: '#0F172A',
     overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 4,
   },
   clubCardImage: {
     width: '100%',

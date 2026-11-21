@@ -1221,7 +1221,7 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
                                 : require('../../assets/campo-logo.png')
                             }
                             style={styles.cardBannerImg}
-                            resizeMode="cover"
+                            resizeMode="contain"
                           />
                         </View>
                         <View style={styles.cardHeader}>
@@ -2578,6 +2578,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     backgroundColor: '#0F172A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 4,
     marginBottom: 10,
   },
   cardBannerImg: {

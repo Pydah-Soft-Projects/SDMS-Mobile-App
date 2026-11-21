@@ -51,23 +51,68 @@ export interface InAppAlert {
   url?: string;
 }
 
-// Helper to ensure Android notification channel exists with MAX priority for background / lockscreen alerts
+// Helper to ensure Android notification channels exist with MAX priority for background / lockscreen alerts
 export const ensureAndroidNotificationChannel = async () => {
   if (Platform.OS === 'android' && Notifications?.setNotificationChannelAsync) {
     try {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'Campo Campus Updates',
-        description: 'Announcements, events, and important college notices',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#1E3A8A',
-        sound: 'default',
-        enableVibrate: true,
-        showBadge: true,
-        lockscreenVisibility: Notifications.AndroidNotificationVisibility?.PUBLIC ?? 1,
-        bypassDnd: false,
-      });
-      logger.info('NOTIFICATIONS', 'Default Android notification channel verified');
+      const channels = [
+        {
+          id: 'default',
+          name: 'Campo Campus Updates',
+          description: 'General college announcements and updates',
+        },
+        {
+          id: 'urgent',
+          name: 'Urgent Alerts & Notices',
+          description: 'Critical announcements and emergency campus circulars',
+        },
+        {
+          id: 'announcements',
+          name: 'Announcements & Circulars',
+          description: 'Official campus notices, notices, and updates',
+        },
+        {
+          id: 'events',
+          name: 'Campus Events & Workshops',
+          description: 'College fests, club activities, and workshops',
+        },
+        {
+          id: 'attendance',
+          name: 'Attendance Alerts',
+          description: 'Daily attendance logs and shortage alerts',
+        },
+        {
+          id: 'fees',
+          name: 'Fee & Payment Updates',
+          description: 'Fee dues, receipts, and payment deadlines',
+        },
+        {
+          id: 'exams',
+          name: 'Examinations & Results',
+          description: 'Exam schedules, hall tickets, and test results',
+        },
+        {
+          id: 'assignments',
+          name: 'Assignments & Academics',
+          description: 'Class assignments, submissions, and syllabus',
+        },
+      ];
+
+      for (const ch of channels) {
+        await Notifications.setNotificationChannelAsync(ch.id, {
+          name: ch.name,
+          description: ch.description,
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#1E3A8A',
+          sound: 'default',
+          enableVibrate: true,
+          showBadge: true,
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility?.PUBLIC ?? 1,
+          bypassDnd: false,
+        });
+      }
+      logger.info('NOTIFICATIONS', 'All 8 Android notification channels verified');
     } catch (e: any) {
       logger.warn('NOTIFICATIONS', 'Android notification channel init failed', e?.message);
     }

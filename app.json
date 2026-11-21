@@ -14,14 +14,15 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.pydahsoft.studentapp"
+      "bundleIdentifier": "com.pydahsoft.campobuddy"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
-      "package": "com.pydahsoft.studentapp",
+      "package": "com.pydahsoft.campobuddy",
+      "googleServicesFile": "./google-services.json",
       "usesCleartextTraffic": true,
       "permissions": [
         "RECEIVE_BOOT_COMPLETED",

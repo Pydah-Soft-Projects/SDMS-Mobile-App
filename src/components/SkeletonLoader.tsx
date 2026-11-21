@@ -174,53 +174,76 @@ export const DashboardSkeleton: React.FC<DashboardSkeletonProps> = ({
 /* ── 3. Attendance Page Skeleton (Matches app/(tabs)/attendance.tsx) ─── */
 export const AttendanceSkeleton: React.FC = () => {
   return (
-    <ScrollView style={styles.fullWidth} contentContainerStyle={styles.pageContainer} showsVerticalScrollIndicator={false} scrollEnabled={false}>
-      {/* Overview Percentage Card */}
-      <View style={styles.cardContainer}>
-        <View style={styles.cardHeaderRow}>
-          <View style={styles.flex1}>
-            <SkeletonBox width="55%" height={17} borderRadius={6} style={styles.mb6} />
-            <SkeletonBox width="40%" height={12} borderRadius={4} />
-          </View>
-          <SkeletonBox width={70} height={24} borderRadius={12} />
-        </View>
-
-        <View style={styles.attendanceCircleRow}>
-          <SkeletonBox width={100} height={100} borderRadius={50} />
-          <View style={styles.attendanceStatsCol}>
-            <View style={styles.statLine}>
-              <SkeletonBox width={70} height={12} borderRadius={4} />
-              <SkeletonBox width={36} height={14} borderRadius={4} />
-            </View>
-            <View style={styles.statLine}>
-              <SkeletonBox width={70} height={12} borderRadius={4} />
-              <SkeletonBox width={36} height={14} borderRadius={4} />
-            </View>
-            <View style={styles.statLine}>
-              <SkeletonBox width={70} height={12} borderRadius={4} />
-              <SkeletonBox width={36} height={14} borderRadius={4} />
-            </View>
-          </View>
-        </View>
+    <ScrollView
+      style={styles.fullWidth}
+      contentContainerStyle={[styles.pageContainer, { paddingHorizontal: 16 }]}
+      showsVerticalScrollIndicator={false}
+      scrollEnabled={false}
+    >
+      {/* 1. Range Filter Tabs: Semester | This Month | This Week */}
+      <View style={styles.attFilterRowSkeleton}>
+        <SkeletonBox width="31%" height={40} borderRadius={12} />
+        <SkeletonBox width="31%" height={40} borderRadius={12} />
+        <SkeletonBox width="31%" height={40} borderRadius={12} />
       </View>
 
-      {/* Daily Breakdown / Periods Header */}
-      <View style={styles.sectionHeaderRow}>
-        <SkeletonBox width={130} height={16} borderRadius={6} />
-        <SkeletonBox width={80} height={14} borderRadius={6} />
+      {/* 2. 4 Metric Cards Row */}
+      <View style={styles.attMetricsRowSkeleton}>
+        <SkeletonBox width="23%" height={82} borderRadius={16} />
+        <SkeletonBox width="23%" height={82} borderRadius={16} />
+        <SkeletonBox width="23%" height={82} borderRadius={16} />
+        <SkeletonBox width="23%" height={82} borderRadius={16} />
       </View>
 
-      {/* Period Cards */}
-      {[1, 2, 3, 4].map((idx) => (
-        <View key={`att_item_${idx}`} style={styles.periodCardSkeleton}>
-          <View style={styles.flex1}>
-            <SkeletonBox width="65%" height={15} borderRadius={6} style={styles.mb6} />
-            <SkeletonBox width="45%" height={12} borderRadius={4} style={styles.mb4} />
-            <SkeletonBox width="30%" height={10} borderRadius={4} />
-          </View>
-          <SkeletonBox width={65} height={26} borderRadius={13} />
+      {/* 3. Monthly Calendar Card */}
+      <View style={styles.attCalendarCardSkeleton}>
+        {/* Navigation Header */}
+        <View style={styles.attCalHeaderSkeleton}>
+          <SkeletonBox width={30} height={30} borderRadius={10} />
+          <SkeletonBox width={130} height={22} borderRadius={6} />
+          <SkeletonBox width={30} height={30} borderRadius={10} />
         </View>
-      ))}
+
+        {/* Weekdays Row: Sun Mon Tue Wed Thu Fri Sat */}
+        <View style={styles.attWeekdaysRowSkeleton}>
+          {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+            <SkeletonBox key={`wd_${i}`} width={28} height={12} borderRadius={4} />
+          ))}
+        </View>
+
+        {/* 5 Rows of Calendar Days Grid */}
+        {[1, 2, 3, 4, 5].map((row) => (
+          <View key={`cal_row_${row}`} style={styles.attCalGridRowSkeleton}>
+            {[1, 2, 3, 4, 5, 6, 7].map((col) => (
+              <SkeletonBox
+                key={`cal_day_${row}_${col}`}
+                width={34}
+                height={34}
+                borderRadius={17}
+              />
+            ))}
+          </View>
+        ))}
+      </View>
+
+      {/* 4. Attendance Insights Banner */}
+      <View style={styles.attInsightsCardSkeleton}>
+        <View style={styles.attInsightsLeftSkeleton}>
+          <SkeletonBox width={38} height={38} borderRadius={12} />
+          <View style={{ gap: 6, flex: 1 }}>
+            <SkeletonBox width={140} height={16} borderRadius={6} />
+            <SkeletonBox width={95} height={12} borderRadius={4} />
+          </View>
+        </View>
+        <SkeletonBox width={34} height={34} borderRadius={17} />
+      </View>
+
+      {/* 5. Status Legend Row */}
+      <View style={styles.attLegendRowSkeleton}>
+        <SkeletonBox width={70} height={16} borderRadius={8} />
+        <SkeletonBox width={70} height={16} borderRadius={8} />
+        <SkeletonBox width={70} height={16} borderRadius={8} />
+      </View>
     </ScrollView>
   );
 };
@@ -309,33 +332,63 @@ export const AnnouncementsSkeleton: React.FC = () => {
 /* ── 6. Profile Page Skeleton (Matches app/(tabs)/profile.tsx) ────────── */
 export const ProfileSkeleton: React.FC = () => {
   return (
-    <ScrollView style={styles.fullWidth} contentContainerStyle={styles.pageContainer} showsVerticalScrollIndicator={false} scrollEnabled={false}>
-      {/* Hero Profile Card */}
-      <View style={styles.profileHeroCard}>
-        <SkeletonBox width={76} height={76} borderRadius={38} style={styles.mb12} />
-        <SkeletonBox width="50%" height={20} borderRadius={6} style={styles.mb6} />
-        <SkeletonBox width="35%" height={13} borderRadius={4} style={styles.mb12} />
-        <SkeletonBox width={110} height={24} borderRadius={12} />
+    <ScrollView
+      style={styles.fullWidth}
+      contentContainerStyle={[styles.pageContainer, { paddingHorizontal: 14 }]}
+      showsVerticalScrollIndicator={false}
+      scrollEnabled={false}
+    >
+      {/* 1. Hero Blue Banner Card */}
+      <View style={styles.profileHeroCardSkeleton}>
+        <View style={styles.profileHeroTopRow}>
+          <SkeletonBox width={84} height={84} borderRadius={42} />
+          <View style={{ flex: 1, gap: 8 }}>
+            <SkeletonBox width="80%" height={22} borderRadius={6} />
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              <SkeletonBox width={82} height={22} borderRadius={11} />
+              <SkeletonBox width={92} height={22} borderRadius={11} />
+            </View>
+          </View>
+        </View>
       </View>
 
-      {/* Academic Details Card */}
-      <View style={styles.cardContainer}>
-        <SkeletonBox width={140} height={16} borderRadius={6} style={styles.mb12} />
-        {[1, 2, 3, 4, 5].map((row) => (
-          <View key={`prof_acad_${row}`} style={styles.profileRow}>
-            <SkeletonBox width="35%" height={13} borderRadius={4} />
-            <SkeletonBox width="45%" height={13} borderRadius={4} />
+      {/* 2. Overlapping Academic Card */}
+      <View style={styles.profileAcademicCardSkeleton}>
+        {[1, 2, 3].map((row) => (
+          <View key={`acad_skel_${row}`} style={styles.profileAcademicRowSkeleton}>
+            <SkeletonBox width={20} height={20} borderRadius={6} />
+            <SkeletonBox width="72%" height={15} borderRadius={4} />
           </View>
         ))}
       </View>
 
-      {/* Personal Info Card */}
-      <View style={styles.cardContainer}>
-        <SkeletonBox width={150} height={16} borderRadius={6} style={styles.mb12} />
-        {[1, 2, 3, 4].map((row) => (
-          <View key={`prof_pers_${row}`} style={styles.profileRow}>
-            <SkeletonBox width="30%" height={13} borderRadius={4} />
-            <SkeletonBox width="50%" height={13} borderRadius={4} />
+      {/* 3. Action Buttons Row */}
+      <View style={styles.profileActionsRowSkeleton}>
+        <SkeletonBox width="31%" height={44} borderRadius={12} />
+        <SkeletonBox width="31%" height={44} borderRadius={12} />
+        <SkeletonBox width="31%" height={44} borderRadius={12} />
+      </View>
+
+      {/* 4. Segmented Tab Bar */}
+      <View style={styles.profileTabBarSkeleton}>
+        <SkeletonBox width="31%" height={36} borderRadius={18} />
+        <SkeletonBox width="31%" height={36} borderRadius={18} />
+        <SkeletonBox width="31%" height={36} borderRadius={18} />
+      </View>
+
+      {/* 5. Details Card */}
+      <View style={styles.profileDetailsCardSkeleton}>
+        <View style={styles.profileDetailsHeaderSkeleton}>
+          <SkeletonBox width={32} height={32} borderRadius={10} />
+          <SkeletonBox width={120} height={18} borderRadius={6} />
+        </View>
+        {[1, 2, 3, 4, 5].map((row) => (
+          <View key={`detail_skel_${row}`} style={styles.profileDetailRowSkeleton}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+              <SkeletonBox width={18} height={18} borderRadius={5} />
+              <SkeletonBox width="45%" height={14} borderRadius={4} />
+            </View>
+            <SkeletonBox width="35%" height={14} borderRadius={4} />
           </View>
         ))}
       </View>
@@ -667,6 +720,148 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
+  },
+
+  /* Attendance New Skeletons */
+  attFilterRowSkeleton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+    marginTop: 2,
+  },
+  attMetricsRowSkeleton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  attCalendarCardSkeleton: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 14,
+    gap: 12,
+  },
+  attCalHeaderSkeleton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    marginBottom: 4,
+  },
+  attWeekdaysRowSkeleton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 6,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  attCalGridRowSkeleton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  attInsightsCardSkeleton: {
+    backgroundColor: '#EFF6FF',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  attInsightsLeftSkeleton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  attLegendRowSkeleton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 20,
+    paddingVertical: 8,
+  },
+
+  /* Profile New Skeletons */
+  profileHeroCardSkeleton: {
+    backgroundColor: '#0047BA',
+    borderRadius: 24,
+    paddingTop: 18,
+    paddingHorizontal: 16,
+    paddingBottom: 42,
+    marginBottom: 0,
+  },
+  profileHeroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  profileAcademicCardSkeleton: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginTop: -28,
+    marginHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 10,
+    zIndex: 10,
+  },
+  profileAcademicRowSkeleton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 8,
+  },
+  profileActionsRowSkeleton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 14,
+    marginBottom: 14,
+  },
+  profileTabBarSkeleton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 30,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 14,
+  },
+  profileDetailsCardSkeleton: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 16,
+    marginBottom: 16,
+    gap: 10,
+  },
+  profileDetailsHeaderSkeleton: {
+    backgroundColor: '#EFF6FF',
+    borderRadius: 14,
+    padding: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 6,
+  },
+  profileDetailRowSkeleton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
 
   /* Profile Hero */

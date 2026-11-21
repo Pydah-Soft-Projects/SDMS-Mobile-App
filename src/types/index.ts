@@ -91,6 +91,19 @@ export interface StudentAttendanceData {
     totals: AttendanceTotals;
     series?: AttendanceSeriesItem[];
   };
+  daily?: {
+    records?: Array<{
+      date: string;
+      total?: number;
+      present: number;
+      absent: number;
+      notPosted?: number;
+      percentage?: number;
+      dayStatus?: string;
+      sessions?: any[];
+    }>;
+    totals?: any;
+  };
 }
 
 // Fee Types from SDMS /api/fees/students/:admissionNumber/details

@@ -176,6 +176,7 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { userType } = useAuth();
   const isStaff = userType === 'staff' || userType === 'admin';
+  const isStudent = userType === 'student';
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
@@ -219,7 +220,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="announcements"
         options={{
-          title: 'Notifications',
+          title: isStudent ? 'Events' : 'Notifications',
         }}
       />
       <Tabs.Screen

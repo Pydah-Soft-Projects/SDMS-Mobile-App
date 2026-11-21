@@ -4,7 +4,7 @@
     "slug": "pydah-student-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/campo-icon.png",
+    "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/campo-icon.png",
       "resizeMode": "contain",

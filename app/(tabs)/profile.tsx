@@ -58,9 +58,11 @@ export default function ProfileScreen() {
   const { user, userType, logout } = useAuth();
   const student = user as any;
 
+  const isParent = userType === 'parent';
   const isStudent =
     userType === 'student' ||
-    (!userType && !student?.role?.includes('admin') && !student?.role?.includes('staff'));
+    (!userType && !student?.role?.includes('admin') && !student?.role?.includes('staff') && !isParent);
+  const showStudentDetails = isStudent || isParent;
 
   const admissionNo =
     student?.admission_number || student?.admission_no || student?.username || '';
@@ -104,10 +106,59 @@ export default function ProfileScreen() {
     }
     try {
       if (userType === 'parent') {
-        const parentProfile = await parentService.getProfile();
-        if (parentProfile) {
-          setStudentData(parentProfile);
+        // In parent login, concurrently query parent profile, dashboard summary, children list, and student record
+        const [profileRes, summaryRes, childrenRes, studentRes] = await Promise.allSettled([
+          parentService.getProfile(),
+          parentService.getDashboardSummary(),
+          parentService.getChildren(),
+          admissionNo ? api.get(`/students/${encodeURIComponent(admissionNo)}`) : Promise.resolve(null),
+        ]);
+
+        let merged: any = { ...(user || {}) };
+
+        // 1. Merge matched child from getChildren
+        if (childrenRes.status === 'fulfilled' && Array.isArray(childrenRes.value)) {
+          const matchedChild = childrenRes.value.find(
+            (c: any) =>
+              c.admission_number === admissionNo ||
+              c.pin_no === (user as any)?.pin_no ||
+              String(c.id) === String((user as any)?.studentId)
+          );
+          if (matchedChild) {
+            merged = { ...merged, ...matchedChild };
+          }
         }
+
+        // 2. Merge student from dashboard summary
+        if (summaryRes.status === 'fulfilled' && summaryRes.value) {
+          const s = summaryRes.value.student || summaryRes.value;
+          if (s && typeof s === 'object') {
+            merged = { ...merged, ...s };
+          }
+        }
+
+        // 3. Merge from getProfile (unwrapping nested student / ward / data if present)
+        if (profileRes.status === 'fulfilled' && profileRes.value) {
+          const p = profileRes.value;
+          if (p && typeof p === 'object') {
+            const studentInside = p.student || p.ward || p.data;
+            if (studentInside && typeof studentInside === 'object') {
+              merged = { ...merged, ...p, ...studentInside };
+            } else {
+              merged = { ...merged, ...p };
+            }
+          }
+        }
+
+        // 4. Merge full database record from /students/:admissionNo (if accessible with parent token)
+        if (studentRes.status === 'fulfilled' && studentRes.value?.data) {
+          const sData = studentRes.value.data?.data || studentRes.value.data?.student || studentRes.value.data;
+          if (sData && typeof sData === 'object') {
+            merged = { ...merged, ...sData };
+          }
+        }
+
+        setStudentData(merged);
       } else {
         const res = await api.get(`/students/${encodeURIComponent(admissionNo)}`);
         if (res.data?.success && res.data.data) {
@@ -119,7 +170,7 @@ export default function ProfileScreen() {
     } catch {
       // Keep existing data or user fallback
     }
-  }, [admissionNo, userType]);
+  }, [admissionNo, userType, user]);
 
   const fetchStudentRequests = useCallback(async () => {
     if (!isStudent) return;
@@ -158,7 +209,11 @@ export default function ProfileScreen() {
   const getStudentData = useCallback(
     (key: string, fallback = '—') => {
       if (!displayData) return fallback;
-      let parsed = displayData.student_data;
+      let parsed =
+        displayData.student_data ||
+        (displayData as any)?.student?.student_data ||
+        (displayData as any)?.ward?.student_data ||
+        (displayData as any)?.parsedData;
       if (typeof parsed === 'string') {
         try {
           parsed = JSON.parse(parsed);
@@ -219,6 +274,189 @@ export default function ProfileScreen() {
     courseVal && branchVal && courseVal !== branchVal
       ? `${courseVal} - ${branchVal}`
       : courseVal || branchVal || '—';
+
+  // Helper to extract non-empty, clean string value
+  const getVal = (val: any) => {
+    if (val === undefined || val === null) return '';
+    const s = String(val).trim();
+    if (
+      s === '' ||
+      s === '—' ||
+      s === '-' ||
+      s.toLowerCase() === 'n/a' ||
+      s.toLowerCase() === 'null' ||
+      s.toLowerCase() === 'undefined'
+    ) {
+      return '';
+    }
+    return s;
+  };
+
+  // Student Mobile
+  const studentMobile =
+    getVal(displayData.student_mobile) ||
+    getVal(displayData.studentMobile) ||
+    getVal(displayData.mobile) ||
+    getVal(displayData.phone) ||
+    getVal(student?.mobile) ||
+    getVal(getStudentData('Student Mobile', '')) ||
+    getVal(getStudentData('Student Mobile number', '')) ||
+    getVal(getStudentData('Student Mobile No', '')) ||
+    getVal(getStudentData('Mobile', '')) ||
+    getVal(getStudentData('Mobile Number', '')) ||
+    '';
+
+  // Father Name
+  const fatherName =
+    getVal(displayData.father_name) ||
+    getVal(displayData.fatherName) ||
+    getVal(displayData.father) ||
+    getVal(displayData.father_name_english) ||
+    getVal(displayData.guardian_name) ||
+    getVal(displayData.parent_name) ||
+    getVal(getStudentData('Father Name', '')) ||
+    getVal(getStudentData("Father's Name", '')) ||
+    getVal(getStudentData('Father', '')) ||
+    getVal(getStudentData('FATHER NAME', '')) ||
+    getVal(getStudentData('Father_Name', '')) ||
+    getVal(getStudentData('Guardian Name', '')) ||
+    getVal(getStudentData('Parent Name', '')) ||
+    getVal((user as any)?.father_name) ||
+    getVal((user as any)?.fatherName) ||
+    '-';
+
+  // Father Mobile / Number
+  const rawFatherMobile =
+    getVal(displayData.father_mobile) ||
+    getVal(displayData.fatherMobile) ||
+    getVal(displayData.father_phone) ||
+    getVal(displayData.fatherPhone) ||
+    getVal(displayData.father_number) ||
+    getVal(displayData.fatherNumber) ||
+    getVal(displayData.father_contact) ||
+    getVal(displayData.parent_mobile) ||
+    getVal(displayData.parentMobile) ||
+    getVal(displayData.parent_mobile1) ||
+    getVal(displayData.parent_phone) ||
+    getVal(displayData.guardian_mobile) ||
+    getVal((user as any)?.parent_mobile) ||
+    getVal((user as any)?.mobileNumber) ||
+    getVal((user as any)?.mobile) ||
+    getVal((user as any)?.phone) ||
+    getVal(getStudentData('Father Mobile', '')) ||
+    getVal(getStudentData('Father Mobile number', '')) ||
+    getVal(getStudentData('Father Mobile No', '')) ||
+    getVal(getStudentData("Father's Mobile", '')) ||
+    getVal(getStudentData("Father's Mobile number", '')) ||
+    getVal(getStudentData("Father's Mobile No", '')) ||
+    getVal(getStudentData('Father Phone', '')) ||
+    getVal(getStudentData('Father Number', '')) ||
+    getVal(getStudentData('Father Contact', '')) ||
+    getVal(getStudentData('Parent Mobile', '')) ||
+    getVal(getStudentData('Parent Mobile Number', '')) ||
+    getVal(getStudentData('Parent Mobile Number 1', '')) ||
+    getVal(getStudentData('Parent Mobile 1', '')) ||
+    getVal(getStudentData('Parent Phone', '')) ||
+    getVal(getStudentData('Guardian Mobile', '')) ||
+    '';
+
+  const fatherMobile = rawFatherMobile || '-';
+
+  // Mother Name
+  const motherName =
+    getVal(displayData.mother_name) ||
+    getVal(displayData.motherName) ||
+    getVal(displayData.mother) ||
+    getVal(displayData.mother_name_english) ||
+    getVal(getStudentData('Mother Name', '')) ||
+    getVal(getStudentData("Mother's Name", '')) ||
+    getVal(getStudentData('Mother', '')) ||
+    getVal(getStudentData('MOTHER NAME', '')) ||
+    getVal(getStudentData('Mother_Name', '')) ||
+    getVal((user as any)?.mother_name) ||
+    getVal((user as any)?.motherName) ||
+    '-';
+
+  // Mother Mobile / Number
+  const rawMotherMobile =
+    getVal(displayData.mother_mobile) ||
+    getVal(displayData.motherMobile) ||
+    getVal(displayData.mother_phone) ||
+    getVal(displayData.motherPhone) ||
+    getVal(displayData.mother_number) ||
+    getVal(displayData.motherNumber) ||
+    getVal(displayData.mother_contact) ||
+    getVal(displayData.parent_mobile2) ||
+    getVal(displayData.parentMobile2) ||
+    getVal(getStudentData('Mother Mobile', '')) ||
+    getVal(getStudentData('Mother Mobile number', '')) ||
+    getVal(getStudentData('Mother Mobile No', '')) ||
+    getVal(getStudentData("Mother's Mobile", '')) ||
+    getVal(getStudentData("Mother's Mobile number", '')) ||
+    getVal(getStudentData("Mother's Mobile No", '')) ||
+    getVal(getStudentData('Mother Phone', '')) ||
+    getVal(getStudentData('Mother Number', '')) ||
+    getVal(getStudentData('Mother Contact', '')) ||
+    getVal(getStudentData('Parent Mobile 2', '')) ||
+    getVal(getStudentData('Parent Mobile Number 2', '')) ||
+    getVal((user as any)?.mother_mobile) ||
+    '';
+
+  const motherMobile = rawMotherMobile || '-';
+
+  // Preferred Mobile
+  const rawPreferred =
+    getVal(displayData.preferred_mobile) ||
+    getVal(displayData.preferredMobile) ||
+    getVal(displayData.preferred_phone) ||
+    getVal(getStudentData('Preferred Mobile', '')) ||
+    getVal(getStudentData('Preferred Mobile Number', '')) ||
+    getVal(getStudentData('Preferred Mobile No', '')) ||
+    getVal(getStudentData('Preferred Phone', '')) ||
+    getVal(getStudentData('Preferred Number', '')) ||
+    getVal(getStudentData('Preferred Contact', '')) ||
+    '';
+
+  let preferredType = 'Father Number';
+  let preferredLabel = 'Father Number';
+  let preferredValue = fatherMobile !== '-' ? fatherMobile : studentMobile || '-';
+
+  if (rawPreferred) {
+    const rawLower = String(rawPreferred).toLowerCase();
+    if (rawLower.includes('father')) {
+      preferredType = 'Father Number';
+      preferredLabel = 'Father Number';
+      preferredValue = fatherMobile !== '-' ? fatherMobile : rawPreferred;
+    } else if (rawLower.includes('mother')) {
+      preferredType = 'Mother Number';
+      preferredLabel = 'Mother Number';
+      preferredValue = motherMobile !== '-' ? motherMobile : rawPreferred;
+    } else if (rawLower.includes('student') || rawLower.includes('same')) {
+      preferredType = 'Same as Student';
+      preferredLabel = 'Student Number';
+      preferredValue = studentMobile || fatherMobile;
+    } else if (studentMobile && rawPreferred === studentMobile) {
+      preferredType = 'Same as Student';
+      preferredLabel = 'Student Number';
+      preferredValue = studentMobile;
+    } else if (rawMotherMobile && rawPreferred === rawMotherMobile) {
+      preferredType = 'Mother Number';
+      preferredLabel = 'Mother Number';
+      preferredValue = rawMotherMobile;
+    } else if (rawFatherMobile && rawPreferred === rawFatherMobile) {
+      preferredType = 'Father Number';
+      preferredLabel = 'Father Number';
+      preferredValue = rawFatherMobile;
+    } else {
+      preferredType = rawPreferred.length > 10 ? 'Father Number' : rawPreferred;
+      preferredLabel = 'Father Number';
+      preferredValue = rawFatherMobile || rawPreferred;
+    }
+  } else if (!rawFatherMobile && studentMobile) {
+    preferredType = 'Same as Student';
+    preferredLabel = 'Student Number';
+    preferredValue = studentMobile;
+  }
 
   // Open Edit Profile modal with pre-populated current values
   const handleOpenEditModal = () => {
@@ -467,30 +705,84 @@ export default function ProfileScreen() {
             </View>
           </LinearGradient>
 
-          {/* Floating Academic Info Subcard (Overlapping the bottom edge of blue card) */}
-          <View style={styles.academicFloatingCard}>
-            <View style={styles.academicRow}>
-              <Building2 size={17} color="#0052CC" />
-              <Text style={styles.academicRowText} numberOfLines={1}>
-                {displayData.college || getStudentData('College') || '—'}
-              </Text>
-            </View>
+          {/* Subcard (Overlapping the bottom edge of blue card): Parent Details in Parent Login, Academic Subcard for others */}
+          {isParent ? (
+            <View style={styles.parentDetailsCard}>
+              <View style={styles.parentDetailsHeader}>
+                <Users size={20} color="#0047BA" />
+                <Text style={styles.parentDetailsTitle}>Parent Details</Text>
+              </View>
 
-            <View style={styles.academicRow}>
-              <GraduationCap size={17} color="#1E293B" />
-              <Text style={styles.academicRowText} numberOfLines={1}>
-                {courseBranch}
-              </Text>
-            </View>
+              <View style={styles.parentGridRow}>
+                <View style={styles.parentGridCol}>
+                  <Text style={styles.parentGridLabel}>Father Name</Text>
+                  <Text style={styles.parentGridValue} numberOfLines={1}>
+                    {fatherName}
+                  </Text>
+                </View>
+                <View style={styles.parentGridCol}>
+                  <Text style={styles.parentGridLabel}>Father Mobile</Text>
+                  <Text style={styles.parentGridValue} numberOfLines={1}>
+                    {fatherMobile}
+                  </Text>
+                </View>
+              </View>
 
-            <View style={[styles.academicRow, { borderBottomWidth: 0 }]}>
-              <Calendar size={17} color="#EA580C" />
-              <Text style={styles.academicRowText} numberOfLines={1}>
-                Year {displayData.current_year || getStudentData('Year') || '—'} / Sem{' '}
-                {displayData.current_semester || getStudentData('Semister') || '—'}
-              </Text>
+              <View style={styles.parentGridRow}>
+                <View style={styles.parentGridCol}>
+                  <Text style={styles.parentGridLabel}>Mother Name</Text>
+                  <Text style={styles.parentGridValue} numberOfLines={1}>
+                    {motherName}
+                  </Text>
+                </View>
+                <View style={styles.parentGridCol}>
+                  <Text style={styles.parentGridLabel}>Mother Mobile</Text>
+                  <Text style={styles.parentGridValue} numberOfLines={1}>
+                    {motherMobile}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={[styles.parentGridRow, { marginBottom: 4 }]}>
+                <View style={styles.parentGridCol}>
+                  <Text style={styles.parentGridLabel}>Preferred Mobile</Text>
+                  <Text style={styles.parentGridValue} numberOfLines={1}>
+                    {preferredType}
+                  </Text>
+                </View>
+                <View style={styles.parentGridCol}>
+                  <Text style={styles.parentGridLabel}>{preferredLabel}</Text>
+                  <Text style={styles.parentGridValue} numberOfLines={1}>
+                    {preferredValue}
+                  </Text>
+                </View>
+              </View>
             </View>
-          </View>
+          ) : (
+            <View style={styles.academicFloatingCard}>
+              <View style={styles.academicRow}>
+                <Building2 size={17} color="#0052CC" />
+                <Text style={styles.academicRowText} numberOfLines={1}>
+                  {displayData.college || getStudentData('College') || '—'}
+                </Text>
+              </View>
+
+              <View style={styles.academicRow}>
+                <GraduationCap size={17} color="#1E293B" />
+                <Text style={styles.academicRowText} numberOfLines={1}>
+                  {courseBranch}
+                </Text>
+              </View>
+
+              <View style={[styles.academicRow, { borderBottomWidth: 0 }]}>
+                <Calendar size={17} color="#EA580C" />
+                <Text style={styles.academicRowText} numberOfLines={1}>
+                  Year {displayData.current_year || getStudentData('Year') || '—'} / Sem{' '}
+                  {displayData.current_semester || getStudentData('Semister') || '—'}
+                </Text>
+              </View>
+            </View>
+          )}
 
           {/* 2. ACTION BUTTONS ROW: Edit Profile, Password & ID Card */}
           <View style={styles.actionButtonsRow}>
@@ -523,7 +815,7 @@ export default function ProfileScreen() {
               </Text>
             </TouchableOpacity>
 
-            {isStudent && (
+            {(isStudent || isParent) && (
               <TouchableOpacity
                 style={[styles.actionBtn, styles.actionBtnOrange]}
                 onPress={() => setShowIdCardModal(true)}
@@ -616,7 +908,7 @@ export default function ProfileScreen() {
           )}
 
           {/* 3. SEGMENTED TABS PILL BAR: Personal | Contact | Academic */}
-          {isStudent && (
+          {showStudentDetails && (
             <View style={styles.tabBarContainer}>
               <TouchableOpacity
                 style={[styles.tabBtn, activeTab === 'personal' && styles.tabBtnActive]}
@@ -666,7 +958,7 @@ export default function ProfileScreen() {
           )}
 
           {/* 4. DETAILS CARD WITH ICON ROWS (Matching exact image alignment) */}
-          {isStudent ? (
+          {showStudentDetails ? (
             <View style={styles.detailsCard}>
               {/* Card Header with Icon Box */}
               <View style={styles.detailsCardHeader}>
@@ -688,7 +980,7 @@ export default function ProfileScreen() {
                   <DetailRow
                     icon={User}
                     label="Father Name"
-                    value={displayData.father_name || getStudentData('Father Name') || getStudentData('Father')}
+                    value={fatherName !== '-' ? fatherName : (displayData.father_name || getStudentData('Father Name') || getStudentData('Father'))}
                   />
                   <DetailRow
                     icon={UserCheck}
@@ -710,11 +1002,11 @@ export default function ProfileScreen() {
                     label="Aadhar Number"
                     value={displayData.adhar_no || displayData.aadhar_number || getStudentData('Adhar No') || getStudentData('Aadhar Number') || getStudentData('Aadhar')}
                   />
-                  {(displayData.mother_name || getStudentData('Mother Name')) && (
+                  {(motherName !== '-' || displayData.mother_name || getStudentData('Mother Name')) && (
                     <DetailRow
                       icon={Heart}
                       label="Mother Name"
-                      value={displayData.mother_name || getStudentData('Mother Name')}
+                      value={motherName !== '-' ? motherName : (displayData.mother_name || getStudentData('Mother Name'))}
                     />
                   )}
                   {(displayData.blood_group || getStudentData('Blood Group')) && (
@@ -734,7 +1026,7 @@ export default function ProfileScreen() {
                   <DetailRow
                     icon={Phone}
                     label="Student Mobile"
-                    value={displayData.student_mobile || displayData.mobile || student?.mobile || getStudentData('Student Mobile') || getStudentData('Student Mobile number')}
+                    value={studentMobile || displayData.student_mobile || displayData.mobile || student?.mobile || getStudentData('Student Mobile') || getStudentData('Student Mobile number')}
                   />
                   <DetailRow
                     icon={Mail}
@@ -744,13 +1036,13 @@ export default function ProfileScreen() {
                   <DetailRow
                     icon={PhoneCall}
                     label="Parent Mobile 1"
-                    value={displayData.parent_mobile || displayData.parent_mobile1 || getStudentData('Parent Mobile') || getStudentData('Parent Mobile Number 1') || getStudentData('Father Mobile')}
+                    value={fatherMobile !== '-' ? fatherMobile : (displayData.parent_mobile || displayData.parent_mobile1 || getStudentData('Parent Mobile') || getStudentData('Parent Mobile Number 1') || getStudentData('Father Mobile'))}
                   />
-                  {(displayData.parent_mobile2 || getStudentData('Parent Mobile Number 2')) && (
+                  {(motherMobile !== '-' || displayData.parent_mobile2 || getStudentData('Parent Mobile Number 2')) && (
                     <DetailRow
                       icon={PhoneCall}
                       label="Parent Mobile 2"
-                      value={displayData.parent_mobile2 || getStudentData('Parent Mobile Number 2')}
+                      value={motherMobile !== '-' ? motherMobile : (displayData.parent_mobile2 || getStudentData('Parent Mobile Number 2'))}
                     />
                   )}
                   <DetailRow
@@ -1089,11 +1381,17 @@ export default function ProfileScreen() {
       </Modal>
 
       {/* Digital Student ID Card Modal */}
-      {isStudent && (
+      {(isStudent || isParent) && (
         <DigitalStudentIdCardModal
           visible={showIdCardModal}
           onClose={() => setShowIdCardModal(false)}
-          student={displayData}
+          student={{
+            ...displayData,
+            father_name: fatherName !== '-' ? fatherName : displayData.father_name,
+            parent_mobile1: fatherMobile !== '-' ? fatherMobile : displayData.parent_mobile1,
+            parent_mobile: fatherMobile !== '-' ? fatherMobile : displayData.parent_mobile,
+            student_mobile: studentMobile || displayData.student_mobile,
+          }}
           getStudentData={getStudentData}
         />
       )}
@@ -1244,6 +1542,60 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#0047BA',
     letterSpacing: 0.2,
+  },
+  // Floating Parent Details Subcard (Replacing academicFloatingCard in Parent Login)
+  parentDetailsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 16,
+    marginTop: -28,
+    marginHorizontal: 10,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    zIndex: 10,
+  },
+  parentDetailsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingBottom: 12,
+    marginBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  parentDetailsTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.2,
+  },
+  parentGridRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  parentGridCol: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  parentGridLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#475569',
+    marginBottom: 4,
+  },
+  parentGridValue: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.2,
   },
   // Floating Academic Subcard (Overlapping bottom edge of blue hero card)
   academicFloatingCard: {

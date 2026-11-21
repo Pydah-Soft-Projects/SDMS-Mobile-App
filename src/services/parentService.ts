@@ -61,10 +61,10 @@ export const parentService = {
   async getProfile(): Promise<any> {
     try {
       const res = await api.get('/parent/profile');
-      if (res.data?.success) {
+      if (res.data?.success && res.data.data) {
         return res.data.data;
       }
-      return null;
+      return res.data?.data || res.data?.student || res.data || null;
     } catch (err: any) {
       logger.warn('PARENT_SERVICE', `getProfile error: ${err.message}`);
       return null;

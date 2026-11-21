@@ -15,12 +15,14 @@ import { useAuth } from '../context/AuthContext';
 import notificationService from '../services/notificationService';
 import { getStaticFileUrl } from '../config/api';
 
-interface HeaderProps {
+export interface HeaderProps {
   title: string;
   subtitle?: string;
   showLogout?: boolean;
   showPydianTag?: boolean;
   showBuddyTag?: boolean;
+  tagText?: string;
+  tagColor?: string;
   showBack?: boolean;
   onBack?: () => void;
 }
@@ -31,6 +33,8 @@ export const Header: React.FC<HeaderProps> = ({
   showLogout = false,
   showPydianTag,
   showBuddyTag,
+  tagText,
+  tagColor,
   showBack = false,
   onBack,
 }) => {
@@ -43,27 +47,55 @@ export const Header: React.FC<HeaderProps> = ({
   const router = useRouter();
   const { user, userType } = useAuth();
   const student = user as any;
+  const isParent = userType === 'parent';
   const isStudent =
     userType === 'student' ||
     (!userType && !student?.role?.includes('admin') && !student?.role?.includes('staff'));
+  const showActions = isStudent || isParent;
 
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    if (!isStudent) return;
+    if (!showActions) return;
     notificationService.getUnreadCount().then(setUnreadCount);
     const unsubscribe = notificationService.subscribeBadge(setUnreadCount);
     return unsubscribe;
-  }, [isStudent]);
+  }, [showActions]);
 
-  const shouldShowBuddy =
-    showBuddyTag !== undefined
-      ? showBuddyTag
-      : showPydianTag !== undefined
-      ? showPydianTag
-      : title.toLowerCase().includes('good');
+  // Determine cursive script tag text and color (e.g., "Buddy" for students, "Parent" for parents)
+  let resolvedTagText: string | null = null;
+  let resolvedTagColor = '#1E3A8A';
+
+  if (tagText !== undefined) {
+    resolvedTagText = tagText;
+    resolvedTagColor = tagColor || (isParent ? '#B47B2B' : '#1E3A8A');
+  } else if (isParent) {
+    const shouldShow =
+      showBuddyTag !== undefined
+        ? showBuddyTag
+        : showPydianTag !== undefined
+        ? showPydianTag
+        : title.toLowerCase().includes('good');
+    if (shouldShow) {
+      resolvedTagText = 'Parent';
+      resolvedTagColor = tagColor || '#B47B2B';
+    }
+  } else {
+    const shouldShow =
+      showBuddyTag !== undefined
+        ? showBuddyTag
+        : showPydianTag !== undefined
+        ? showPydianTag
+        : title.toLowerCase().includes('good');
+    if (shouldShow) {
+      resolvedTagText = 'Buddy';
+      resolvedTagColor = tagColor || '#1E3A8A';
+    }
+  }
+
   const initialLetter =
-    (student?.name || student?.student_name || 'S')?.charAt(0)?.toUpperCase() || 'S';
+    (student?.student_name || student?.name || (isParent ? 'P' : 'S'))?.charAt(0)?.toUpperCase() ||
+    (isParent ? 'P' : 'S');
   const studentPhotoUri =
     student?.avatarUrl || student?.student_photo
       ? getStaticFileUrl(student.avatarUrl || student.student_photo)
@@ -103,15 +135,17 @@ export const Header: React.FC<HeaderProps> = ({
         <View style={styles.verticalDivider} />
       </View>
 
-      {/* Middle: Title & Buddy in Cursive */}
+      {/* Middle: Title & Cursive Tag (Buddy / Parent) */}
       <View style={styles.titleContainer}>
         <View style={styles.titleRow}>
           <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
             {title}
           </Text>
-          {shouldShowBuddy && (
-            <Text style={styles.buddyCursiveText}>Buddy</Text>
-          )}
+          {resolvedTagText ? (
+            <Text style={[styles.cursiveText, { color: resolvedTagColor }]}>
+              {resolvedTagText}
+            </Text>
+          ) : null}
         </View>
         {subtitle && (
           <Text style={styles.subtitle} numberOfLines={1} ellipsizeMode="tail">
@@ -122,7 +156,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right: Notifications Bell + Profile Avatar Button */}
       <View style={styles.actions}>
-        {isStudent && (
+        {showActions && (
           <>
             {/* Notification Bell */}
             <TouchableOpacity
@@ -143,7 +177,7 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </TouchableOpacity>
 
-            {/* Profile Avatar Button (Navigates directly to profile, replacing sidebar) */}
+            {/* Profile Avatar Button */}
             <TouchableOpacity
               onPress={() => router.push('/(tabs)/profile' as any)}
               style={styles.profileBtn}
@@ -213,7 +247,7 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     letterSpacing: -0.2,
   },
-  buddyCursiveText: {
+  cursiveText: {
     fontFamily: 'DancingScript-Bold',
     fontSize: 20,
     color: '#1E3A8A',

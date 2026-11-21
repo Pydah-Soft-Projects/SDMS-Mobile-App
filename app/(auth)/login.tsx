@@ -55,6 +55,7 @@ export default function LoginScreen() {
   const [parentLoading, setParentLoading] = useState(false);
   const [selectionToken, setSelectionToken] = useState<string | null>(null);
   const [linkedStudents, setLinkedStudents] = useState<any[]>([]);
+  const [selectingStudentId, setSelectingStudentId] = useState<number | string | null>(null);
 
   // Automatically scroll up when keyboard opens while password field is focused
   useEffect(() => {
@@ -186,6 +187,7 @@ export default function LoginScreen() {
   const handleSelectStudent = async (studentId: number | string) => {
     if (!selectionToken) return;
     setError(null);
+    setSelectingStudentId(studentId);
     setParentLoading(true);
 
     try {
@@ -199,6 +201,7 @@ export default function LoginScreen() {
       setError(err.response?.data?.message || 'Failed to sign in for selected ward.');
     } finally {
       setParentLoading(false);
+      setSelectingStudentId(null);
     }
   };
 
@@ -468,7 +471,11 @@ export default function LoginScreen() {
                               {s.course} • {s.branch}
                             </Text>
                           </View>
-                          <ChevronRight size={18} color="#64748B" />
+                          {selectingStudentId === s.id && parentLoading ? (
+                            <ActivityIndicator size="small" color="#0047BA" />
+                          ) : (
+                            <ChevronRight size={18} color="#64748B" />
+                          )}
                         </TouchableOpacity>
                       ))}
                     </View>

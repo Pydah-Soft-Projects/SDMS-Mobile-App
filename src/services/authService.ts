@@ -1,6 +1,6 @@
 import api from '../config/api';
 import logger from '../utils/logger';
-import { StudentUser, StaffUser, UserRole } from '../types';
+import { StudentUser, StaffUser, ParentUser, UserRole } from '../types';
 
 export interface StudentLoginPayload {
   rollNumber?: string;
@@ -20,8 +20,24 @@ export interface LoginResponse {
   success: boolean;
   token: string;
   userType: UserRole;
-  user: StudentUser | StaffUser;
+  user: StudentUser | StaffUser | ParentUser;
   message?: string;
+}
+
+export interface ParentOtpSendResponse {
+  success: boolean;
+  message?: string;
+  studentCount?: number;
+}
+
+export interface ParentVerifyResponse {
+  success: boolean;
+  message?: string;
+  requiresSelection?: boolean;
+  token?: string;
+  user?: ParentUser;
+  selectionToken?: string;
+  students?: any[];
 }
 
 export const authService = {
@@ -198,6 +214,45 @@ export const authService = {
       username: rollNumberOrEmail,
       identifier: rollNumberOrEmail,
     });
+    return response.data;
+  },
+
+  /**
+   * Send OTP for Parent Portal Login
+   * Endpoint: POST /api/auth/parent/otp/send
+   */
+  async sendParentOtp(mobileNumber: string): Promise<ParentOtpSendResponse> {
+    logger.info('AUTH', `Sending parent OTP to mobile: ${mobileNumber}`);
+    const response = await api.post('/auth/parent/otp/send', {
+      mobileNumber: mobileNumber.trim(),
+    });
+    return response.data;
+  },
+
+  /**
+   * Verify OTP for Parent Portal Login
+   * Endpoint: POST /api/auth/parent/otp/verify
+   */
+  async verifyParentOtp(mobileNumber: string, otp: string): Promise<ParentVerifyResponse> {
+    logger.info('AUTH', `Verifying parent OTP for mobile: ${mobileNumber}`);
+    const response = await api.post('/auth/parent/otp/verify', {
+      mobileNumber: mobileNumber.trim(),
+      otp: otp.trim(),
+    });
+    return response.data;
+  },
+
+  /**
+   * Select Student for Multi-child Parent Portal Login
+   * Endpoint: POST /api/auth/parent/select-student
+   */
+  async selectParentStudent(selectionToken: string, studentId: number | string): Promise<{ success: boolean; token: string; user: ParentUser; message?: string }> {
+    logger.info('AUTH', `Selecting student ID ${studentId} for parent`);
+    const response = await api.post(
+      '/auth/parent/select-student',
+      { studentId },
+      { headers: { Authorization: `Bearer ${selectionToken}` } }
+    );
     return response.data;
   },
 };

@@ -54,6 +54,7 @@ import {
 import { useAuth } from '../../src/context/AuthContext';
 import Header from '../../src/components/Header';
 import StaffDashboard from '../../src/components/StaffDashboard';
+import ParentDashboardView from '../../src/components/ParentDashboardView';
 import { DashboardSkeleton } from '../../src/components/SkeletonLoader';
 import studentService from '../../src/services/studentService';
 import { StudentUser, StudentAttendanceData, StudentFeeDetails, Announcement } from '../../src/types';
@@ -136,6 +137,11 @@ export default function DashboardScreen() {
   // If staff or admin user, render Staff Management Dashboard
   if (userType === 'staff' || userType === 'admin') {
     return <StaffDashboard />;
+  }
+
+  // If parent user, render Parent Portal Dashboard
+  if (userType === 'parent') {
+    return <ParentDashboardView />;
   }
 
   const [loading, setLoading] = useState(true);

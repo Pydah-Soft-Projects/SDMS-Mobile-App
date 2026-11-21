@@ -27,6 +27,7 @@ import Header from '../../src/components/Header';
 import StaffAttendanceView from '../../src/components/StaffAttendanceView';
 import { AttendanceSkeleton } from '../../src/components/SkeletonLoader';
 import studentService from '../../src/services/studentService';
+import parentService from '../../src/services/parentService';
 import { StudentAttendanceData, AttendanceTotals } from '../../src/types';
 import logger from '../../src/utils/logger';
 
@@ -56,7 +57,10 @@ export default function AttendanceScreen() {
   const fetchAttendance = async () => {
     logger.info('ATTENDANCE_SCREEN', 'Fetching live attendance records');
     try {
-      const data = await studentService.getAttendance();
+      const data =
+        userType === 'parent'
+          ? await parentService.getAttendance()
+          : await studentService.getAttendance();
       setAttendanceData(data);
     } catch (e: any) {
       logger.error('ATTENDANCE_SCREEN', 'Failed to fetch attendance', e.message);

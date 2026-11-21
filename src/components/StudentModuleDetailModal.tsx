@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -54,6 +54,7 @@ import StudentLibraryView from './StudentLibraryView';
 import StudentFeesView from './StudentFeesView';
 import StudentFeedbackView from './StudentFeedbackView';
 import StudentTransportView from './StudentTransportView';
+import StudentServicesView from './StudentServicesView';
 import { ModuleContentSkeleton } from './SkeletonLoader';
 import logger from '../utils/logger';
 import studentService from '../services/studentService';
@@ -401,14 +402,12 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
     }
   };
 
-  useEffect(() => {
+  const fetchModuleData = useCallback(async () => {
     if (!module) {
       setData(null);
       return;
     }
-
-    const fetchModuleData = async () => {
-      setLoading(true);
+    setLoading(true);
       try {
         if (module.id === 'timetable') {
           const branchCode = student?.branch || student?.branch_name;
@@ -580,10 +579,11 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
       } finally {
         setLoading(false);
       }
-    };
+  }, [module?.id, admissionNo, student]);
 
+  useEffect(() => {
     fetchModuleData();
-  }, [module?.id, admissionNo]);
+  }, [fetchModuleData]);
 
   useEffect(() => {
     if (module?.id === 'clubs' && initialClubId && Array.isArray(data) && data.length > 0) {
@@ -850,67 +850,12 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
 
             {/* 5. Student Services & Certificate Requests */}
             {module.id === 'services' && (
-              <View style={styles.section}>
-                {data?.requests && Array.isArray(data.requests) && data.requests.length > 0 ? (
-                  <>
-                    <Text style={styles.subSectionLabel}>Submitted Service Requests</Text>
-                    {data.requests.map((item: any, idx: number) => (
-                      <View key={item.id || idx} style={styles.card}>
-                        <View style={styles.cardHeader}>
-                          <Text style={styles.cardTitle}>{item.service_name || item.type || 'Certificate Request'}</Text>
-                          <View style={[styles.pillBadge, { backgroundColor: '#EFF6FF' }]}>
-                            <Text style={[styles.pillBadgeText, { color: '#1D4ED8' }]}>
-                              {(item.status || 'SUBMITTED').toUpperCase()}
-                            </Text>
-                          </View>
-                        </View>
-                        <Text style={styles.cardSub}>
-                          Requested on: {item.created_at ? new Date(item.created_at).toLocaleDateString('en-IN') : 'N/A'}
-                        </Text>
-                        {item.purpose ? <Text style={styles.descText}>Purpose: {item.purpose}</Text> : null}
-                      </View>
-                    ))}
-                  </>
-                ) : null}
-
-                {data?.availableServices && Array.isArray(data.availableServices) && data.availableServices.length > 0 ? (
-                  <>
-                    <Text style={[styles.subSectionLabel, { marginTop: 12 }]}>Available Services & Certificates</Text>
-                    {data.availableServices.map((svc: any, idx: number) => (
-                      <View key={svc.id || idx} style={styles.card}>
-                        <View style={styles.cardHeader}>
-                          <Text style={styles.cardTitle}>{svc.name || svc.title}</Text>
-                          {svc.fee ? (
-                            <Text style={styles.cardHighlight}>₹{svc.fee}</Text>
-                          ) : (
-                            <Text style={[styles.cardHighlight, { color: '#15803D' }]}>Free</Text>
-                          )}
-                        </View>
-                        <Text style={styles.cardSub}>{svc.description || 'Standard institutional certificate service.'}</Text>
-                        <TouchableOpacity
-                          style={styles.moduleActionButton}
-                          onPress={() => setSelectedService(svc)}
-                          activeOpacity={0.8}
-                        >
-                          <Text style={styles.moduleActionButtonText}>Initiate Request</Text>
-                          <ChevronRight size={16} color="#FFFFFF" />
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                  </>
-                ) : null}
-
-                {(!data?.requests || data.requests.length === 0) &&
-                (!data?.availableServices || data.availableServices.length === 0) ? (
-                  <View style={styles.emptyCard}>
-                    <FileText size={28} color="#94A3B8" />
-                    <Text style={styles.emptyTitle}>No Service Requests</Text>
-                    <Text style={styles.emptySub}>
-                      No certificate requests (Bonafide, Study, Custodian) submitted for your account.
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
+              <StudentServicesView
+                data={data}
+                student={student}
+                admissionNo={admissionNo}
+                onRefresh={fetchModuleData}
+              />
             )}
 
             {/* 6. Document Vault */}

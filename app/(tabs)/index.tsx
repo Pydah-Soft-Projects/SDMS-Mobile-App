@@ -532,11 +532,11 @@ export default function DashboardScreen() {
       },
       {
         key: 'services',
-        label: 'Services',
+        label: 'Campus Services',
         route: '/student-module/services',
         iconName: 'Sparkles',
-        iconBg: '#FAF5FF',
-        iconColor: '#7C3AED',
+        iconBg: '#EFF6FF',
+        iconColor: '#1E3A8A',
         enabled: isEnabled('services'),
       },
       {

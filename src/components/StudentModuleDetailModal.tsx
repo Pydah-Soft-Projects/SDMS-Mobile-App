@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -402,14 +402,12 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
     }
   };
 
-  useEffect(() => {
+  const fetchModuleData = useCallback(async () => {
     if (!module) {
       setData(null);
       return;
     }
-
-    const fetchModuleData = async () => {
-      setLoading(true);
+    setLoading(true);
       try {
         if (module.id === 'timetable') {
           const branchCode = student?.branch || student?.branch_name;
@@ -581,10 +579,11 @@ export const StudentModuleView: React.FC<StudentModuleViewProps> = ({
       } finally {
         setLoading(false);
       }
-    };
+  }, [module?.id, admissionNo, student]);
 
+  useEffect(() => {
     fetchModuleData();
-  }, [module?.id, admissionNo]);
+  }, [fetchModuleData]);
 
   useEffect(() => {
     if (module?.id === 'clubs' && initialClubId && Array.isArray(data) && data.length > 0) {

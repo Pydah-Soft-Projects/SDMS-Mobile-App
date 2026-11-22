@@ -37,6 +37,7 @@
       "favicon": "./assets/campo-icon.png"
     },
     "plugins": [
+      "./plugins/withHardwareFeatures",
       "expo-router",
       [
         "expo-font",

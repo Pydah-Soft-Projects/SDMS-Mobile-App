@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Campo Buddy",
-    "slug": "pydah-student-app",
+    "slug": "campobuddy",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

@@ -157,8 +157,8 @@ export const SDMS_STUDENT_SECTIONS: {
       {
         id: 'services',
         layoutKey: 'services',
-        title: 'Services',
-        subtitle: 'Bonafide, Custodian & Slips',
+        title: 'Campus Services',
+        subtitle: 'Request official certificates, applications & track status in real-time',
         category: 'finance',
         iconName: 'FileText',
       },

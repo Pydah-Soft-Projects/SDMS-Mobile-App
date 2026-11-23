@@ -475,7 +475,22 @@ export const ParentDashboardView: React.FC = () => {
             </View>
             <View style={styles.announcementsList}>
               {announcements.slice(0, 3).map((item, idx) => (
-                <View key={item.id || idx} style={styles.announcementCard}>
+                <TouchableOpacity
+                  key={item.id || idx}
+                  style={styles.announcementCard}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(tabs)/announcements',
+                      params: {
+                        tab: 'announcements',
+                        id: String(item.id || ''),
+                        type: 'announcement',
+                        _t: String(Date.now()),
+                      },
+                    } as any)
+                  }
+                  activeOpacity={0.8}
+                >
                   <View style={styles.announcementIconBox}>
                     <Megaphone size={16} color="#0047BA" />
                   </View>
@@ -487,7 +502,7 @@ export const ParentDashboardView: React.FC = () => {
                       {item.created_at ? new Date(item.created_at).toLocaleDateString('en-IN') : 'Recent Circular'}
                     </Text>
                   </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
           </View>

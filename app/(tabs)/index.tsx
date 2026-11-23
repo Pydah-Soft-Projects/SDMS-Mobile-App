@@ -925,7 +925,17 @@ export default function DashboardScreen() {
                   <TouchableOpacity
                     key={item.id}
                     style={[styles.eventCard, { width: horizontalCardWidth }]}
-                    onPress={() => router.push({ pathname: '/(tabs)/announcements', params: { tab: item.type === 'event' ? 'events' : 'announcements' } } as any)}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(tabs)/announcements',
+                        params: {
+                          tab: item.type === 'event' ? 'events' : 'announcements',
+                          id: String(item.raw?.id || item.id).replace(/^(ann-|evt-)/, ''),
+                          type: item.type,
+                          _t: String(Date.now()),
+                        },
+                      } as any)
+                    }
                     activeOpacity={0.85}
                   >
                     <View style={styles.eventCardBanner}>

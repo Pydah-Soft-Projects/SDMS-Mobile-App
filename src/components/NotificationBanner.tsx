@@ -141,7 +141,19 @@ export const NotificationBanner: React.FC = () => {
 
   const handlePress = () => {
     hideBanner();
-    router.push('/(tabs)/announcements');
+    if (alert?.id) {
+      router.push({
+        pathname: '/(tabs)/announcements',
+        params: {
+          tab: 'announcements',
+          id: String(alert.id),
+          type: 'announcement',
+          _t: String(Date.now()),
+        },
+      } as any);
+    } else {
+      router.push('/(tabs)/announcements');
+    }
   };
 
   return (

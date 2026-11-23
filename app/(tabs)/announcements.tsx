@@ -46,7 +46,7 @@ const SafeAnnouncementImage: React.FC<{
   uri?: string | null;
   style: any;
   resizeMode?: 'cover' | 'contain' | 'stretch' | 'center';
-}> = ({ uri, style, resizeMode = 'cover' }) => {
+}> = React.memo(({ uri, style, resizeMode = 'cover' }) => {
   const [loadError, setLoadError] = useState(false);
 
   if (!uri || loadError) {
@@ -61,7 +61,7 @@ const SafeAnnouncementImage: React.FC<{
       onError={() => setLoadError(true)}
     />
   );
-};
+});
 
 export default function AnnouncementsScreen() {
   const insets = useSafeAreaInsets();
@@ -69,11 +69,17 @@ export default function AnnouncementsScreen() {
   const isStaff = userType === 'staff' || userType === 'admin';
   const params = useLocalSearchParams<{ tab?: string; id?: string; type?: string; _t?: string }>();
   const openedParamRef = useRef<string | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
 
   // Active Tab: 'announcements' | 'events' | 'polls'
   const [activeTab, setActiveTab] = useState<'announcements' | 'events' | 'polls'>(
     params.tab === 'polls' ? 'polls' : params.tab === 'events' ? 'events' : 'announcements'
   );
+
+  const handleTabChange = useCallback((newTab: 'announcements' | 'events' | 'polls') => {
+    setActiveTab(newTab);
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, []);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -290,8 +296,9 @@ export default function AnnouncementsScreen() {
         <View style={styles.tabBar}>
           <TouchableOpacity
             style={[styles.tabButton, activeTab === 'announcements' && styles.tabButtonActive]}
-            onPress={() => setActiveTab('announcements')}
-            activeOpacity={0.8}
+            onPress={() => handleTabChange('announcements')}
+            activeOpacity={0.7}
+            delayPressIn={0}
           >
             <Bell size={14} color={activeTab === 'announcements' ? '#1E3A8A' : '#64748B'} />
             <Text style={[styles.tabText, activeTab === 'announcements' && styles.tabTextActive]} numberOfLines={1}>
@@ -301,8 +308,9 @@ export default function AnnouncementsScreen() {
 
           <TouchableOpacity
             style={[styles.tabButton, activeTab === 'events' && styles.tabButtonActive]}
-            onPress={() => setActiveTab('events')}
-            activeOpacity={0.8}
+            onPress={() => handleTabChange('events')}
+            activeOpacity={0.7}
+            delayPressIn={0}
           >
             <CalendarDays size={14} color={activeTab === 'events' ? '#1E3A8A' : '#64748B'} />
             <Text style={[styles.tabText, activeTab === 'events' && styles.tabTextActive]} numberOfLines={1}>
@@ -312,8 +320,9 @@ export default function AnnouncementsScreen() {
 
           <TouchableOpacity
             style={[styles.tabButton, activeTab === 'polls' && styles.tabButtonActive]}
-            onPress={() => setActiveTab('polls')}
-            activeOpacity={0.8}
+            onPress={() => handleTabChange('polls')}
+            activeOpacity={0.7}
+            delayPressIn={0}
           >
             <Vote size={14} color={activeTab === 'polls' ? '#1E3A8A' : '#64748B'} />
             <Text style={[styles.tabText, activeTab === 'polls' && styles.tabTextActive]} numberOfLines={1}>
@@ -330,10 +339,10 @@ export default function AnnouncementsScreen() {
         <AnnouncementsSkeleton />
       ) : (
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) + 84 }]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           showsVerticalScrollIndicator={false}
-          removeClippedSubviews={Platform.OS === 'android'}
           scrollEventThrottle={16}
           overScrollMode="never"
         >

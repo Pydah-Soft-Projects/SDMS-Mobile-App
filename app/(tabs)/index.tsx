@@ -75,7 +75,7 @@ const SafeEventImage: React.FC<{ uri?: string | null; style: any }> = ({ uri, st
     <Image
       source={{ uri: getStaticFileUrl(uri) }}
       style={style}
-      resizeMode="cover"
+      resizeMode="contain"
       onError={() => setLoadError(true)}
     />
   );
@@ -1570,19 +1570,18 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   eventCardBanner: {
-    height: 105,
-    backgroundColor: '#312E81',
+    width: '100%',
+    height: 110,
+    backgroundColor: '#0F172A',
     position: 'relative',
     overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 4,
   },
   eventCardImage: {
     width: '100%',
     height: '100%',
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
   },
   eventCardPlaceholder: {
     width: '100%',

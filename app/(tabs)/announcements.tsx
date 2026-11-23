@@ -480,6 +480,7 @@ export default function AnnouncementsScreen() {
                         <SafeAnnouncementImage
                           uri={event.image_url || event.poster_url}
                           style={styles.cardImage}
+                          resizeMode="contain"
                         />
                         <View style={styles.imageTapHint}>
                           <Maximize2 size={11} color="#FFFFFF" />
@@ -1226,6 +1227,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginVertical: 10,
     backgroundColor: '#0F172A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 4,
   },
   cardImage: {
     width: '100%',

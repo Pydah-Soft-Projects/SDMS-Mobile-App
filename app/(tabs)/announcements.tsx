@@ -1,5 +1,5 @@
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   View,
@@ -67,7 +67,8 @@ export default function AnnouncementsScreen() {
   const insets = useSafeAreaInsets();
   const { userType } = useAuth();
   const isStaff = userType === 'staff' || userType === 'admin';
-  const params = useLocalSearchParams<{ tab?: string }>();
+  const params = useLocalSearchParams<{ tab?: string; id?: string; type?: string; _t?: string }>();
+  const openedParamRef = useRef<string | null>(null);
 
   // Active Tab: 'announcements' | 'events' | 'polls'
   const [activeTab, setActiveTab] = useState<'announcements' | 'events' | 'polls'>(
@@ -102,6 +103,32 @@ export default function AnnouncementsScreen() {
       setActiveTab('announcements');
     }
   }, [params.tab]);
+
+  // Automatically open detail modal when params.id is provided
+  useEffect(() => {
+    if (!params.id) return;
+    const navKey = `${params.id}-${params._t || ''}`;
+    if (openedParamRef.current === navKey) return;
+
+    const targetId = String(params.id).replace(/^(ann-|evt-)/, '');
+    const targetType = params.type || (params.tab === 'events' ? 'event' : 'announcement');
+
+    if (targetType === 'event') {
+      const match = events.find((e) => String(e.id) === targetId) || announcements.find((a) => String(a.id) === targetId);
+      if (match) {
+        openedParamRef.current = navKey;
+        const resolvedType = events.some((e) => String(e.id) === targetId) ? 'event' : 'announcement';
+        setSelectedDetail({ type: resolvedType, data: match });
+      }
+    } else {
+      const match = announcements.find((a) => String(a.id) === targetId) || events.find((e) => String(e.id) === targetId);
+      if (match) {
+        openedParamRef.current = navKey;
+        const resolvedType = announcements.some((a) => String(a.id) === targetId) ? 'announcement' : 'event';
+        setSelectedDetail({ type: resolvedType, data: match });
+      }
+    }
+  }, [params.id, params.type, params.tab, params._t, announcements, events]);
 
   const sortEventsNewestFirst = (list: any[]) => {
     return (list || []).slice().sort((a, b) => {
